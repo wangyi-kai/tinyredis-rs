@@ -8,8 +8,12 @@ pub enum HashError {
     DictEntryDup,
     #[error("Dict Is Empty")]
     DictEmpty,
-    #[error("Hash Key Is Not Exist")]
-    DictNoKey,
-    #[error("Rehash Error!")]
-    RehashErr,
+    #[error("Key: {0} Is Not Exist")]
+    DictNoKey(String),
+    #[error("Rehash Error: {0}!")]
+    RehashErr(String),
+    #[error("Expand Error: {0}!")]
+    ExpandErr(String),
+    #[error("Dict Is Rehashing")]
+    IsRehashing,
 }

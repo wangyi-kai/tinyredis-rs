@@ -3,9 +3,11 @@ use std::ptr::NonNull;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use std::mem;
 use std::ops::Deref;
 
-use crate::hash::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
+use crate::hash::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL, LONG_MAX};
+use crate::hash::DictResizeFlag::DictResizeForbid;
 use crate::hash::error::HashError;
 use crate::hash::hash::{sys_hash};
 
@@ -25,6 +27,18 @@ fn dict_size_mask(exp: i32) -> u64 {
     } else {
         dict_size(exp) - 1
     }
+}
+
+fn next_exp(size: usize) -> i32 {
+    if size <= DICT_HT_INITIAL_SIZE {
+        return DICT_HT_INITIAL_EXP as i32;
+    }
+    let long_bits = size_of::<usize>() * 8;
+    if size >= LONG_MAX as usize {
+        return (long_bits - 1) as i32;
+    }
+    let leading_zeros = (size - 1).leading_zeros() as usize;
+    (long_bits - leading_zeros) as i32
 }
 
 #[derive(Debug)]
@@ -101,17 +115,17 @@ where K: Default + Clone + Eq + Hash,
     }
 
     #[inline]
-    pub fn dict_is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.key == K::default() && self.val == V::default()
     }
 
     #[inline]
-    pub fn dict_get_key(&self) -> K {
+    pub fn get_key(&self) -> K {
         self.key.clone()
     }
 
     #[inline]
-    pub fn dict_get_val(&self) -> V {
+    pub fn get_val(&self) -> V {
         self.val.clone()
     }
 
@@ -126,17 +140,29 @@ where K: Default + Clone + Eq + Hash,
     }
 
     #[inline]
-    pub fn dict_get_next(&self) -> Option<DictEntry<K, V>> {
+    pub fn get_next_ref(&self) -> Option<&mut DictEntry<K, V>> {
         unsafe {
-            self.next.map(|next| (*next.as_ptr()).clone())
+            self.next.map(|next| &mut (*next.as_ptr()))
         }
     }
 
     #[inline]
-    pub fn set_next(&mut self, next: &mut DictEntry<K, V>) {
+    pub fn get_next(&self) -> Option<DictEntry<K, V>> {
         unsafe {
-            self.next = Some(NonNull::new_unchecked(next as *mut DictEntry<K, V>));
+            self.next.map(|mut entry| (*entry.as_ptr()).clone())
         }
+    }
+
+    #[inline]
+    pub fn set_next(&mut self, next: &DictEntry<K, V>) {
+        unsafe {
+            self.next = Some(NonNull::new_unchecked(Box::into_raw(Box::new(next.clone()))))
+        }
+    }
+
+    #[inline]
+    fn set_next_none(&mut self) {
+        self.next = None
     }
 }
 
@@ -158,33 +184,48 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl <K, V> Dict<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where K: Default + Clone + Eq + Hash + Debug + Display,
+      V: Default + PartialEq + Clone + Debug
 {
+    pub fn new() -> Self {
+        Self {
+            ht_table: vec![vec![DictEntry::default(); DICT_HT_INITIAL_SIZE], vec![]],
+            ht_used: vec![0; 2],
+            rehash_idx: -1,
+            pause_rehash: 0,
+            ht_size_exp: vec![DICT_HT_INITIAL_EXP as i32; 2],
+        }
+    }
+
     pub unsafe fn dict_add(&mut self, key: K, val: V) -> Result<(), HashError> {
         let hash = sys_hash(&key);
-        let mut idx = hash & dict_size_mask(*self.ht_size_exp.get(0).unwrap());
+        let mut idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked(0));
 
-        let mut tail = DictEntry::default();
+        if self.dict_is_rehashing() {
+            if (idx as i64) >= self.rehash_idx && *self.ht_table.get_unchecked(0).get_unchecked(idx as usize) != DictEntry::default() {
+                self.rehash_at_index(idx as usize);
+            } else {
+                self.rehash(1)?;
+            }
+        }
+        self.expand_if_needed()?;
 
         for table in 0..2 {
             if table == 0 && (idx as i64) < self.rehash_idx {
                 continue;
             }
             idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked(table));
-            let head = self.ht_table.get_unchecked_mut(table).get_unchecked_mut(idx as usize);
-            let mut tail = &DictEntry::default();
+            let mut head= self.ht_table.get_unchecked(table).get_unchecked(idx as usize);
             loop {
-                if *head == DictEntry::default() {
+                if *head == DictEntry::default(){
                     break;
                 }
-                let he_key = head.dict_get_key();
+                let he_key = head.get_key();
                 if he_key == key {
                     return Err(HashError::DictEntryDup);
                 }
-                tail = head;
-                if let Some(next) = head.dict_get_next() {
-                    *head = next;
+                if let Some(next) = head.get_next_ref() {
+                    head = next;
                 } else {
                     break;
                 }
@@ -193,110 +234,98 @@ where K: Default + Clone + Eq + Hash,
         }
 
         let ht_idx: usize = if self.dict_is_rehashing() { 1 } else { 0 };
-        
-        if tail == DictEntry::default() {
-            *self.ht_table.get_unchecked_mut(ht_idx).get_unchecked_mut(idx as usize) = DictEntry::new(key, val);
+        let bucket = self.ht_table.get_unchecked_mut(ht_idx).get_unchecked_mut(idx as usize);
+        let mut entry = DictEntry::new(key, val);
+        if *bucket == DictEntry::default() {
+            entry.set_next_none();
         } else {
-            tail.push_back(DictEntry::new(key, val));
+            entry.set_next(bucket);
         }
-        *self.ht_used.get_mut(ht_idx).unwrap() += 1;
+        *bucket = entry;
+        *self.ht_used.get_unchecked_mut(ht_idx) += 1;
 
         Ok(())
     }
 
-    pub unsafe fn dict_find(&mut self, key: K) -> Result<DictEntry<K, V>, HashError> {
+    pub unsafe fn dict_find(&mut self, key: &K) -> Option<&DictEntry<K, V>> {
         if self.dict_size() == 0 {
-            return Err(HashError::DictEmpty);
+            return None;
         }
 
-        let hash = sys_hash(key.clone());
-        let idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked_mut(0));
+        let hash = sys_hash(key);
+        let mut idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked(0));
         for table in 0..2 {
             if table == 0 && (idx as i64) < self.rehash_idx {
                 continue;
             }
-            let idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked_mut(table));
-            let head = self.ht_table.get_unchecked_mut(table).get_unchecked_mut(idx as usize);
+            idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked(table));
+            let mut head = self.ht_table.get_unchecked(table).get_unchecked(idx as usize);
             loop {
                 if *head == DictEntry::default() {
                     break;
                 }
-                let he_key = head.dict_get_key();
-                if he_key == key {
-                    return Ok(head.clone());
+                let he_key = head.get_key();
+                if he_key == *key {
+                    return Some(head);
                 }
-                if let Some(next) = head.dict_get_next() {
-                    *head = next;
+                if let Some(next) = head.get_next_ref() {
+                    head = next;
                 } else {
                     break;
                 }
             }
             if !self.dict_is_rehashing() { break; }
         }
-        Err(HashError::DictNoKey)
-    }
-
-    pub unsafe fn dict_get_val(&mut self, key: &K) -> Option<V> {
-        let hash = sys_hash(key.clone());
-        let idx = hash & dict_size_mask(*self.ht_size_exp.get(0).unwrap());
-        let table: usize = if self.dict_is_rehashing() { 1 } else { 0 };
-        let head = self.ht_table.get_mut(table).unwrap().get_mut(idx as usize).unwrap();
-
-        loop {
-            if *head == DictEntry::default() {
-                break;
-            }
-            let he_key = head.dict_get_key();
-            if he_key == *key {
-                let val = head.dict_get_val();
-                return Some(val);
-            }
-            if let Some(next) = head.dict_get_next() {
-                *head = next;
-            } else {
-                break;
-            }
-        }
         None
     }
 
-    pub unsafe fn dict_delete(&mut self, key: K) -> Result<DictEntry<K, V>, HashError> {
+    pub unsafe fn dict_delete(&mut self, key: K) -> Result<(), HashError> {
         let hash = sys_hash(&key);
-        let mut idx = hash & dict_size_mask(*self.ht_size_exp.get(0).unwrap());
+        let mut idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked(0));
 
         for table in 0..2 {
             if table == 0 && (idx as i64) < self.rehash_idx {
                 continue;
             }
-            idx = hash & dict_size_mask(*self.ht_size_exp.get(table).unwrap());
-            let mut he = std::mem::replace(self.ht_table.get_unchecked_mut(table).get_unchecked_mut(idx as usize), DictEntry::default());
-            let mut prev = DictEntry::default();
+            idx = hash & dict_size_mask(*self.ht_size_exp.get_unchecked(table));
+            let mut he = self.ht_table.get_unchecked_mut(table).get_unchecked_mut(idx as usize);
+            let mut prev = &mut DictEntry::default();
             loop {
-                if he == DictEntry::default() {
+                if *he == DictEntry::default() {
                     break;
                 }
-                let he_key = he.dict_get_key();
-                let next = he.dict_get_next();
+                let he_key = he.get_key();
                 if he_key == key {
-                    if let Some(mut next) = next {
-                        if !prev.dict_is_empty() {
-                            prev.set_next(&mut next);
+                    if let Some(next) = he.get_next() {
+                        if !prev.is_empty() {
+                            prev.set_next(&next);
                         } else {
-                            *self.ht_table.get_unchecked_mut(table).get_unchecked_mut(idx as usize) = next;
+                            *he = next;
+                        }
+                    } else {
+                        if !prev.is_empty() {
+                            prev.set_next_none();
+                        } else {
+                            //println!("删除key: {}, next: None", key);
+                            *he = DictEntry::default();
                         }
                     }
+                    //println!("prev: {:?}, cur: {:?}", prev, he);
                     *self.ht_used.get_unchecked_mut(table) -= 1;
-                    return Ok(he);
+                    return Ok(());
                 }
-                prev = std::mem::replace(&mut he, DictEntry::default());
-                if let Some(next) = next {
+
+                //prev = he;
+                if let Some(next) = he.get_next_ref() {
                     he = next;
                 } else {
                     break;
                 }
+                //println!("更新后prev: {:?}, cur: {:?}", prev, he);
             }
+            if !self.dict_is_rehashing() { break; }
         }
-        Err(HashError::DictNoKey)
+        Err(HashError::DictNoKey(key.to_string()))
     }
 
     pub unsafe fn dict_get_table(&mut self) -> &Vec<DictEntry<K, V>> {
@@ -304,25 +333,26 @@ where K: Default + Clone + Eq + Hash,
     }
 
     pub unsafe fn rehash_at_index(&mut self, idx: usize) {
-        let mut cur = std::mem::replace(self.ht_table.get_unchecked_mut(0).get_unchecked_mut(idx), DictEntry::default());
+        let mut cur = mem::replace(self.ht_table.get_unchecked_mut(0).get_unchecked_mut(idx), DictEntry::default());
         loop {
             if cur == DictEntry::default() {
                 break;
             }
-            let next = cur.dict_get_next();
-            let key = cur.dict_get_key();
+            let next = cur.get_next();
+            let key = cur.get_key();
             let mut idx = 0;
             if *self.ht_size_exp.get_unchecked(1) > *self.ht_size_exp.get_unchecked(0)
             {
                 idx = sys_hash(&key) & dict_size_mask(*self.ht_size_exp.get_unchecked(1));
             }
-            let mut target_entry = self.ht_table.get_unchecked_mut(1).get_unchecked_mut(idx as usize);
-            cur.set_next(std::mem::replace(&mut target_entry, &mut DictEntry::default()));
+            let target_entry = self.ht_table.get_unchecked_mut(1).get_unchecked_mut(idx as usize);
+            //cur.set_next(mem::replace(&mut target_entry, &mut DictEntry::default()));
+            cur.set_next(target_entry);
             *self.ht_table.get_unchecked_mut(1).get_unchecked_mut(idx as usize) = cur;
             *self.ht_used.get_unchecked_mut(0) -= 1;
             *self.ht_used.get_unchecked_mut(1) += 1;
             if let Some(next_entry) = next {
-                cur = next_entry;
+                cur = next_entry.clone();
             } else {
                 break;
             }
@@ -342,48 +372,83 @@ where K: Default + Clone + Eq + Hash,
         true
     }
 
-    pub unsafe fn rehash(&mut self, mut n: usize) -> Result<bool, HashError> {
+    pub unsafe fn rehash(&mut self, mut n: usize) -> Result<(), HashError> {
         let mut empty_visits = n * 10;
-        if DICT_CAN_RESIZE == DictResizeFlag::DictResizeEnable || !self.dict_is_rehashing() {
-            return Err(HashError::RehashErr);
+        if DICT_CAN_RESIZE == DictResizeForbid || !self.dict_is_rehashing() {
+            return Err(HashError::RehashErr("rehash forbid or is rehashing".to_string()));
         }
         let s0 = dict_size(*self.ht_size_exp.get(0).unwrap());
         let s1 = dict_size(*self.ht_size_exp.get(1).unwrap());
         if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0) || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1)) {
-            return Err(HashError::RehashErr);
+            return Err(HashError::RehashErr("rehash avoid".to_string()));
         }
+        println!("s0: {}, s1: {}", s0, s1);
 
-        while n != 0 || *self.ht_used.get(0).unwrap() != 0 {
+        loop {
+            if n == 0 || *self.ht_used.get_unchecked(0) == 0 {
+                break;
+            }
             assert!(dict_size(*self.ht_size_exp.get_unchecked(0)) as i64 > self.rehash_idx);
-            while *self.ht_table.get_unchecked(0).get(self.rehash_idx as usize).unwrap() == DictEntry::default() {
+            loop {
+                if *self.ht_table.get_unchecked(0).get_unchecked(self.rehash_idx as usize) != DictEntry::default() {
+                    break;
+                }
                 self.rehash_idx += 1;
                 empty_visits -= 1;
                 if empty_visits == 0 {
-                    return Ok(true);
+                    return Ok(());
                 }
             }
             self.rehash_at_index(self.rehash_idx as usize);
             self.rehash_idx += 1;
             n -= 1;
         }
-        Ok(true)
+        self.check_rehashing_complete();
+        Ok(())
     }
+
+    unsafe fn resize(&mut self, size: usize) -> Result<(), HashError> {
+        assert!(!self.dict_is_rehashing());
+        let new_ht_size_exp = next_exp(size);
+        let new_ht_size = dict_size(new_ht_size_exp);
+
+        if new_ht_size_exp == (*self.ht_used.get_unchecked_mut(0) as i32) {
+            return Err(HashError::RehashErr(format!("old hash size: {} is equal to new hash size:{}", *self.ht_used.get_unchecked_mut(0), new_ht_size_exp)));
+        }
+        let new_ht_table = vec![DictEntry::default(); new_ht_size as usize];
+        *self.ht_size_exp.get_unchecked_mut(1) = new_ht_size_exp;
+        *self.ht_used.get_unchecked_mut(1) = 0;
+        *self.ht_table.get_unchecked_mut(1) = new_ht_table;
+        self.rehash_idx = 0;
+
+        Ok(())
+    }
+
+    unsafe fn expand(&mut self, size: usize) -> Result<(), HashError> {
+        if self.dict_is_rehashing() || *self.ht_used.get_unchecked(0) > (size as u32) || dict_size(*self.ht_size_exp.get_unchecked(0)) >= (size as u64) {
+            return Err(HashError::ExpandErr("size is invalid".to_string()));
+        }
+        self.resize(size)
+    }
+
+    unsafe fn expand_if_needed(&mut self) -> Result<(), HashError> {
+        if self.dict_is_rehashing() {
+            return Ok(());
+        }
+
+        let ht_used = *self.ht_used.get_unchecked(0) as u64;
+        if DICT_CAN_RESIZE == DictResizeFlag::DictResizeEnable && ht_used >= dict_size(*self.ht_size_exp.get_unchecked(0)) || (DICT_CAN_RESIZE != DictResizeForbid && ht_used >= DICT_FORCE_RESIZE_RATIO * dict_size(*self.ht_size_exp.get_unchecked(0))) {
+            self.expand((ht_used + 1) as usize)?;
+        }
+        Ok(())
+    }
+
 }
 
 impl <K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub fn new() -> Self {
-        Self {
-            ht_table: vec![vec![DictEntry::default(); DICT_HT_INITIAL_SIZE]; 2],
-            ht_used: vec![0; 2],
-            rehash_idx: -1,
-            pause_rehash: 0,
-            ht_size_exp: vec![DICT_HT_INITIAL_EXP as i32; 2],
-        }
-    }
-
     #[inline]
     pub unsafe fn reset(&mut self, table: usize) {
         *self.ht_table.get_unchecked_mut(table) = vec![];
@@ -437,28 +502,31 @@ where K: Default + Clone + Eq + Hash,
 
 #[cfg(test)]
 mod test {
+    use std::fmt::format;
     use super::*;
     #[test]
     fn dict_insert()  -> Result<(), HashError>{
         unsafe {
-            let mut dict = Dict::new();
-            dict.dict_add("hello", "world").unwrap();
-            dict.dict_add("hello1", "world").unwrap();
-            if let Ok(ret) = dict.dict_find("hello") {
-                let v = ret.dict_get_val();
-                println!("val: {}", v);
-                let val = dict.dict_get_val(&"hello");
-                assert_eq!("world", v);
-                assert_eq!(Some("world"), val);
+            let mut dict: Dict<String, String>= Dict::new();
+            let num = 500;
+
+            for i in 0..num {
+                let key = format!("key_{}", i.to_string());
+                let value = format!("val_{}", i.to_string());
+                let _ = dict.dict_add(key, value)?;
             }
-            let res = dict.dict_delete("hello")?;
-            println!("Dict delete: {:?}", res);
-            match dict.dict_find("hello") {
-                Ok(res) => {
-                    return Ok(())
-                }
-                Err(e) => {
-                    println!("Error：{}", e);
+            //dict.dict_delete(format!("key_{}", 2))?;
+
+            for i in 0..num {
+                let key = format!("key_{}", i.to_string());
+                let entry = dict.dict_find(&key);
+                match entry {
+                    Some(val) => {
+                        println!("找到要查找key: {}, entry: {:?}", key, val);
+                    }
+                    None => {
+                        println!("没有找到key: {}", key);
+                    }
                 }
             }
         }
