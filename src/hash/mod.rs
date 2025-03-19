@@ -2,6 +2,7 @@ pub mod dict;
 pub mod error;
 pub mod hash;
 mod hash_iter;
+mod test;
 
 const DICT_HT_INITIAL_EXP: usize = 2;
 const DICT_HT_INITIAL_SIZE: usize = 1 << DICT_HT_INITIAL_EXP;

@@ -12,7 +12,7 @@ use crate::hash::error::HashError;
 use crate::hash::hash::{sys_hash};
 
 #[inline]
-fn dict_size(exp: i32) -> u64 {
+pub fn dict_size(exp: i32) -> u64 {
     return if exp == -1 {
         0
     } else {
@@ -21,12 +21,19 @@ fn dict_size(exp: i32) -> u64 {
 }
 
 #[inline]
-fn dict_size_mask(exp: i32) -> u64 {
+pub fn dict_size_mask(exp: i32) -> u64 {
     return if exp == -1 {
         0
     } else {
         dict_size(exp) - 1
     }
+}
+
+pub fn pause_rehash<K, V>(dict: &mut Dict<K, V>)
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
+    dict.pause_rehash += 1
 }
 
 fn next_exp(size: usize) -> i32 {
@@ -41,19 +48,19 @@ fn next_exp(size: usize) -> i32 {
     (long_bits - leading_zeros) as i32
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy)]
 pub struct DictEntry<K, V>
 where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+      V: Default + PartialEq + Clone 
 {
-    key: K,
-    val: V,
-    next: Option<NonNull<DictEntry<K, V>>>,
+    pub(crate) key: K,
+    pub(crate) val: V,
+    pub(crate) next: Option<NonNull<DictEntry<K, V>>>,
 }
 
 impl<K, V> Default for DictEntry<K, V>
 where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+      V: Default + PartialEq + Clone 
 {
     fn default() -> Self {
         Self {
@@ -66,7 +73,7 @@ where K: Default + Clone + Eq + Hash,
 
 impl <K, V> Clone for DictEntry<K, V>
 where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+      V: Default + PartialEq + Clone 
 {
     fn clone(&self) -> Self {
         Self {
@@ -88,7 +95,7 @@ where K: Default + Clone + Eq + Hash,
 
 impl <K, V> PartialEq for DictEntry<K, V>
 where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+      V: Default + PartialEq + Clone 
 {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.val == other.val
@@ -97,13 +104,21 @@ where K: Default + Clone + Eq + Hash,
 
 impl <K, V> DictEntry<K, V>
 where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+      V: Default + PartialEq + Clone 
 {
     pub fn new(key: K, val: V) -> Self {
         Self {
             key,
             val,
             next: None,
+        }
+    }
+
+    pub unsafe fn new_with_next(key: K, val: V, next: Option<NonNull<DictEntry<K, V>>>) -> Self {
+        Self {
+            key,
+            val,
+            next,
         }
     }
 
@@ -169,10 +184,10 @@ where K: Default + Clone + Eq + Hash,
 #[derive(Clone)]
 pub struct Dict<K, V>
 where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+      V: Default + PartialEq + Clone 
 {
     /// hash table
-    ht_table: Vec<Vec<DictEntry<K, V>>>,
+    pub ht_table: Vec<Vec<DictEntry<K, V>>>,
     /// hash table used
     ht_used: Vec<u32>,
     /// rehashing not in progress if rehash_idx == -1
@@ -180,12 +195,12 @@ where K: Default + Clone + Eq + Hash,
     /// If >0 rehashing is paused
     pause_rehash: u64,
     /// exponent of size. (size = 1<<exp)
-    ht_size_exp: Vec<i32>,
+    pub ht_size_exp: Vec<i32>,
 }
 
 impl <K, V> Dict<K, V>
-where K: Default + Clone + Eq + Hash + Debug + Display,
-      V: Default + PartialEq + Clone + Debug
+where K: Default + Clone + Eq + Hash + Display,
+      V: Default + PartialEq + Clone 
 {
     pub fn new() -> Self {
         Self {
@@ -203,9 +218,9 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
 
         if self.dict_is_rehashing() {
             if (idx as i64) >= self.rehash_idx && *self.ht_table.get_unchecked(0).get_unchecked(idx as usize) != DictEntry::default() {
-                self.rehash_at_index(idx as usize);
+                self.bucket_rehash(idx as usize);
             } else {
-                self.rehash(1)?;
+                self.rehash_step()?;
             }
         }
         self.expand_if_needed()?;
@@ -310,7 +325,6 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
                             *he = DictEntry::default();
                         }
                     }
-                    //println!("prev: {:?}, cur: {:?}", prev, he);
                     *self.ht_used.get_unchecked_mut(table) -= 1;
                     return Ok(());
                 }
@@ -321,15 +335,10 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
                 } else {
                     break;
                 }
-                //println!("更新后prev: {:?}, cur: {:?}", prev, he);
             }
             if !self.dict_is_rehashing() { break; }
         }
         Err(HashError::DictNoKey(key.to_string()))
-    }
-
-    pub unsafe fn dict_get_table(&mut self) -> &Vec<DictEntry<K, V>> {
-        self.ht_table.get_unchecked_mut(0)
     }
 
     pub unsafe fn rehash_at_index(&mut self, idx: usize) {
@@ -360,11 +369,29 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
         *self.ht_table.get_unchecked_mut(0).get_unchecked_mut(idx) = DictEntry::default();
     }
 
+    unsafe fn bucket_rehash(&mut self, idx: usize) -> bool {
+        if self.pause_rehash != 0 {
+            return false;
+        }
+        let s0 = dict_size(*self.ht_size_exp.get(0).unwrap());
+        let s1 = dict_size(*self.ht_size_exp.get(1).unwrap());
+        if DICT_CAN_RESIZE == DictResizeForbid || !self.dict_is_rehashing() {
+            return false;
+        }
+
+        if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0) || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1)) {
+            return false;
+        }
+        self.rehash_at_index(idx);
+        self.check_rehashing_complete();
+        true
+    }
+
     unsafe fn check_rehashing_complete(&mut self) -> bool {
         if *self.ht_used.get_unchecked(0) != 0 {
             return false;
         }
-        *self.ht_table.get_unchecked_mut(0) = std::mem::replace(&mut *self.ht_table.get_unchecked_mut(1), vec![DictEntry::default(); 0]);
+        *self.ht_table.get_unchecked_mut(0) = mem::replace(&mut *self.ht_table.get_unchecked_mut(1), vec![DictEntry::default(); 0]);
         *self.ht_used.get_unchecked_mut(0) = *self.ht_used.get_unchecked(1);
         *self.ht_size_exp.get_unchecked_mut(0) = *self.ht_size_exp.get_unchecked(1);
         self.reset(1);
@@ -372,7 +399,7 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
         true
     }
 
-    pub unsafe fn rehash(&mut self, mut n: usize) -> Result<(), HashError> {
+    pub unsafe fn rehash(&mut self, mut n: usize) -> Result<bool, HashError> {
         let mut empty_visits = n * 10;
         if DICT_CAN_RESIZE == DictResizeForbid || !self.dict_is_rehashing() {
             return Err(HashError::RehashErr("rehash forbid or is rehashing".to_string()));
@@ -382,7 +409,6 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
         if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0) || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1)) {
             return Err(HashError::RehashErr("rehash avoid".to_string()));
         }
-        println!("s0: {}, s1: {}", s0, s1);
 
         loop {
             if n == 0 || *self.ht_used.get_unchecked(0) == 0 {
@@ -396,7 +422,7 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
                 self.rehash_idx += 1;
                 empty_visits -= 1;
                 if empty_visits == 0 {
-                    return Ok(());
+                    return Ok(true);
                 }
             }
             self.rehash_at_index(self.rehash_idx as usize);
@@ -404,6 +430,13 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
             n -= 1;
         }
         self.check_rehashing_complete();
+        Ok(true)
+    }
+
+    pub unsafe fn rehash_step(&mut self) -> Result<(), HashError> {
+        if self.pause_rehash == 0 {
+            self.rehash(1)?;
+        }
         Ok(())
     }
 
@@ -431,23 +464,30 @@ where K: Default + Clone + Eq + Hash + Debug + Display,
         self.resize(size)
     }
 
-    unsafe fn expand_if_needed(&mut self) -> Result<(), HashError> {
+    unsafe fn expand_if_needed(&mut self) -> Result<bool, HashError> {
         if self.dict_is_rehashing() {
-            return Ok(());
+            return Ok(true);
         }
 
         let ht_used = *self.ht_used.get_unchecked(0) as u64;
         if DICT_CAN_RESIZE == DictResizeFlag::DictResizeEnable && ht_used >= dict_size(*self.ht_size_exp.get_unchecked(0)) || (DICT_CAN_RESIZE != DictResizeForbid && ht_used >= DICT_FORCE_RESIZE_RATIO * dict_size(*self.ht_size_exp.get_unchecked(0))) {
             self.expand((ht_used + 1) as usize)?;
         }
-        Ok(())
+        Ok(false)
     }
 
+    pub unsafe fn get_entry(&self, table: usize, index: usize) -> DictEntry<K, V> {
+        self.ht_table.get_unchecked(table).get_unchecked(index).clone()
+    }
+
+    pub fn pause_rehash(&mut self) {
+        self.pause_rehash += 1
+    }
 }
 
 impl <K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+      V: Default + PartialEq + Clone 
 {
     #[inline]
     pub unsafe fn reset(&mut self, table: usize) {
@@ -463,8 +503,13 @@ where K: Default + Clone + Eq + Hash,
     }
 
     #[inline]
-    fn dict_is_rehashing(&self) -> bool {
+    pub fn dict_is_rehashing(&self) -> bool {
         self.rehash_idx != -1
+    }
+
+    #[inline]
+    pub fn get_rehash_idx(&self) -> i64 {
+        self.rehash_idx
     }
 
     #[inline]
@@ -497,40 +542,6 @@ where K: Default + Clone + Eq + Hash,
     #[inline]
     fn dict_is_rehash_paused(&self) -> bool {
         self.pause_rehash > 0
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::fmt::format;
-    use super::*;
-    #[test]
-    fn dict_insert()  -> Result<(), HashError>{
-        unsafe {
-            let mut dict: Dict<String, String>= Dict::new();
-            let num = 500;
-
-            for i in 0..num {
-                let key = format!("key_{}", i.to_string());
-                let value = format!("val_{}", i.to_string());
-                let _ = dict.dict_add(key, value)?;
-            }
-            //dict.dict_delete(format!("key_{}", 2))?;
-
-            for i in 0..num {
-                let key = format!("key_{}", i.to_string());
-                let entry = dict.dict_find(&key);
-                match entry {
-                    Some(val) => {
-                        println!("找到要查找key: {}, entry: {:?}", key, val);
-                    }
-                    None => {
-                        println!("没有找到key: {}", key);
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 }
 
