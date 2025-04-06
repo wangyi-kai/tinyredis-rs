@@ -4,7 +4,6 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
-use std::ops::Deref;
 
 use crate::hash::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL, LONG_MAX};
 use crate::hash::DictResizeFlag::DictResizeForbid;
@@ -514,19 +513,19 @@ where K: Default + Clone + Eq + Hash,
 
     #[inline]
     fn dict_buckets(&self) -> u64 {
-        let size0 = *self.ht_size_exp.get(0).unwrap();
-        let size1 = *self.ht_size_exp.get(1).unwrap();
+        let size0 = self.ht_size_exp[0];
+        let size1 = self.ht_size_exp[1];
         dict_size(size0) + dict_size(size1)
     }
 
     #[inline]
     fn dict_size(&self) -> u32 {
-        *self.ht_used.get(0).unwrap() + *self.ht_used.get(1).unwrap()
+        self.ht_used[0] + self.ht_used[1]
     }
 
     #[inline]
     fn dict_is_empty(&self) -> bool {
-        *self.ht_used.get(0).unwrap() == 0 && *self.ht_used.get(1).unwrap() == 0
+        self.ht_used[0] == 0 && self.ht_used[1] == 0
     }
 
     #[inline]
