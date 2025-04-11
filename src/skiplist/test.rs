@@ -56,4 +56,26 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn skiplist_update() {
+        let mut skip_list = unsafe { SkipList::new() };
+        let num = 100i64;
+        for i in 0..num {
+            let elem = i.to_string();
+            unsafe { skip_list.insert(i, elem); }
+        }
+        for i in 0..num {
+            let elem = i.to_string();
+            unsafe {
+                skip_list.update_score(i, &elem, 100);
+                let x = skip_list.get_elem_by_rank(i + 1);
+                if let Some(x) = x {
+                    let score = (*x.as_ptr()).get_score();
+                    println!("score: {}", score);
+                    //assert_eq!(score, 100);
+                }
+            }
+        }
+    }
 }

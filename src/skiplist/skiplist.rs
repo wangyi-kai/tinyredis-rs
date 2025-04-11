@@ -42,6 +42,10 @@ impl Node {
     pub fn get_elem(&self) -> String {
         self.elem.clone()
     }
+
+    pub fn get_score(&self) -> i64 {
+        self.score
+    }
 }
 
 impl Node {
@@ -57,7 +61,7 @@ impl Node {
 
 #[derive(Clone, Debug)]
 struct Level {
-    forward: Option<NonNull<Node>>,
+    pub forward: Option<NonNull<Node>>,
     span: i64,
 }
 
@@ -80,9 +84,9 @@ impl Level {
 #[derive(Clone, Debug)]
 pub struct SkipList {
     /// head node
-    head: Option<NonNull<Node>>,
+    pub head: Option<NonNull<Node>>,
     /// tail node
-    tail: Option<NonNull<Node>>,
+    pub tail: Option<NonNull<Node>>,
     /// number of nodes in skip_list
     length: i64,
     /// level of node with max level
@@ -99,6 +103,10 @@ impl SkipList {
             length: 0,
             level: 1,
         }
+    }
+
+    pub fn get_tail(&self) -> Option<NonNull<Node>> {
+        self.tail
     }
 
     pub unsafe fn insert(&mut self, score: i64, elem: String) -> NonNull<Node> {
@@ -272,7 +280,7 @@ impl SkipList {
         }
 
         x = (*x.as_ptr()).level[0].forward.unwrap();
-        if (*x.as_ptr()).backward.is_none() || (*(*x.as_ptr()).backward.unwrap().as_ptr()).score < new_score && (*x.as_ptr()).level[0].forward.is_none() || (*(*x.as_ptr()).level[0].forward.unwrap().as_ptr()).score > new_score {
+        if ((*x.as_ptr()).backward.is_none() || (*(*x.as_ptr()).backward.unwrap().as_ptr()).score < new_score) && ((*x.as_ptr()).level[0].forward.is_none() || (*(*x.as_ptr()).level[0].forward.unwrap().as_ptr()).score > new_score) {
             (*x.as_ptr()).score = new_score;
             return x;
         }
