@@ -8,7 +8,7 @@ const SKIP_LIST_P: f32 = 0.25;
 const SKIP_MAX_SEARCH: usize = 10;
 const RAND_MAX: i32 = i32::MAX;
 
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub struct RangeSpec {
     min: i64,
     max: i64,
@@ -17,7 +17,7 @@ pub struct RangeSpec {
 }
 
 pub fn value_gte_min(value: i64, range_spec: RangeSpec) -> bool {
-    if range_spec.min_ex {
+    if range_spec.min_ex == 1 {
         value > range_spec.min
     } else {
         value >= range_spec.min

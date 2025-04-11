@@ -60,7 +60,7 @@ impl Node {
 }
 
 #[derive(Clone, Debug)]
-struct Level {
+pub struct Level {
     pub forward: Option<NonNull<Node>>,
     span: i64,
 }
