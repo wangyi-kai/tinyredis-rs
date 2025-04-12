@@ -1,5 +1,6 @@
 mod ziplist;
 mod lib;
+mod error;
 
 const ZIPLIST_HEADER_SIZE: usize = 10;
 const ZIPLIST_END_SIZE: usize = 1;
@@ -23,5 +24,11 @@ pub const ZIP_INT_32B: u8 = 0xc0 | (1 << 4);
 pub const ZIP_INT_64B: u8 = 0xc0 | (2 << 4);
 pub const ZIP_INT_24B: u8 = 0xc0 | (3 << 4);
 pub const ZIP_INT_8B:  u8 = 0xfe;
+
+const ZIP_INT_IMM_MIN: u8 = 0xf1;    /* 11110001 */
+const ZIP_INT_IMM_MAX: u8 = 0xfd;    /* 11111101 */
+
+const ZIP_ENCODING_SIZE_INVALID: u8 =  0xff;
+const LONG_STR_SIZE: usize = 21;
 
 
