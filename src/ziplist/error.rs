@@ -1,4 +1,5 @@
 
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum ZipListError {
     #[error("Position out of range(0)")]
     OutOfRange(usize),
@@ -8,4 +9,14 @@ pub enum ZipListError {
     InValidString,
     #[error("FirstDigitError")]
     InvalidFirstDigit,
+    #[error("InvalidChar")]
+    InvalidChar,
+    #[error("Mul overflow")]
+    OverFlowMul,
+    #[error("Add overflow")]
+    OverFlowAdd,
+    #[error("Negative overflow")]
+    OverFlowNegative,
+    #[error("Positive overflow")]
+    OverFlowPositive,
 }

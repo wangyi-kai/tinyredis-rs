@@ -31,4 +31,7 @@ const ZIP_INT_IMM_MAX: u8 = 0xfd;    /* 11111101 */
 const ZIP_ENCODING_SIZE_INVALID: u8 =  0xff;
 const LONG_STR_SIZE: usize = 21;
 
+const INT_24_MAX: i64 = 0x7fffff;
+const INT_24_MIN: i64 = -INT_24_MAX - 1;
+
 

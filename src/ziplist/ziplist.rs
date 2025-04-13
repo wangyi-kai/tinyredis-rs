@@ -1,6 +1,6 @@
 use crate::ziplist::{ZIP_ENCODING_SIZE_INVALID, ZIP_END, ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE};
 use crate::ziplist::error::ZipListError;
-use crate::ziplist::lib::{decode_length, decode_prev_len, decode_prev_len_size, encoding_len_size, entry_encoding};
+use crate::ziplist::lib::{decode_length, decode_prev_len, decode_prev_len_size, encoding_len_size, entry_encoding, int_size, prev_len_bytes_diff, store_entry_encoding, store_prev_entry_length, store_prev_entry_length_large, try_encoding};
 
 #[derive(Clone, Debug)]
 pub struct ZipListEntry {
@@ -61,6 +61,13 @@ impl ZipList {
         Self { data: zl }
     }
 
+    fn resize(&mut self, len: usize) {
+        assert!(len < u32::MAX as usize);
+        self.data.resize(len, 0);
+        self.data[0..4].copy_from_slice(&len.to_be_bytes());
+        self.data[len - 1] = ZIP_END;
+    }
+
     fn ziplist_len(&self) -> usize {
         let buf = &self.data[0..4];
         u32::from_be_bytes(buf.try_into().unwrap()) as usize
@@ -85,22 +92,58 @@ impl ZipList {
         } else {
             self.last_bytes()
         };
-        self.insert(pos, data)
     }
 
-    pub fn insert(&mut self, pos: usize, data: &[u8]) -> Result<(), ZipListError> {
+    pub fn insert(&mut self, pos: usize, s: &str) -> Result<(), ZipListError> {
         let cur_len = u32::from_be_bytes([self.data[0], self.data[1], self.data[2], self.data[3]]) as usize;
         let mut prev_len_size = 0;
         let mut prev_len = 0;
+        let mut encoding = 0;
 
         if self.data[pos] != ZIP_END {
             (prev_len_size, prev_len) = decode_prev_len(&self.data[pos..]);
         } else {
-            let tail = self.data[self.tail_offset()..];
+            let tail = &self.data[self.tail_offset()..];
             if tail[0] != ZIP_END {
-                let prev_len = self.raw_entry_length(cur_len, self.tail_offset())?;
+                prev_len = self.raw_entry_length(cur_len, self.tail_offset())?;
             }
         }
+        let mut req_len = if let Some((value, encode)) = try_encoding(s) {
+            encoding = encode;
+            int_size(encoding)
+        } else {
+            s.len()
+        };
+        req_len += store_prev_entry_length_large(None, prev_len as u32);
+        req_len += store_entry_encoding(None, encoding, s.len() as u32);
+
+        let mut force_large = 0;
+        let mut next_diff = if self.data[pos] != ZIP_END {
+            prev_len_bytes_diff(&self.data[pos..], req_len)
+        } else {
+            0
+        };
+        if next_diff == -4 && req_len < 4 {
+            next_diff = 0;
+            force_large = 1;
+        }
+
+        let new_len = (cur_len as i32 + req_len as i32 + next_diff) as usize;
+        self.resize(new_len);
+
+        if self.data[pos] != ZIP_END {
+            let dst_start = pos + req_len;
+            let src_start = (pos as i32 - next_diff) as usize;
+            let src_end = cur_len - 1;
+            self.data.copy_within(src_start..src_end, dst_start);
+            if force_large {
+                store_prev_entry_length_large(Some(&mut self.data[pos + req_len..]), req_len as u32);
+            } else {
+                store_prev_entry_length(Some(&mut self.data[pos + req_len..]), req_len as u32);
+            }
+
+        }
+
         Ok(())
     }
 
