@@ -164,7 +164,7 @@ pub fn int_size(encoding: u8) -> usize {
     panic!("unreachable code reached");
 }
 
-pub fn store_prev_entry_length_large(data: Option<&mut [u8]>, len: u32) -> usize {
+pub fn store_prev_entry_length_large(data: Option<&mut [u8]>, len: usize) -> usize {
     if let Some(p) = data {
         p[0] = ZIP_BIG_PREVLEN;
         p[1..5].copy_from_slice(&len.to_be_bytes());
@@ -172,16 +172,16 @@ pub fn store_prev_entry_length_large(data: Option<&mut [u8]>, len: u32) -> usize
      1 + size_of::<u32>()
 }
 
-pub fn store_prev_entry_length(data: Option<&mut [u8]>, len: u32) -> usize {
+pub fn store_prev_entry_length(data: Option<&mut [u8]>, len: usize) -> usize {
     if let Some(p) = data {
-        if len < ZIP_BIG_PREVLEN as u32 {
+        if len < (ZIP_BIG_PREVLEN as usize) {
             p[0] = len as u8;
             1
         } else {
-            return store_prev_entry_length_large(data, len);
+            store_prev_entry_length_large(data, len)
         }
     } else {
-        if len < ZIP_BIG_PREVLEN as u32 {
+        if len < ZIP_BIG_PREVLEN as usize {
             1
         } else {
             1 + size_of::<u32>()
@@ -189,11 +189,11 @@ pub fn store_prev_entry_length(data: Option<&mut [u8]>, len: u32) -> usize {
     }
 }
 
-fn is_string(encoding: u8) -> bool {
+pub fn is_string(encoding: u8) -> bool {
     encoding & ZIP_STR_MASK < ZIP_STR_MASK
 }
 
-pub fn store_entry_encoding(data: Option<&mut [u8]>, encoding: u8, raw_len: u32) -> usize {
+pub fn store_entry_encoding(data: Option<&mut [u8]>, encoding: u8, raw_len: usize) -> usize {
     let mut len = 1;
     let mut buf = vec![0u8; 5];
 
@@ -233,7 +233,37 @@ pub fn store_entry_encoding(data: Option<&mut [u8]>, encoding: u8, raw_len: u32)
 
 pub fn prev_len_bytes_diff(ptr: &[u8], len: usize) -> i32 {
     let prev_len_size = decode_prev_len_size(ptr);
-    store_prev_entry_length(None, len as u32) as i32 - prev_len_size as i32
+    store_prev_entry_length(None, len) as i32 - prev_len_size as i32
+}
+
+pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
+    match encoding {
+        ZIP_INT_8B => {
+            ptr[0] = value as i8 as u8;
+        }
+        ZIP_INT_16B => {
+            let i16 = (value as i16).to_le_bytes();
+            ptr[..2].copy_from_slice(&i16);
+        }
+        ZIP_INT_24B => {
+            let i32 = ((value as u64) << 8).to_le_bytes();
+            ptr[..3].copy_from_slice(&i32[1..]);
+        }
+        ZIP_STR_32B => {
+            let i32 = (value as i32).to_le_bytes();
+            ptr[..4].copy_from_slice(&i32);
+        }
+        ZIP_INT_64B => {
+            let i64 = (value as i64).to_le_bytes();
+            ptr[..8].copy_from_slice(&i64);
+        }
+        IMM if IMM >= ZIP_INT_IMM_MIN && IMM <= ZIP_INT_IMM_MAX => {
+
+        }
+        _ => {
+            panic!("Invalid zip integer encoding");
+        }
+    }
 }
 
 #[cfg(test)]
