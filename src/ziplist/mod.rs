@@ -6,6 +6,7 @@ const ZIPLIST_HEADER_SIZE: usize = 10;
 const ZIPLIST_END_SIZE: usize = 1;
 const ZIP_END: u8 = 255;
 const ZIP_BIG_PREVLEN: u8 = 254;
+const ZIPLIST_LENGTH_OFFSET: usize = 8;
 
 pub const ZIPLIST_HEAD: i32 = 0;
 pub const ZIPLIST_TAIL: i32 = 1;

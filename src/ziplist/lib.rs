@@ -254,7 +254,7 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
             ptr[..4].copy_from_slice(&i32);
         }
         ZIP_INT_64B => {
-            let i64 = (value as i64).to_le_bytes();
+            let i64 = (value).to_le_bytes();
             ptr[..8].copy_from_slice(&i64);
         }
         IMM if IMM >= ZIP_INT_IMM_MIN && IMM <= ZIP_INT_IMM_MAX => {
@@ -263,6 +263,13 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
         _ => {
             panic!("Invalid zip integer encoding");
         }
+    }
+}
+
+pub fn incr_length(ptr: &[u8], incr:usize) {
+    let len = u16::from_le_bytes(ptr[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].try_into().unwrap());
+    if len < u16::MAX {
+        ptr[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&(len + incr).to_le_bytes())
     }
 }
 
