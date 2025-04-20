@@ -1,8 +1,9 @@
 use crate::ziplist::{*};
 use crate::ziplist::error::ZipListError;
 
+#[derive(Debug)]
 pub enum Content {
-    String(String),
+    Char(String),
     Integer(i64),
 }
 
@@ -174,12 +175,9 @@ pub fn int_size(encoding: u8) -> u32 {
         ZIP_INT_24B => 3,
         ZIP_INT_32B => 4,
         ZIP_INT_64B => 8,
+        n if n >= ZIP_INT_IMM_MIN && n <= ZIP_INT_IMM_MAX => 0,
         _ => 0,
-    };
-    if encoding >= ZIP_INT_IMM_MIN && encoding <= ZIP_INT_IMM_MAX {
-        return 0;
     }
-    0
     //panic!("unreachable code reached");
 }
 
@@ -194,7 +192,7 @@ pub fn store_prev_entry_length_large(data: Option<&mut [u8]>, len: u32) -> u32 {
 pub fn store_prev_entry_length(data: Option<&mut [u8]>, len: u32) -> u32 {
     if let Some(p) = data {
         if len < ZIP_BIG_PREVLEN as u32 {
-            p.to_vec()[0] = len as u8;
+            p[0] = len as u8;
             1
         } else {
             store_prev_entry_length_large(Some(p), len)
@@ -281,6 +279,37 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
         IMM if IMM >= ZIP_INT_IMM_MIN && IMM <= ZIP_INT_IMM_MAX => { }
         _ => {
             panic!("Invalid zip integer encoding");
+        }
+    }
+}
+
+pub fn load_integer(ptr: &[u8], encoding: u8) -> i64 {
+    match encoding {
+        ZIP_INT_8B => {
+            ptr[0] as i8 as i64
+        }
+        ZIP_INT_16B => {
+            let bytes = ptr[..2].try_into().unwrap();
+            i16::from_le_bytes(bytes) as i64
+        }
+        ZIP_INT_24B => {
+            let mut bytes = [0u8; 4];
+            bytes[1..].copy_from_slice(&ptr[..3]);
+            i32::from_le_bytes(bytes) as i64 >> 8
+        }
+        ZIP_STR_32B => {
+            let bytes = ptr[..4].try_into().unwrap();
+            i32::from_le_bytes(bytes) as i64
+        }
+        ZIP_INT_64B => {
+            let bytes = ptr[..8].try_into().unwrap();
+            i64::from_le_bytes(bytes)
+        }
+        encode if encode >= ZIP_INT_IMM_MIN && encode <= ZIP_INT_IMM_MAX => {
+            ((encoding & ZIP_INT_IMM_MASK) as i64) - 1
+        }
+        _ => {
+            panic!("Invalid encoding!")
         }
     }
 }

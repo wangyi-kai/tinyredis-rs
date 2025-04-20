@@ -29,6 +29,7 @@ pub const ZIP_INT_8B:  u8 = 0xfe;
 
 const ZIP_INT_IMM_MIN: u8 = 0xf1;    /* 11110001 */
 const ZIP_INT_IMM_MAX: u8 = 0xfd;    /* 11111101 */
+const ZIP_INT_IMM_MASK: u8 = 0x0f;
 
 const ZIP_ENCODING_SIZE_INVALID: u8 =  0xff;
 const LONG_STR_SIZE: usize = 21;
