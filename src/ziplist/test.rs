@@ -20,7 +20,6 @@ mod test {
         println!("entry num: {entry_num}");
         println!("tail offset: {}", zl.tail_offset());
         println!("ziplist len: {}", zl.ziplist_len());
-        let entry = zl.zip_get_entry(10).unwrap();
 
         let mut p = ZIPLIST_HEADER_SIZE as usize;
         while let Some(next) = zl.next_entry_position(p) {
@@ -38,6 +37,37 @@ mod test {
                 println!("prev entry: {:?}", entry);
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn ziplist_delete() -> Result<(), ZipListError> {
+        let mut zl = ZipList::new();
+        let num = 5;
+        for i in 0..num {
+            let s = "1000";
+            zl.push(s, false)?;
+        }
+        let entry_num = zl.entry_num();
+        println!("entry num: {entry_num}");
+        println!("tail offset: {}", zl.tail_offset());
+        println!("ziplist len: {}", zl.ziplist_len());
+
+        let mut p = ZIPLIST_HEADER_SIZE as usize;
+        let res = zl._delete(p, 3);
+
+        while let Some(next) = zl.next_entry_position(p) {
+            //println!("next pos: {}", next);
+            p = next;
+            if let Some(entry) = zl.zip_get_entry(next) {
+                println!("next entry: {:?}", entry);
+            }
+        }
+        let entry_num = zl.entry_num();
+        println!("entry num: {entry_num}");
+        println!("tail offset: {}", zl.tail_offset());
+        println!("ziplist len: {}", zl.ziplist_len());
+
         Ok(())
     }
 }
