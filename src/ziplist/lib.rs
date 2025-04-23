@@ -1,5 +1,6 @@
 use crate::ziplist::{*};
 use crate::ziplist::error::ZipListError;
+use crate::ziplist::ziplist::{ZipList, ZlEntry};
 
 #[derive(Debug)]
 pub enum Content {
@@ -319,6 +320,18 @@ pub fn incr_length(ptr: &mut [u8], incr: usize) {
     if len < u16::MAX {
         ptr[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&(len as usize + incr).to_le_bytes())
     }
+}
+
+pub fn ziplist_repr(zl: ZipList) {
+    let mut pos = 0;
+    let index = 0;
+    let mut zl_bytes = zl.ziplist_len();
+    let num = zl.entry_num();
+    let tail_offset = zl.tail_offset();
+    println!("total bytes: {}, num entries: {}, tail_offset: {}", zl_bytes, num, tail_offset);
+    pos = ZIPLIST_HEADER_SIZE as usize;
+
+    while
 }
 
 #[cfg(test)]

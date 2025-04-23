@@ -1,4 +1,4 @@
-use std::str::from_utf8;
+use std::str::{from_utf8, from_utf8_mut};
 use crate::ziplist::{ZIP_ENCODING_SIZE_INVALID, ZIP_END, ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE, ZIPLIST_LENGTH_OFFSET};
 use crate::ziplist::error::ZipListError;
 use crate::ziplist::lib::{Content, decode_length, decode_prev_len, decode_prev_len_size, encoding_len_size, entry_encoding, incr_length, int_size, is_string, load_integer, prev_len_bytes_diff, save_integer, store_entry_encoding, store_prev_entry_length, store_prev_entry_length_large, try_encoding};
@@ -457,8 +457,82 @@ impl ZipList {
                 self.cascade_update(pos);
             }
         }
-
         Ok(())
+    }
+
+    pub fn zip_index(&self, mut index: i32) -> usize {
+        let mut prev_len_size = 0;
+        let mut prev_len = 0;
+        let bytes = self.ziplist_len();
+        let mut pos = 0;
+
+        if index < 0 {
+            index = (-index) - 1;
+            pos = self.tail_offset();
+            if self.data[pos] != ZIP_END {
+                let mut prev_len_size = decode_prev_len_size(&self.data[pos..]);
+                assert!((pos + prev_len_size as usize) < bytes - 1);
+                (prev_len_size, prev_len) = decode_prev_len(&self.data[pos..]);
+                while prev_len > 0 && index != 0 {
+                    index -= 1;
+                    pos -= prev_len as usize;
+                    assert!(pos >= ZIPLIST_HEADER_SIZE as usize && pos < (bytes - ZIPLIST_END_SIZE as usize));
+                    (prev_len_size, prev_len) = decode_prev_len(&self.data[pos..]);
+                }
+            }
+        } else {
+            pos = ZIPLIST_HEADER_SIZE as usize;
+            while index > 0 {
+                index -= 1;
+                if let Ok(raw_len) = self.raw_entry_length_safe(bytes, pos) {
+                    pos += raw_len as usize;
+                } else {
+                    return 0;
+                };
+                if self.data[pos] != ZIP_END {
+                    break;
+                }
+            }
+        }
+        if self.data[pos] != ZIP_END || index > 0 {
+            return 0;
+        }
+        match self.entry_safe(bytes, pos, 1) {
+            Ok(_) => { }
+            Err(_) => {
+                return 0;
+            }
+        }
+        pos
+    }
+
+    pub fn delete_range(&mut self, index: i32, num: usize) -> Result<(), ZipListError> {
+        let pos = self.zip_index(index);
+        if pos == 0 {
+            return Ok(())
+        } else {
+            self._delete(pos, num)
+        }
+    }
+
+    pub fn get(&self, pos: usize, sstr: &mut String, slen: &mut u32, sval: &mut i64) -> bool {
+        if self.data[pos] == ZIP_END {
+            return false;
+        }
+        let entry = self.zip_entry(pos);
+        if is_string(entry.encoding) {
+            if !sstr.is_empty() {
+                *slen = entry.len;
+                let start = pos + entry.head_size as usize;
+                let content = from_utf8(&self.data[start..start + entry.len as usize]).unwrap().to_string();
+                *sstr = content;
+            }
+        } else {
+            if *sval != 0 {
+                *sval = load_integer(&self.data[pos + entry.head_size as usize..], entry.encoding);
+            }
+        }
+        true
     }
 }
 
