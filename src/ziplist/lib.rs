@@ -1,3 +1,4 @@
+use std::str::from_utf8;
 use crate::ziplist::{*};
 use crate::ziplist::error::ZipListError;
 use crate::ziplist::ziplist::{ZipList, ZlEntry};
@@ -324,14 +325,88 @@ pub fn incr_length(ptr: &mut [u8], incr: usize) {
 
 pub fn ziplist_repr(zl: ZipList) {
     let mut pos = 0;
-    let index = 0;
-    let mut zl_bytes = zl.ziplist_len();
+    let mut index = 0;
+    let zl_bytes = zl.ziplist_len();
     let num = zl.entry_num();
     let tail_offset = zl.tail_offset();
     println!("total bytes: {}, num entries: {}, tail_offset: {}", zl_bytes, num, tail_offset);
     pos = ZIPLIST_HEADER_SIZE as usize;
 
-    while
+    while zl.data[pos] != ZIP_END {
+        let entry = match zl.entry_safe(zl_bytes, pos, 1) {
+            Ok(entry) => { entry }
+            Err(_) => { return; }
+        };
+        println!("addr: {}, index: {}, offset: {}, hdr+entry len: {}, hdr len: {}, prevrawlen: {}, prevrawlensize: {}, payload: {}", pos, index, pos, entry.head_size+entry.len, entry.head_size, entry.prev_raw_len, entry.prev_raw_len_size, entry.len);
+        for i in 0..(entry.head_size+entry.len) {
+            println!("{:02x}|", zl.data[pos]);
+        }
+        pos += entry.head_size as usize;
+        if is_string(entry.encoding) {
+            let s = from_utf8(&zl.data[pos..]).unwrap();
+            println!("[str]: {}", s);
+        } else {
+            let value = load_integer(&zl.data[pos..], entry.encoding);
+            println!("[int]: {}", value);
+        }
+        pos += entry.len as usize;
+        index += 1;
+    }
+    println!("End");
+}
+
+type ZiplistValidateEntryCb = fn(pos: usize, head_count: u32, user_dara: *mut c_void) -> i32;
+use std::ffi::c_void;
+
+pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: ZiplistValidateEntryCb, user_data: *mut c_void) -> i32 {
+    if size < (ZIPLIST_HEADER_SIZE + ZIPLIST_END_SIZE) as usize {
+        return 0;
+    }
+    let bytes = zl.ziplist_len();
+    if bytes != size {
+        return 0;
+    }
+    if zl.data[size - ZIPLIST_END_SIZE as usize] != ZIP_END {
+        return 0;
+    }
+    if zl.tail_offset() > (size - ZIPLIST_END_SIZE as usize) {
+        return 0;
+    }
+    if deep == 0 {
+        return 1;
+    }
+
+    let mut count = 0;
+    let header_count = zl.entry_num();
+    let mut pos = ZIPLIST_HEADER_SIZE as usize;
+    let mut prev_raw_size = 0;
+    let mut prev = 0;
+    while zl.data[pos] != ZIP_END {
+        let e = match zl.entry_safe(size, pos, 1) {
+            Ok(entry) => entry,
+            Err(_) => return 0,
+        };
+        if e.prev_raw_len != prev_raw_size {
+            return 0;
+        }
+        if entry_cb(pos, header_count as u32, user_data) {
+            return 0;
+        }
+        prev_raw_size = e.head_size + e.len;
+        prev = pos;
+        pos += (e.head_size + e.len) as usize;
+        count += 1;
+    }
+    if pos != bytes - ZIPLIST_END_SIZE as usize {
+        return 0;
+    }
+    if prev != 0 && prev != zl.tail_offset() {
+        return 0;
+    }
+    if header_count != u16::MAX && count != header_count {
+        return 0;
+    }
+    1
 }
 
 #[cfg(test)]

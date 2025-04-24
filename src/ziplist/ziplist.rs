@@ -13,17 +13,17 @@ pub struct ZipListEntry {
 
 pub struct ZlEntry {
     /// length of prev entry length info
-    prev_raw_len_size: u32,
+    pub prev_raw_len_size: u32,
     /// prev entry length
-    prev_raw_len: u32,
+    pub prev_raw_len: u32,
     /// length of cur entry length info
-    len_size: u32,
+    pub len_size: u32,
     /// cur entry length
-    len: u32,
+    pub len: u32,
     /// cur entry head length
-    head_size: u32,
+    pub head_size: u32,
     /// cur entry data encode
-    encoding: u8,
+    pub encoding: u8,
     pos: usize,
 }
 
@@ -42,7 +42,7 @@ impl ZlEntry {
 }
 
 pub struct ZipList {
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 impl ZipList {
@@ -201,7 +201,7 @@ impl ZipList {
     }
 
     #[inline]
-    fn entry_safe(&self, zl_bytes: usize, pos: usize, validate_len: i32) -> Result<ZlEntry, ZipListError> {
+    pub fn entry_safe(&self, zl_bytes: usize, pos: usize, validate_len: i32) -> Result<ZlEntry, ZipListError> {
         fn out_of_range(pos: usize, first: usize, last: usize) -> bool {
             if pos < first || pos > last {
                 return true;
