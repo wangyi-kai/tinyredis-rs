@@ -267,7 +267,7 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
             ptr[..2].copy_from_slice(&i16);
         }
         ZIP_INT_24B => {
-            let i32 = ((value as u64) << 8).to_le_bytes();
+            let i32 = (((value as u64) << 8) as i32).to_le_bytes();
             ptr[..3].copy_from_slice(&i32[1..]);
         }
         ZIP_STR_32B => {
@@ -323,7 +323,7 @@ pub fn incr_length(ptr: &mut [u8], incr: usize) {
     }
 }
 
-pub fn ziplist_repr(zl: ZipList) {
+pub fn ziplist_repr(zl: &ZipList) {
     let mut pos = 0;
     let mut index = 0;
     let zl_bytes = zl.ziplist_len();
@@ -337,13 +337,14 @@ pub fn ziplist_repr(zl: ZipList) {
             Ok(entry) => { entry }
             Err(_) => { return; }
         };
-        println!("addr: {}, index: {}, offset: {}, hdr+entry len: {}, hdr len: {}, prevrawlen: {}, prevrawlensize: {}, payload: {}", pos, index, pos, entry.head_size+entry.len, entry.head_size, entry.prev_raw_len, entry.prev_raw_len_size, entry.len);
+        //println!("addr: {}, index: {}, offset: {}, hdr+entry len: {}, hdr len: {}, prevrawlen: {}, prevrawlensize: {}, payload: {}", pos, index, pos, entry.head_size+entry.len, entry.head_size, entry.prev_raw_len, entry.prev_raw_len_size, entry.len);
         for i in 0..(entry.head_size+entry.len) {
-            println!("{:02x}|", zl.data[pos]);
+            //print!("{:02x}|", zl.data[pos]);
         }
+        //print!("\n");
         pos += entry.head_size as usize;
         if is_string(entry.encoding) {
-            let s = from_utf8(&zl.data[pos..]).unwrap();
+            let s = from_utf8(&zl.data[pos..pos + entry.len as usize]).unwrap();
             println!("[str]: {}", s);
         } else {
             let value = load_integer(&zl.data[pos..], entry.encoding);
@@ -389,7 +390,7 @@ pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: Z
         if e.prev_raw_len != prev_raw_size {
             return 0;
         }
-        if entry_cb(pos, header_count as u32, user_data) {
+        if entry_cb(pos, header_count, user_data) != 0 {
             return 0;
         }
         prev_raw_size = e.head_size + e.len;
@@ -403,10 +404,20 @@ pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: Z
     if prev != 0 && prev != zl.tail_offset() {
         return 0;
     }
-    if header_count != u16::MAX && count != header_count {
+    if header_count != u16::MAX as u32 && count != header_count {
         return 0;
     }
     1
+}
+
+pub fn zlentry_zero(mut entry: ZlEntry) {
+    entry.prev_raw_len_size = 0;
+    entry.prev_raw_len = 0;
+    entry.head_size = 0;
+    entry.len_size = 0;
+    entry.len = 0;
+    entry.encoding = 0;
+    entry.pos = 0;
 }
 
 #[cfg(test)]
