@@ -185,8 +185,8 @@ pub fn int_size(encoding: u8) -> u32 {
 
 pub fn store_prev_entry_length_large(data: Option<&mut [u8]>, len: u32) -> u32 {
     if let Some(p) = data {
-        p.to_vec()[0] = ZIP_BIG_PREVLEN;
-        p.to_vec()[1..5].copy_from_slice(&len.to_le_bytes());
+        (*p)[0] = ZIP_BIG_PREVLEN;
+        (*p)[1..5].copy_from_slice(&len.to_le_bytes());
     }
     (1 + size_of::<u32>()) as u32
 }

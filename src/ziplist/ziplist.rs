@@ -12,6 +12,7 @@ pub struct ZipListEntry {
     l_val: i64,
 }
 
+#[derive(Default, Debug)]
 pub struct ZlEntry {
     /// length of prev entry length info
     pub prev_raw_len_size: u32,
@@ -535,6 +536,9 @@ impl ZipList {
         if pos == 0 || self.data[pos] == ZIP_END {
             return false;
         }
+        *sstr = "".to_string();
+        *slen = 0;
+
         let entry = self.zip_entry(pos);
         if is_string(entry.encoding) {
             *slen = entry.len;
@@ -542,8 +546,6 @@ impl ZipList {
             let content = from_utf8(&self.data[start..start + entry.len as usize]).unwrap().to_string();
             *sstr = content;
         } else {
-            *sstr = "".to_string();
-            *slen = 0;
             *sval = load_integer(&self.data[pos + entry.head_size as usize..], entry.encoding);
         }
         true

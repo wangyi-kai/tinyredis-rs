@@ -2,13 +2,13 @@
 #[cfg(test)]
 mod test {
     use crate::ziplist::error::ZipListError;
-    use crate::ziplist::ziplist::ZipList;
+    use crate::ziplist::ziplist::{ZipList, ZlEntry};
     use crate::ziplist::{ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL};
 
     use std::time::{SystemTime, UNIX_EPOCH, Instant};
     use rand::{Rng, rng};
     use rand::distr::Alphanumeric;
-    use crate::ziplist::lib::ziplist_repr;
+    use crate::ziplist::lib::{ziplist_repr, zlentry_zero};
     use ansi_term::Color::{Green, Red};
     use std::slice;
 
@@ -17,7 +17,7 @@ mod test {
         let _ = zl.push("foo", false);
         let _ = zl.push("quux", false);
         let _ = zl.push("hello", true);
-        let _ = zl.push("1024", true);
+        let _ = zl.push("1024", false);
         zl
     }
 
@@ -103,7 +103,11 @@ mod test {
 
     fn verify(zl: ZipList) {
         let len = zl.ziplist_len();
+        let entry = ZlEntry::new(0, 0, 0, 0, 0, 0, 0);
 
+        for i in 0..len {
+
+        }
     }
 
     #[test]
@@ -144,8 +148,8 @@ mod test {
                 println!("ERROR: Could not access index 3");
                 return;
             }
-            println!("Get: {}, Expected: quux", entry);
-            assert_eq!("quux", entry);
+            println!("Get: {}, Expected: 1024", value);
+            assert_eq!(1024, value);
         }
 
         print!("[TEST]Get element at index 4: ");
@@ -175,8 +179,8 @@ mod test {
                 println!("ERROR: Could not access index -1");
                 return;
             }
-            println!("Get: {}, Expected: quux", entry);
-            assert_eq!("quux", entry);
+            println!("Get: {}, Expected: 1024", value);
+            assert_eq!(1024, value);
         }
 
         print!("[TEST]Get element at index -4 (first element): ");
@@ -191,8 +195,8 @@ mod test {
                 println!("ERROR: Could not access index -4");
                 return;
             }
-            println!("Get: {}, Expected: 1024", value);
-            assert_eq!(1024, value);
+            println!("Get: {}, Expected: hello", entry);
+            assert_eq!("hello", entry);
         }
 
         print!("[TEST]Get element at index -5 (reverse out of range): ");
@@ -405,24 +409,78 @@ mod test {
             pos = zl.zip_index(1);
             let _ = zl.replace(pos, "65536");
             pos = zl.zip_index(0);
-            while zl.get(pos, &mut entry, &mut elen, &mut value) {
-                if !entry.is_empty() {
-                    if elen > 0 {
-                        print!("{} ", entry);
-                    }
-                } else {
-                    print!("{} ", value);
-                }
-                pos = zl.prev_entry_position(pos);
-            }
 
             let expected: &[u8] = b"\x00\x05zoink\
                             \x07\xf0\x00\x00\x01\
                             \x05\x04quux\
                             \x06\x02yy\
                             \xff";
-            //assert_eq!(&zl.data[pos..], expected);
+            assert_eq!(&zl.data[pos..], expected);
             println!("SUCCESS");
+        }
+
+        print!("[TEST]Replace with different size: ");
+        {
+            let mut pos = 0;
+            zl = create();
+            pos = zl.zip_index(1);
+            let _ = zl.replace(pos, "squirrel");
+            pos = zl.zip_index(0);
+            let expected: &[u8] = b"\x00\x05hello\
+                                    \x07\x08squirrel\
+                                    \x0a\x04quux\
+                                    \x06\xc0\x00\x04\
+                                    \xff";
+            assert_eq!(&zl.data[pos..], expected);
+            println!("SUCCESS");
+        }
+
+        print!("[TEST]Regression test for >255 byte strings: ");
+        {
+            let mut v1 = [0; 257];
+            let mut v2 = [0; 257];
+            v1[..256].fill(b'x');
+            v2[..256].fill(b'y');
+
+            let mut pos = 0;
+            let mut entry = String::default();
+            let mut elen: u32 = 0;
+            let mut value: i64 = 0;
+
+            let mut zl = ZipList::new();
+            let _ = zl.push(std::str::from_utf8(&v1).unwrap(), false);
+            let _ = zl.push(std::str::from_utf8(&v2).unwrap(), false);
+
+            pos = zl.zip_index(0);
+            if !zl.get(pos, &mut entry, &mut elen, &mut value) {
+                panic!("FAIL");
+            }
+            assert_eq!(&v1, entry.as_bytes());
+            pos = zl.zip_index(1);
+
+            if !zl.get(pos, &mut entry, &mut elen, &mut value) {
+                panic!("FAIL");
+            }
+            assert_eq!(&v2, entry.as_bytes());
+            println!("SUCCESS");
+        }
+
+        print!("Regression test deleting next to last entries: ");
+        {
+            let mut v = [[0; 257]; 3];
+            let e = [ZlEntry {prev_raw_len_size:0, prev_raw_len: 0, len_size: 0, len: 0, head_size: 0, encoding: 0, pos: 0}; 3];
+
+            for (i, row) in v.iter_mut().enumerate() {
+                row.fill(b'a' + i as u8);
+            }
+            v[0][256] = b'\0';
+            v[1][  1] = b'\0';
+            v[2][256] = b'\0';
+
+            let mut zl = ZipList::new();
+            for (i, row) in v.iter_mut().enumerate() {
+                let _ = zl.push(std::str::from_utf8(&v[i]).unwrap(), false);
+            }
         }
     }
 }
