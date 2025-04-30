@@ -8,7 +8,8 @@ mod test {
     use std::time::{SystemTime, UNIX_EPOCH, Instant};
     use rand::{Rng, rng};
     use rand::distr::Alphanumeric;
-    use crate::ziplist::lib::{ziplist_repr, zlentry_zero};
+    use crate::ziplist::lib::{ziplist_merge, ziplist_repr};
+    use std::io::Write;
     use ansi_term::Color::{Green, Red};
     use std::slice;
 
@@ -101,12 +102,14 @@ mod test {
         s
     }
 
-    fn verify(zl: ZipList) {
-        let len = zl.ziplist_len();
-        let entry = ZlEntry::new(0, 0, 0, 0, 0, 0, 0);
+    fn verify(zl: &ZipList, e: &mut [ZlEntry]) {
+        let len = zl.entry_num();
+        let entry = ZlEntry::default();
 
-        for i in 0..len {
-
+        for i in 0..len as i32 {
+            e[i as usize] = zl.zip_entry(zl.zip_index(i));
+            let _e = zl.zip_entry(zl.zip_index(i - len as i32));
+            assert_eq!(e[i as usize], _e);
         }
     }
 
@@ -465,22 +468,92 @@ mod test {
             println!("SUCCESS");
         }
 
-        print!("Regression test deleting next to last entries: ");
+        print!("[TEST]Regression test deleting next to last entries: ");
         {
             let mut v = [[0; 257]; 3];
-            let e = [ZlEntry {prev_raw_len_size:0, prev_raw_len: 0, len_size: 0, len: 0, head_size: 0, encoding: 0, pos: 0}; 3];
+            let mut e = [ZlEntry::default(); 3];
 
             for (i, row) in v.iter_mut().enumerate() {
                 row.fill(b'a' + i as u8);
             }
-            v[0][256] = b'\0';
-            v[1][  1] = b'\0';
-            v[2][256] = b'\0';
+            v[0][256] = 0;
+            v[1][  1] = 0;
+            v[2][256] = 0;
 
             let mut zl = ZipList::new();
-            for (i, row) in v.iter_mut().enumerate() {
+            for (i, row) in v.iter().enumerate() {
                 let _ = zl.push(std::str::from_utf8(&v[i]).unwrap(), false);
             }
+
+            verify(&zl, &mut e);
+            assert_eq!(e[0].prev_raw_len_size, 1);
+            assert_eq!(e[1].prev_raw_len_size, 5);
+            assert_eq!(e[2].prev_raw_len_size, 5);
+
+            let mut pos = e[1].pos;
+            let _ = zl.delete(&mut pos);
+
+            verify(&zl, &mut e);
+            assert_eq!(e[0].prev_raw_len_size, 1);
+            assert_eq!(e[1].prev_raw_len_size, 5);
+            println!("SUCCESS");
+        }
+
+        print!("[TEST]Create long list and check indices: ");
+        {
+            let start = Instant::now();
+            let mut zl = ZipList::new();
+            let mut buf = [0; 32];
+
+            for i in 0..1000 {
+                let _ = zl.push(&i.to_string(), false);
+            }
+
+            for i in 0..1000 {
+                let mut pos = zl.zip_index(i);
+                assert_eq!(true, zl.get(pos, &mut String::default(), &mut 0, &mut value));
+                assert_eq!(i as i64, value);
+
+                pos = zl.zip_index(-i-1);
+                assert_eq!(true, zl.get(pos, &mut String::default(), &mut 0, &mut value));
+                assert_eq!(999-i as i64, value);
+            }
+
+            let end = start.elapsed();
+            println!("SUCCESS, time = {:?}", end);
+        }
+
+        print!("[TEST]Compare strings with ziplist entries: ");
+        {
+            let zl = create();
+            let mut pos = zl.zip_index(0);
+            if !zl.compare(pos, &"hello") {
+                panic!("ERROR: NOT hello");
+            }
+            if zl.compare(pos, &"hella") {
+                panic!("ERROR: hella");
+            }
+
+            pos = zl.zip_index(3);
+            if !zl.compare(pos, &"1024") {
+                panic!("ERROR: NOT 1024");
+            }
+            if zl.compare(pos, &"1025") {
+                panic!("ERROR: 1025");
+            }
+            println!("SUCCESS");
+        }
+
+        print!("[TEST]Merge test: ");
+        {
+            /* create list gives us: [hello, foo, quux, 1024] */
+            let mut zl = create();
+            let mut zl2 = create();
+            let mut zl3 = ZipList::new();
+            let mut zl4 = ZipList::new();
+
+            let zl4 = ziplist_merge(&mut zl4, &mut zl4);
+
         }
     }
 }

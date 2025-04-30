@@ -12,7 +12,7 @@ pub struct ZipListEntry {
     l_val: i64,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq, Copy, Clone)]
 pub struct ZlEntry {
     /// length of prev entry length info
     pub prev_raw_len_size: u32,
@@ -43,6 +43,7 @@ impl ZlEntry {
     }
 }
 
+#[derive(Clone)]
 pub struct ZipList {
     pub data: Vec<u8>,
 }
@@ -59,7 +60,7 @@ impl ZipList {
         Self { data: zl }
     }
 
-    fn resize(&mut self, len: u32) {
+    pub fn resize(&mut self, len: u32) {
         assert!(len < u32::MAX);
         self.data.resize(len as usize, 0);
         self.data[0..4].copy_from_slice(&len.to_le_bytes());
@@ -337,7 +338,7 @@ impl ZipList {
     }
 
     #[inline]
-    fn zip_entry(&self, pos: usize) -> ZlEntry {
+    pub fn zip_entry(&self, pos: usize) -> ZlEntry {
         let (prev_raw_len_size, prev_raw_len) = decode_prev_len(&self.data[pos..]);
         let encoding = entry_encoding(&self.data[pos + prev_raw_len_size as usize..]);
         let (len_size, len) = decode_length(&self.data[pos + prev_raw_len_size as usize..], encoding);
@@ -348,7 +349,7 @@ impl ZipList {
         entry
     }
 
-    fn cascade_update(&mut self, mut pos: usize) {
+    pub fn cascade_update(&mut self, mut pos: usize) {
         if self.data[pos] == ZIP_END {
             return;
         }
@@ -580,6 +581,28 @@ impl ZipList {
         }
 
         Ok(())
+    }
+
+    pub fn compare(&self, pos: usize, sstr: &str) -> bool {
+        if self.data[pos] == ZIP_END {
+            return false;
+        }
+
+        let entry = self.zip_entry(pos);
+        if is_string(entry.encoding) {
+            if entry.len == sstr.len() as u32 {
+                let s = from_utf8(&self.data[pos + entry.head_size as usize..pos + (entry.head_size + entry.len) as usize]).unwrap();
+                return s == sstr;
+            } else {
+                return false;
+            }
+        } else {
+            if let Some((value, _)) = try_encoding(sstr) {
+                let zval = load_integer(&self.data[pos + entry.head_size as usize..], entry.encoding);
+                return zval == value;
+            }
+        }
+        false
     }
 }
 

@@ -410,14 +410,50 @@ pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: Z
     1
 }
 
-pub fn zlentry_zero(mut entry: ZlEntry) {
-    entry.prev_raw_len_size = 0;
-    entry.prev_raw_len = 0;
-    entry.head_size = 0;
-    entry.len_size = 0;
-    entry.len = 0;
-    entry.encoding = 0;
-    entry.pos = 0;
+pub fn ziplist_merge<'a>(first: &'a mut ZipList, second: &'a mut ZipList) -> &'a ZipList {
+    let first_bytes = first.ziplist_len();
+    let first_len = first.entry_num();
+    let second_bytes = second.ziplist_len();
+    let second_len = second.entry_num();
+
+    let mut append = false;
+
+    let (mut target, source) = if first_len >= second_len {
+        append = true;
+        (first, second)
+    } else {
+        append = false;
+        (second, first)
+    };
+    let target_bytes = target.ziplist_len();
+    let source_bytes = source.ziplist_len();
+
+    let zl_bytes = first_bytes + second_bytes - ZIPLIST_HEADER_SIZE as usize - ZIPLIST_END_SIZE as usize;
+    let mut zl_len = first_len + second_len;
+    if zl_len >= u16::MAX as u32 {
+        zl_len = u16::MAX as u32;
+    }
+    assert!(zl_bytes < u32::MAX as usize);
+    let first_offset = first.tail_offset();
+    let second_offset = second.tail_offset();
+
+    target.resize(zl_bytes as u32);
+    if append {
+        target.data.copy_from_slice(&source.data[ZIPLIST_HEADER_SIZE as usize..source_bytes - ZIPLIST_END_SIZE as usize]);
+    } else {
+        target.data.copy_within(ZIPLIST_HEADER_SIZE as usize..source_bytes, source_bytes - ZIPLIST_END_SIZE as usize);
+        target.data[..source_bytes - ZIPLIST_END_SIZE as usize].copy_from_slice(&source.data[..source_bytes - ZIPLIST_END_SIZE as usize]);
+    }
+
+    target.data[..4].copy_from_slice(&zl_bytes.to_le_bytes());
+    target.data[8..10].copy_from_slice(&zl_len.to_le_bytes());
+    target.data[4..8].copy_from_slice(&(first_bytes - ZIPLIST_END_SIZE as usize + second_offset - ZIPLIST_HEADER_SIZE as usize).to_le_bytes());
+
+    target.cascade_update(first_offset);
+    if append {
+
+    }
+    target
 }
 
 #[cfg(test)]
