@@ -1,3 +1,4 @@
+use std::cmp;
 use std::str::from_utf8;
 use crate::ziplist::{*};
 use crate::ziplist::error::ZipListError;
@@ -152,7 +153,7 @@ pub fn try_encoding(entry: &str) -> Option<(i64, u8)> {
                 ZIP_INT_IMM_MIN + value as u8
             } else if value >= i8::MIN as i64 && value <= i8::MAX as i64 {
                 ZIP_INT_8B
-            } else if value >= i16:: MIN as i64 && value <= i16::MAX as i64 {
+            } else if value >= i16::MIN as i64 && value <= i16::MAX as i64 {
                 ZIP_INT_16B
             } else if value >= INT_24_MIN && value <= INT_24_MAX {
                 ZIP_INT_24B
@@ -279,9 +280,7 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
             ptr[..8].copy_from_slice(&i64);
         }
         IMM if IMM >= ZIP_INT_IMM_MIN && IMM <= ZIP_INT_IMM_MAX => { }
-        _ => {
-            panic!("Invalid zip integer encoding");
-        }
+        _ => { panic!("Invalid zip integer encoding"); }
     }
 }
 
@@ -358,6 +357,7 @@ pub fn ziplist_repr(zl: &ZipList) {
 
 type ZiplistValidateEntryCb = fn(pos: usize, head_count: u32, user_dara: *mut c_void) -> i32;
 use std::ffi::c_void;
+use std::ops::Deref;
 
 pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: ZiplistValidateEntryCb, user_data: *mut c_void) -> i32 {
     if size < (ZIPLIST_HEADER_SIZE + ZIPLIST_END_SIZE) as usize {
@@ -410,36 +410,34 @@ pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: Z
     1
 }
 
-pub fn ziplist_merge<'a>(first: &'a mut ZipList, second: &'a mut ZipList) -> &'a ZipList {
-    let first_bytes = first.ziplist_len();
-    let first_len = first.entry_num();
-    let second_bytes = second.ziplist_len();
-    let second_len = second.entry_num();
-
-    let mut append = false;
-
-    let (mut target, source) = if first_len >= second_len {
-        append = true;
-        (first, second)
-    } else {
-        append = false;
-        (second, first)
+pub fn ziplist_merge(first: &mut Option<ZipList>, second: &mut Option<ZipList>) -> Option<ZipList> {
+    let (Some(f), Some(s)) = (first.as_ref(), second.as_ref()) else {
+        return None;
     };
+
+    let first_bytes = f.ziplist_len();
+    let first_len = f.entry_num();
+    let second_bytes = s.ziplist_len();
+    let second_len = s.entry_num();
+    let first_offset = f.tail_offset();
+    let second_offset = s.tail_offset();
+
+    let (mut target, source, append) = if first_len >= second_len {
+        (first.take().unwrap(), s.clone(), true)
+    } else {
+        (second.take().unwrap(), f, false)
+    };
+
     let target_bytes = target.ziplist_len();
     let source_bytes = source.ziplist_len();
 
-    let zl_bytes = first_bytes + second_bytes - ZIPLIST_HEADER_SIZE as usize - ZIPLIST_END_SIZE as usize;
-    let mut zl_len = first_len + second_len;
-    if zl_len >= u16::MAX as u32 {
-        zl_len = u16::MAX as u32;
-    }
-    assert!(zl_bytes < u32::MAX as usize);
-    let first_offset = first.tail_offset();
-    let second_offset = second.tail_offset();
+    let zl_bytes = first_bytes as u32 + second_bytes as u32 - ZIPLIST_HEADER_SIZE - ZIPLIST_END_SIZE;
+    let mut zl_len = cmp::min(first_len + second_len, u16::MAX as u32) as u16;
+    assert!(zl_bytes < u32::MAX);
 
-    target.resize(zl_bytes as u32);
+    target.resize(zl_bytes);
     if append {
-        target.data.copy_from_slice(&source.data[ZIPLIST_HEADER_SIZE as usize..source_bytes - ZIPLIST_END_SIZE as usize]);
+        target.data[target_bytes - ZIPLIST_END_SIZE as usize..].copy_from_slice(&source.data[ZIPLIST_HEADER_SIZE as usize..source_bytes]);
     } else {
         target.data.copy_within(ZIPLIST_HEADER_SIZE as usize..source_bytes, source_bytes - ZIPLIST_END_SIZE as usize);
         target.data[..source_bytes - ZIPLIST_END_SIZE as usize].copy_from_slice(&source.data[..source_bytes - ZIPLIST_END_SIZE as usize]);
@@ -447,13 +445,13 @@ pub fn ziplist_merge<'a>(first: &'a mut ZipList, second: &'a mut ZipList) -> &'a
 
     target.data[..4].copy_from_slice(&zl_bytes.to_le_bytes());
     target.data[8..10].copy_from_slice(&zl_len.to_le_bytes());
-    target.data[4..8].copy_from_slice(&(first_bytes - ZIPLIST_END_SIZE as usize + second_offset - ZIPLIST_HEADER_SIZE as usize).to_le_bytes());
-
+    target.data[4..8].copy_from_slice(&(first_bytes as u32 - ZIPLIST_END_SIZE + second_offset as u32 - ZIPLIST_HEADER_SIZE).to_le_bytes());
     target.cascade_update(first_offset);
+
     if append {
 
     }
-    target
+    Some(target)
 }
 
 #[cfg(test)]

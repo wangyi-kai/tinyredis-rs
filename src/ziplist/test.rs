@@ -4,12 +4,14 @@ mod test {
     use crate::ziplist::error::ZipListError;
     use crate::ziplist::ziplist::{ZipList, ZlEntry};
     use crate::ziplist::{ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL};
+    use crate::adlist::adlist::{*};
 
     use std::time::{SystemTime, UNIX_EPOCH, Instant};
-    use rand::{Rng, rng};
+    use rand::{Rng, rng, random};
     use rand::distr::Alphanumeric;
     use crate::ziplist::lib::{ziplist_merge, ziplist_repr};
-    use std::io::Write;
+    use std::fmt::Write as _;
+    use std::io::Write as _;
     use ansi_term::Color::{Green, Red};
     use std::slice;
 
@@ -87,8 +89,8 @@ mod test {
     fn rand_string(min_num: u32, max_num: u32) -> String {
         let rand: u32 = rand::rng().random();
         let len = min_num + rand % (max_num - min_num + 1);
-        let mut s = String::default();
-        let (min_val, max_val) = match rand::rng().random_range(0..3) {
+        let mut s = String::new();
+        let (min_val, max_val) = match rand::rng().random::<u32>() % 3 {
             0 => (0, 255),
             1 => (48, 122),
             2 => (48, 52),
@@ -503,7 +505,6 @@ mod test {
         {
             let start = Instant::now();
             let mut zl = ZipList::new();
-            let mut buf = [0; 32];
 
             for i in 0..1000 {
                 let _ = zl.push(&i.to_string(), false);
@@ -547,13 +548,124 @@ mod test {
         print!("[TEST]Merge test: ");
         {
             /* create list gives us: [hello, foo, quux, 1024] */
-            let mut zl = create();
-            let mut zl2 = create();
-            let mut zl3 = ZipList::new();
-            let mut zl4 = ZipList::new();
+            let zl = create();
+            let zl2 = create();
+            let zl3 = ZipList::new();
+            let zl4 = ZipList::new();
 
-            let zl4 = ziplist_merge(&mut zl4, &mut zl4);
+            if let Some(zl4) = ziplist_merge(&mut Some(zl3), &mut Some(zl4)) {
+                ziplist_repr(&zl4);
+            }
 
+            /* merge gives us: [hello, foo, quux, 1024, hello, foo, quux, 1024] */
+            let zl2 = ziplist_merge(&mut Some(zl), &mut Some(zl2)).unwrap();
+            if zl2.entry_num() != 8 {
+                panic!("ERROR: Merged length not 8, but: {}", zl2.entry_num());
+            }
+            let pos = zl2.zip_index(0);
+            if !zl2.compare(pos, "hello") {
+                panic!("ERROR: not hello");
+            }
+            if zl2.compare(pos, "hella") {
+                panic!("ERROR: hella");
+            }
+
+            let pos = zl2.zip_index(3);
+            if !zl2.compare(pos, "1024") {
+                panic!("ERROR: not 1024");
+            }
+            if zl2.compare(pos, "1025") {
+                panic!("ERROR: 1025");
+            }
+
+            let pos = zl2.zip_index(4);
+            if !zl2.compare(pos, "hello") {
+                panic!("ERROR: not hello");
+            }
+            if zl2.compare(pos, "hella") {
+                panic!("ERROR: hella");
+            }
+
+            let pos = zl2.zip_index(7);
+            if !zl2.compare(pos, "1024") {
+                panic!("ERROR: not 1024");
+            }
+            if zl2.compare(pos, "1025") {
+                panic!("ERROR: 1025");
+            }
+            print!("SUCCESS");
+        }
+    }
+    #[test]
+    fn stress_test() {
+        print!("[TEST]Stress with random payloads of different encoding: ");
+        {
+            let start = Instant::now();
+            let mut buf_len = 1024;
+            let mut buf = String::new();
+            let mut list_value = 0;
+            let iteration = 50;
+
+            for i in 0.. iteration {
+                let mut zl = ZipList::new();
+                let mut list = List::create();
+                let len= rand::rng().random::<u32>() % 256;
+
+                for j in 0..len {
+                    let is_head = if rand::rng().random::<u32>() & 1 == 1 {
+                        true
+                    } else {
+                        false
+                    };
+                    if rand::rng().random::<u32>() % 2 == 1 {
+                        buf = rand_string(1, buf_len - 1);
+                        println!("{}", buf.len());
+                    } else {
+                        match rand::rng().random::<u32>() % 3 {
+                            0 => {
+                                let rand_value = (rand::rng().random::<u32>() as i64) >> 20;
+                                let _ = write!(&mut buf, "{}", rand_value);
+                            }
+                            1 => {
+                                let rand_value = rand::rng().random::<u32>() as i64;
+                                let _ = write!(&mut buf, "{}", rand_value);
+                            }
+                            2 => {
+                                let rand_value = (rand::rng().random::<u32>() as i64) << 20;
+                                let _ = write!(&mut buf, "{}", rand_value);
+                            }
+                            _ => { }
+                        }
+                    }
+                    /* Add to ziplist */
+                    let new_buf = buf.clone();
+                    let _ = zl.push(&buf, is_head);
+
+                    if is_head {
+                        list.add_node_head(new_buf);
+                    } else {
+                        list.add_node_tail(new_buf);
+                    }
+                }
+                assert_eq!(zl.entry_num(), list.length() as u32);
+                // for j in 0..len {
+                //     let mut entry = String::default();
+                //     let mut elen: u32 = 0;
+                //     let mut value: i64 = 0;
+                //     let pos = zl.zip_index(j as i32);
+                //     let list_node = list.index(j as i64);
+                //
+                //     assert_eq!(true, zl.get(pos, &mut entry, &mut elen, &mut value));
+                //     if entry.is_empty() {
+                //         unsafe {
+                //             let v = (*list_node.unwrap().as_ptr()).value();
+                //         }
+                //     } else {
+                //         buf_len = elen;
+                //     }
+                // }
+            }
+            let end = start.elapsed();
         }
     }
 }

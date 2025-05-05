@@ -43,7 +43,6 @@ impl ZlEntry {
     }
 }
 
-#[derive(Clone)]
 pub struct ZipList {
     pub data: Vec<u8>,
 }
@@ -324,7 +323,7 @@ impl ZipList {
             let start_pos = pos + entry.head_size as usize;
             let len = entry.len;
             let result = from_utf8(&self.data[start_pos..start_pos + len as usize]).unwrap();
-            return Some(Char(result.to_string()));
+            Some(Char(result.to_string()))
         } else {
             let ret = load_integer(&self.data[pos + entry.head_size as usize..], entry.encoding);
             Some(Integer(ret))
