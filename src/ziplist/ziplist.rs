@@ -82,7 +82,7 @@ impl ZipList {
         self.ziplist_len() - ZIPLIST_END_SIZE as usize
     }
 
-    pub fn entry_num(&self) -> u32 {
+    pub fn entry_num(&mut self) -> u32 {
         let mut len= u16::from_le_bytes(self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].try_into().unwrap());
         return if len < u16::MAX {
             len as u32
@@ -94,17 +94,17 @@ impl ZipList {
                 pos += self.raw_entry_length_safe(zl_bytes, pos).unwrap() as usize;
                 len += 1;
             }
+            if len < u16::MAX as u32{
+                self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&(len as u16).to_le_bytes());
+            }
             len
-            // if len < u16:: MAX as u32{
-            //     self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&(len as u16).to_le_bytes());
-            // }
         }
     }
 
-    fn incr_length(&mut self, incr: i16) {
+    fn incr_length(&mut self, incr: i32) {
         let len = self.entry_num();
         if len < u16::MAX as u32 {
-            self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&((len as i16 + incr) as u16).to_le_bytes());
+            self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&((len as i32 + incr) as u16).to_le_bytes());
         }
     }
 
@@ -117,12 +117,12 @@ impl ZipList {
         self.insert(pos, s)
     }
 
-    fn update_tail_offset(&mut self, len: usize) {
+    fn update_tail_offset(&mut self, len: u32) {
         self.data[4..8].copy_from_slice(&len.to_le_bytes())
     }
 
-    fn insert(&mut self, mut pos: usize, s: &str) -> Result<(), ZipListError> {
-        let cur_len = u32::from_le_bytes([self.data[0], self.data[1], self.data[2], self.data[3]]) as usize;
+    pub fn insert(&mut self, mut pos: usize, s: &str) -> Result<(), ZipListError> {
+        let cur_len = u32::from_le_bytes(self.data[0..4].try_into().unwrap()) as usize;
         let mut prev_len_size = 0;
         let mut prev_len = 0;
         let mut encoding = 0;
@@ -191,6 +191,10 @@ impl ZipList {
             }
         } else {
             self.data[4..8].copy_from_slice(&(new_len - req_len - 1).to_le_bytes());
+        }
+
+        if next_diff != 0 {
+            self.cascade_update(pos + req_len as usize);
         }
 
         pos += store_prev_entry_length(Some(&mut self.data[pos..]), prev_len) as usize;
@@ -284,11 +288,11 @@ impl ZipList {
         let zl_bytes = u32::from_le_bytes(self.data[0..4].try_into().unwrap());
 
         if self.data[pos] == ZIP_END {
-            return 0;
+            return pos;
         }
         pos += self.zip_raw_entry_length(pos) as usize;
         if self.data[pos] == ZIP_END {
-            return 0;
+            return pos;
         }
         let _ = self.entry_safe(zl_bytes as usize, pos, 1);
         pos
@@ -352,7 +356,8 @@ impl ZipList {
         if self.data[pos] == ZIP_END {
             return;
         }
-        let cur = self.zip_entry(pos);
+
+        let mut cur = self.zip_entry(pos);
         let mut prev_len = cur.head_size + cur.len;
         let mut raw_len = 0;
         let first_entry_len = prev_len;
@@ -366,7 +371,8 @@ impl ZipList {
         pos += prev_len as usize;
 
         while self.data[pos] != ZIP_END {
-            if let Ok(cur) = self.entry_safe(cur_len, pos, 0) {
+            if let Ok(entry) = self.entry_safe(cur_len, pos, 0) {
+                cur = entry;
                 if cur.prev_raw_len == prev_len {
                     break;
                 }
@@ -381,27 +387,33 @@ impl ZipList {
             } else {
                 return;
             }
+
+            // cur.prev_raw_len means cur is the former head entry.
             assert!(cur.prev_raw_len == 0 || cur.prev_raw_len + delta == prev_len);
+
+            // Update prev entry's info and advance the cursor
             raw_len = cur.head_size + cur.len;
             prev_len = raw_len + delta;
             prev_len_size = store_prev_entry_length(None, prev_len);
+            prev_offset = pos;
             pos += raw_len as usize;
             extra += delta;
             cnt += 1;
         }
+
         if extra == 0 {
             return;
         }
         if tail == prev_offset {
             if (extra - delta) != 0 {
-                self.update_tail_offset(self.tail_offset() + (extra - delta) as usize);
+                self.update_tail_offset((self.tail_offset() as u32 + (extra - delta)));
             }
         } else {
-            self.update_tail_offset(self.tail_offset() + extra as usize);
+            self.update_tail_offset(self.tail_offset() as u32 + extra);
         }
 
         self.resize(cur_len as u32 + extra);
-        self.data.copy_within(pos..pos + cur_len - 1, pos + extra as usize);
+        self.data.copy_within(pos..cur_len - 1, pos + extra as usize);
         pos += extra as usize;
 
         while cnt > 0 {

@@ -3,17 +3,13 @@
 mod test {
     use crate::ziplist::error::ZipListError;
     use crate::ziplist::ziplist::{ZipList, ZlEntry};
-    use crate::ziplist::{ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL};
+    use crate::ziplist::{ZIP_BIG_PREVLEN, ZIP_END, ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL};
     use crate::adlist::adlist::{*};
 
     use std::time::{SystemTime, UNIX_EPOCH, Instant};
-    use rand::{Rng, rng, random};
-    use rand::distr::Alphanumeric;
-    use crate::ziplist::lib::{ziplist_merge, ziplist_repr};
+    use rand::{Rng};
+    use crate::ziplist::lib::{store_entry_encoding, store_prev_entry_length, ziplist_merge, ziplist_repr, ziplist_valid_integerity};
     use std::fmt::Write as _;
-    use std::io::Write as _;
-    use ansi_term::Color::{Green, Red};
-    use std::slice;
 
     fn create() -> ZipList {
         let mut zl = ZipList::new();
@@ -40,17 +36,17 @@ mod test {
         (now.as_secs() as i64) * 1_000_000 + (now.subsec_micros() as i64)
     }
 
-    fn stress(pos: usize, num: usize, max_size: usize, dnum: usize) {
+    fn stress(is_head: bool, num: usize, max_size: usize, dnum: usize) {
         for i in (0..max_size).step_by(dnum) {
             let mut zl = ZipList::new();
 
             for j in 0..i {
-                let _ = zl.push("quux", false);
+                let _ = zl.push("quux", is_head);
             }
 
             let start = Instant::now();
             for k in 0..num {
-                let _ = zl.push("quux", false);
+                let _ = zl.push("quux", is_head);
                 let _ = zl.delete_range(0, 1);
             }
             let end = start.elapsed();
@@ -104,13 +100,13 @@ mod test {
         s
     }
 
-    fn verify(zl: &ZipList, e: &mut [ZlEntry]) {
-        let len = zl.entry_num();
+    fn verify(zl: &mut ZipList, e: &mut [ZlEntry]) {
+        let len = zl.entry_num() as i32;
         let entry = ZlEntry::default();
 
-        for i in 0..len as i32 {
+        for i in 0..len {
             e[i as usize] = zl.zip_entry(zl.zip_index(i));
-            let _e = zl.zip_entry(zl.zip_index(i - len as i32));
+            let _e = zl.zip_entry(zl.zip_index(i - len));
             assert_eq!(e[i as usize], _e);
         }
     }
@@ -124,22 +120,22 @@ mod test {
         let iteration: i32 = 0;
 
         let mut zl = create_int_list();
-        ziplist_repr(&zl);
+        ziplist_repr(&mut zl);
 
         zl = create();
-        ziplist_repr(&zl);
+        ziplist_repr(&mut zl);
 
         pop(&mut zl, ZIPLIST_TAIL);
-        ziplist_repr(&zl);
+        ziplist_repr(&mut zl);
 
         pop(&mut zl, ZIPLIST_HEAD);
-        ziplist_repr(&zl);
+        ziplist_repr(&mut zl);
 
         pop(&mut zl, ZIPLIST_TAIL);
-        ziplist_repr(&zl);
+        ziplist_repr(&mut zl);
 
         pop(&mut zl, ZIPLIST_TAIL);
-        ziplist_repr(&zl);
+        ziplist_repr(&mut zl);
 
         print!("[TEST]Get element at index 3: ");
         {
@@ -343,35 +339,35 @@ mod test {
         {
             zl = create();
             let _ = zl.delete_range(0, 1);
-            ziplist_repr(&zl);
+            ziplist_repr(&mut zl);
         }
 
         print!("[TEST]Delete inclusive range (0, 1): ");
         {
             zl = create();
             let _ = zl.delete_range(0, 2);
-            ziplist_repr(&zl);
+            ziplist_repr(&mut zl);
         }
 
         print!("[TEST]Delete inclusive range (1, 2): ");
         {
             zl = create();
             let _ = zl.delete_range(1, 2);
-            ziplist_repr(&zl);
+            ziplist_repr(&mut zl);
         }
 
         print!("[TEST]Delete with start index out of range: ");
         {
             zl = create();
             let _ = zl.delete_range(5, 1);
-            ziplist_repr(&zl);
+            ziplist_repr(&mut zl);
         }
 
         print!("[TEST]Delete with num overflow: ");
         {
             zl = create();
             let _ = zl.delete_range(1, 5);
-            ziplist_repr(&zl);
+            ziplist_repr(&mut zl);
         }
 
         print!("[TEST]Delete foo while iterating: ");
@@ -396,7 +392,7 @@ mod test {
                 }
             }
             print!("\n");
-            ziplist_repr(&zl);
+            ziplist_repr(&mut zl);
         }
 
         print!("[TEST]Replace with same size: ");
@@ -487,7 +483,7 @@ mod test {
                 let _ = zl.push(std::str::from_utf8(&v[i]).unwrap(), false);
             }
 
-            verify(&zl, &mut e);
+            verify(&mut zl, &mut e);
             assert_eq!(e[0].prev_raw_len_size, 1);
             assert_eq!(e[1].prev_raw_len_size, 5);
             assert_eq!(e[2].prev_raw_len_size, 5);
@@ -495,7 +491,7 @@ mod test {
             let mut pos = e[1].pos;
             let _ = zl.delete(&mut pos);
 
-            verify(&zl, &mut e);
+            verify(&mut zl, &mut e);
             assert_eq!(e[0].prev_raw_len_size, 1);
             assert_eq!(e[1].prev_raw_len_size, 5);
             println!("SUCCESS");
@@ -553,12 +549,12 @@ mod test {
             let zl3 = ZipList::new();
             let zl4 = ZipList::new();
 
-            if let Some(zl4) = ziplist_merge(&mut Some(zl3), &mut Some(zl4)) {
-                ziplist_repr(&zl4);
+            if let Some(mut zl4) = ziplist_merge(&mut Some(zl3), &mut Some(zl4)) {
+                ziplist_repr(&mut zl4);
             }
 
             /* merge gives us: [hello, foo, quux, 1024, hello, foo, quux, 1024] */
-            let zl2 = ziplist_merge(&mut Some(zl), &mut Some(zl2)).unwrap();
+            let mut zl2 = ziplist_merge(&mut Some(zl), &mut Some(zl2)).unwrap();
             if zl2.entry_num() != 8 {
                 panic!("ERROR: Merged length not 8, but: {}", zl2.entry_num());
             }
@@ -597,14 +593,14 @@ mod test {
         }
     }
     #[test]
-    fn stress_test() {
+    fn stress_test() -> Result<(), ZipListError> {
         print!("[TEST]Stress with random payloads of different encoding: ");
         {
             let start = Instant::now();
             let mut buf_len = 1024;
-            let mut buf = String::new();
+            let mut buf = String::with_capacity(1024);
             let mut list_value = 0;
-            let iteration = 50;
+            let iteration = 200;
 
             for i in 0.. iteration {
                 let mut zl = ZipList::new();
@@ -619,53 +615,320 @@ mod test {
                     };
                     if rand::rng().random::<u32>() % 2 == 1 {
                         buf = rand_string(1, buf_len - 1);
-                        println!("{}", buf.len());
                     } else {
                         match rand::rng().random::<u32>() % 3 {
                             0 => {
-                                let rand_value = (rand::rng().random::<u32>() as i64) >> 20;
-                                let _ = write!(&mut buf, "{}", rand_value);
+                                list_value = (rand::rng().random::<u32>() as i64) >> 20;
+                                let _ = write!(&mut buf, "{}", list_value);
                             }
                             1 => {
-                                let rand_value = rand::rng().random::<u32>() as i64;
-                                let _ = write!(&mut buf, "{}", rand_value);
+                                list_value = rand::rng().random::<u32>() as i64;
+                                let _ = write!(&mut buf, "{}", list_value);
                             }
                             2 => {
-                                let rand_value = (rand::rng().random::<u32>() as i64) << 20;
-                                let _ = write!(&mut buf, "{}", rand_value);
+                                list_value = (rand::rng().random::<u32>() as i64) << 20;
+                                let _ = write!(&mut buf, "{}", list_value);
                             }
                             _ => { }
                         }
                     }
                     /* Add to ziplist */
-                    let new_buf = buf.clone();
-                    let _ = zl.push(&buf, is_head);
-
+                    zl.push(&buf, is_head)?;
                     if is_head {
-                        list.add_node_head(new_buf);
+                        list.add_node_head(buf.clone());
                     } else {
-                        list.add_node_tail(new_buf);
+                        list.add_node_tail(buf.clone());
                     }
                 }
                 assert_eq!(zl.entry_num(), list.length() as u32);
-                // for j in 0..len {
-                //     let mut entry = String::default();
-                //     let mut elen: u32 = 0;
-                //     let mut value: i64 = 0;
-                //     let pos = zl.zip_index(j as i32);
-                //     let list_node = list.index(j as i64);
-                //
-                //     assert_eq!(true, zl.get(pos, &mut entry, &mut elen, &mut value));
-                //     if entry.is_empty() {
-                //         unsafe {
-                //             let v = (*list_node.unwrap().as_ptr()).value();
-                //         }
-                //     } else {
-                //         buf_len = elen;
-                //     }
-                // }
+                for j in 0..len {
+                    let mut entry = String::default();
+                    let mut elen: u32 = 0;
+                    let mut value: i64 = 0;
+                    let pos = zl.zip_index(j as i32);
+                    let list_node = list.index(j as i64);
+
+                    assert_eq!(true, zl.get(pos, &mut entry, &mut elen, &mut value));
+                    if entry.is_empty() {
+                        unsafe {
+                            let v = (*list_node.unwrap().as_ptr()).value();
+                            assert_eq!(value.to_string(), *v);
+                        }
+                    } else {
+                        unsafe {
+                            let v = (*list_node.unwrap().as_ptr()).value();
+                            assert_eq!(entry, *v);
+                        }
+                    }
+                }
             }
             let end = start.elapsed();
+            println!("Done, time = {:?}", end);
         }
+
+        print!("Stress with variable ziplist size: ");
+        {
+            let start = Instant::now();
+            let maxsize = 16384;
+            stress(true, 100000, maxsize, 256);
+            stress(false, 100000, maxsize, 256);
+            let end = start.elapsed();
+            println!("Done, time = {:?}", end);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn benchmark() -> Result<(), ZipListError> {
+        let mut zl = ZipList::new();
+        let iteration = 1000;
+        for i in 0.. iteration {
+            let mut buf = vec![0u8; 4096];
+            buf[..4].copy_from_slice(b"asdf");
+            let s = String::from_utf8(buf).unwrap();
+            zl.push(&s[0..4], false)?;
+            zl.push(&s[0..40], false)?;
+            zl.push(&s[0..400], false)?;
+            zl.push(&s[0..4000], false)?;
+            zl.push("1", false)?;
+            zl.push("10", false)?;
+            zl.push("100", false)?;
+            zl.push("1000", false)?;
+            zl.push("10000", false)?;
+            zl.push("100000", false)?;
+        }
+
+        print!("benchmark ziplist Find: ");
+        {
+            let start = Instant::now();
+            for i in 0..2000 {
+                let fptr = zl.zip_index(0);
+            }
+            let end = start.elapsed();
+            println!("Done, time = {:?}", end);
+        }
+
+        print!("Benchmark ziplist Index: ");
+        {
+            let start = Instant::now();
+            for i in 0..2000 {
+                zl.zip_index(999);
+            }
+            let end = start.elapsed();
+            println!("Done, time = {:?}", end);
+        }
+
+        print!("Benchmark ziplist Validate Integrity: ");
+        {
+            let start = Instant::now();
+            for i in 0..2000 {
+                let len = zl.ziplist_len();
+                ziplist_valid_integerity(&mut zl, len, 1, None, None);
+            }
+            let end = start.elapsed();
+            println!("Done, time = {:?}", end);
+        }
+
+        print!("Benchmark ziplist Compare with string: ");
+        {
+            let start = Instant::now();
+            for i in 0..2000 {
+                let mut pos = zl.zip_index(0);
+                while zl.data[pos] != ZIP_END {
+                    zl.compare(pos, "nothing");
+                    pos = zl.next_entry_position(pos);
+                }
+            }
+            let end = start.elapsed();
+            println!("Done, time = {:?}", end);
+        }
+
+        print!("Benchmark ziplist Compare with number: ");
+        {
+            let start = Instant::now();
+            for i in 0..2000 {
+                let mut pos = zl.zip_index(0);
+                while zl.data[pos] != ZIP_END {
+                    zl.compare(pos, "99999");
+                    pos = zl.next_entry_position(pos);
+                }
+            }
+            let end = start.elapsed();
+            println!("Done, time = {:?}", end);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn ziplist_cascade_update() -> Result<(), ZipListError> {
+        print!("Stress ziplist CascadeUpdate: ");
+        {
+            let buf = vec![b'0'; ZIP_BIG_PREVLEN as usize];
+            let s = String::from_utf8(buf).unwrap();
+            let mut zl = ZipList::new();
+            let iteration = 1000;
+            for i in 0..iteration {
+                zl.push(&s[..ZIP_BIG_PREVLEN as usize - 4], false)?;
+            }
+            let start = Instant::now();
+            zl.push(&s[..ZIP_BIG_PREVLEN as usize - 3], true)?;
+            let end = start.elapsed();
+            println!("Done, time = {:?}", end);
+        }
+
+        fn insert_helper(zl: &mut ZipList, ch: char, len: usize, pos: usize) -> Result<(), ZipListError> {
+            assert!(len <= ZIP_BIG_PREVLEN as usize);
+            let mut data = vec![b'0'; ZIP_BIG_PREVLEN as usize];
+            data[..len].fill(u8::try_from(ch).unwrap());
+            let s = String::from_utf8(data).unwrap();
+            zl.insert(pos, &s[..len])
+        }
+
+        fn compare_help(zl: &ZipList, ch: char, len: usize, index: i32) -> bool {
+            assert!(len <= ZIP_BIG_PREVLEN as usize);
+            let mut data = vec![b'0'; ZIP_BIG_PREVLEN as usize];
+            data[..len].fill(u8::try_from(ch).unwrap());
+            let s = String::from_utf8(data).unwrap();
+            let pos = zl.zip_index(index);
+            assert_ne!(zl.data[pos], ZIP_END);
+            zl.compare(pos, &s[..len])
+        }
+
+        fn str_entry_bytes_small(len: usize) -> usize {
+            len + store_prev_entry_length(None, 0) as usize + store_entry_encoding(None, 0, len as u32) as usize
+        }
+
+        fn str_entry_bytes_big(len: usize) -> usize {
+            len + store_prev_entry_length(None, ZIP_BIG_PREVLEN as u32) as usize + store_entry_encoding(None, 0, len as u32) as usize
+        }
+
+        println!("Edge cases of ziplist CascadeUpdate: ");
+        {
+            let mut zl = ZipList::new();
+            let s1 = ZIP_BIG_PREVLEN as usize - 4;
+            let s2 = ZIP_BIG_PREVLEN as usize - 3;
+            let mut e = [ZlEntry::default(); 4];
+
+            insert_helper(&mut zl, 'a', s1, ZIPLIST_HEADER_SIZE as usize)?;
+            verify(&mut zl, &mut e);
+
+            assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
+            assert!(compare_help(&zl, 'a', s1, 0));
+
+            ziplist_repr(&mut zl);
+
+            /* No expand. */
+            insert_helper(&mut zl, 'b', s1, ZIPLIST_HEADER_SIZE as usize)?;
+            verify(&mut zl, &mut e);
+
+            assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
+            assert!(compare_help(&zl, 'b', s1, 0));
+
+            assert!(e[1].prev_raw_len_size == 1 && e[1].prev_raw_len == str_entry_bytes_small(s1) as u32);
+            assert!(compare_help(&zl, 'a', s1, 1));
+
+            ziplist_repr(&mut zl);
+
+            // Expand(tail included).
+            insert_helper(&mut zl, 'c', s2, ZIPLIST_HEADER_SIZE as usize)?;
+            verify(&mut zl, &mut e);
+
+            assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
+            assert!(compare_help(&zl, 'c', s2, 0));
+
+            assert!(e[1].prev_raw_len_size == 5 && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32);
+            assert!(compare_help(&zl, 'b', s1, 1));
+
+            assert!(e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s1) as u32);
+            assert!(compare_help(&zl, 'a', s1, 2));
+
+            ziplist_repr(&mut zl);
+
+            // Expand(only previous head entry)
+            insert_helper(&mut zl, 'd', s2, ZIPLIST_HEADER_SIZE as usize)?;
+            verify(&mut zl, &mut e);
+
+            assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
+            assert!(compare_help(&zl, 'd', s2, 0));
+
+            assert!(e[1].prev_raw_len_size == 5 && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32);
+            assert!(compare_help(&zl, 'c', s2, 1));
+
+            assert!(e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s2) as u32);
+            assert!(compare_help(&zl, 'b', s1, 2));
+
+            assert!(e[3].prev_raw_len_size == 5 && e[3].prev_raw_len == str_entry_bytes_big(s1) as u32);
+            assert!(compare_help(&zl, 'a', s1, 3));
+
+            ziplist_repr(&mut zl);
+
+            // Delete from mid
+            let mut pos = zl.zip_index(2);
+            zl.delete(&mut pos)?;
+            verify(&mut zl, &mut e);
+
+            assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
+            assert!(compare_help(&zl, 'd', s2, 0));
+
+            assert!(e[1].prev_raw_len_size == 5 && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32);
+            assert!(compare_help(&zl, 'c', s2, 1));
+
+            assert!(e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s2) as u32);
+            assert!(compare_help(&zl, 'a', s1, 2));
+
+            ziplist_repr(&mut zl);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn ziplist_insert_nextdiff() -> Result<(), ZipListError> {
+        print!("ziplist Insert nextdiff == -4 && reqlen < 4 (issue #7170):");
+        {
+            let mut zl = ZipList::new();
+
+            // We set some values to almost reach the critical point - 254
+            let mut buf_252 = vec![b'0'; 252];
+            let mut buf_250 = vec![b'0'; 250];
+            buf_252.fill(u8::try_from('A').unwrap());
+            buf_250.fill(u8::try_from('A').unwrap());
+            let s_252 = String::from_utf8(buf_252).unwrap();
+            let s_250 = String::from_utf8(buf_250).unwrap();
+
+            // After the rpush, the list look like: [one two A_252 A_250 three 10]
+            zl.push("one", false)?;
+            zl.push("two", false)?;
+            zl.push(&s_252, false)?;
+            zl.push(&s_250, false)?;
+            zl.push("three", false)?;
+            zl.push("10", false)?;
+            ziplist_repr(&mut zl);
+
+            let mut pos = zl.zip_index(2);
+            if !zl.compare(pos, &s_252) {
+                panic!("ERROR: not \"A_252\"");
+            }
+
+            zl.delete(&mut pos)?;
+            ziplist_repr(&mut zl);
+
+            pos = zl.zip_index(3);
+            if !zl.compare(pos, "three") {
+                panic!("ERROR: not \"three");
+            }
+
+            zl.insert(pos, "10")?;
+            ziplist_repr(&mut zl);
+
+            pos = zl.zip_index(-1);
+            if !zl.compare(pos, "10") {
+                panic!("ERROR: not \"10");
+            }
+        }
+        print!("ALL TESTS PASSED!");
+        Ok(())
     }
 }

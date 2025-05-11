@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 #[derive(PartialEq)]
-struct Node<T> {
+pub struct Node<T> {
     value: T,
     prev: Option<NonNull<Node<T>>>,
     next: Option<NonNull<Node<T>>>,

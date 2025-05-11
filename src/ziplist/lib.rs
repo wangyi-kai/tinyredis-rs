@@ -54,7 +54,7 @@ pub fn decode_length(ptr: &[u8], encoding: u8) -> (u32, u32) {
                 (2, len)
             }
             ZIP_STR_32B => {
-                let len = u32::from_le_bytes([ptr[1], ptr[2], ptr[3], ptr[4]]);
+                let len = (ptr[1] as u32) << 24 | (ptr[2] as u32) <<16 | (ptr[3] as u32) << 8 | (ptr[4] as u32);
                 (5, len)
             }
             _ => (0, 0), // bad encoding
@@ -215,7 +215,7 @@ pub fn is_string(encoding: u8) -> bool {
 
 pub fn store_entry_encoding(data: Option<&mut [u8]>, encoding: u8, raw_len: u32) -> u32 {
     let mut len = 1;
-    let mut buf = vec![0u8; 5];
+    let mut buf = [0u8; 5];
 
     if is_string(encoding) {
         if raw_len <= 0x3f {
@@ -236,9 +236,9 @@ pub fn store_entry_encoding(data: Option<&mut [u8]>, encoding: u8, raw_len: u32)
                 return len;
             }
             buf[0] = ZIP_STR_32B;
-            buf[1] = (raw_len >> 24) as u8;
-            buf[2] = (raw_len >> 16) as u8;
-            buf[3] = (raw_len >> 8) as u8;
+            buf[1] = (raw_len >> 24 & 0xff) as u8;
+            buf[2] = (raw_len >> 16 & 0xff) as u8;
+            buf[3] = (raw_len >> 8 & 0xff) as u8;
             buf[4] = (raw_len & 0xff) as u8;
         }
     } else {
@@ -248,7 +248,7 @@ pub fn store_entry_encoding(data: Option<&mut [u8]>, encoding: u8, raw_len: u32)
         buf[0] = encoding;
     }
     if let Some(data) = data {
-        data[0..len as usize].copy_from_slice(&buf[..len as usize]);
+        data[0..len as usize].copy_from_slice(&buf[0..len as usize]);
     }
     len
 }
@@ -271,7 +271,7 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
             let i32 = (((value as u64) << 8) as i32).to_le_bytes();
             ptr[..3].copy_from_slice(&i32[1..]);
         }
-        ZIP_STR_32B => {
+        ZIP_INT_32B => {
             let i32 = (value as i32).to_le_bytes();
             ptr[..4].copy_from_slice(&i32);
         }
@@ -298,7 +298,7 @@ pub fn load_integer(ptr: &[u8], encoding: u8) -> i64 {
             bytes[1..].copy_from_slice(&ptr[..3]);
             i32::from_le_bytes(bytes) as i64 >> 8
         }
-        ZIP_STR_32B => {
+        ZIP_INT_32B => {
             let bytes = ptr[..4].try_into().unwrap();
             i32::from_le_bytes(bytes) as i64
         }
@@ -322,7 +322,7 @@ pub fn incr_length(ptr: &mut [u8], incr: usize) {
     }
 }
 
-pub fn ziplist_repr(zl: &ZipList) {
+pub fn ziplist_repr(zl: &mut ZipList) {
     let mut pos = 0;
     let mut index = 0;
     let zl_bytes = zl.ziplist_len();
@@ -359,7 +359,7 @@ type ZiplistValidateEntryCb = fn(pos: usize, head_count: u32, user_dara: *mut c_
 use std::ffi::c_void;
 use std::ops::Deref;
 
-pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: ZiplistValidateEntryCb, user_data: *mut c_void) -> i32 {
+pub fn ziplist_valid_integerity(zl: &mut ZipList, size: usize, deep: i32, entry_cb: Option<ZiplistValidateEntryCb>, user_data: Option<*mut c_void>) -> i32 {
     if size < (ZIPLIST_HEADER_SIZE + ZIPLIST_END_SIZE) as usize {
         return 0;
     }
@@ -390,8 +390,10 @@ pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: Z
         if e.prev_raw_len != prev_raw_size {
             return 0;
         }
-        if entry_cb(pos, header_count, user_data) != 0 {
+        if let Some(cb) = entry_cb {
+            if cb(pos, header_count, user_data.unwrap()) != 0 {
             return 0;
+        }
         }
         prev_raw_size = e.head_size + e.len;
         prev = pos;
@@ -411,7 +413,7 @@ pub fn ziplist_valid_integerity(zl: ZipList, size: usize, deep: i32, entry_cb: Z
 }
 
 pub fn ziplist_merge(first: &mut Option<ZipList>, second: &mut Option<ZipList>) -> Option<ZipList> {
-    let (Some(f), Some(s)) = (first.as_ref(), second.as_ref()) else {
+    let (Some(f), Some(s)) = (first.as_mut(), second.as_mut()) else {
         return None;
     };
 
@@ -423,7 +425,7 @@ pub fn ziplist_merge(first: &mut Option<ZipList>, second: &mut Option<ZipList>) 
     let second_offset = s.tail_offset();
 
     let (mut target, source, append) = if first_len >= second_len {
-        (first.take().unwrap(), s.clone(), true)
+        (first.take().unwrap(), s, true)
     } else {
         (second.take().unwrap(), f, false)
     };
