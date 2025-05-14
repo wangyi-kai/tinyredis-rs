@@ -2,7 +2,8 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
-use crate::hash::dict::{Dict, dict_size, DictEntry};
+use crate::dict::dict::{Dict, DictEntry};
+use crate::dict::lib::{*};
 
 #[derive(Debug)]
 pub struct EntryIter<'a, K, V>
@@ -19,7 +20,11 @@ where K: Default + Clone + Eq + Hash,
 {
     pub unsafe fn iter(&self) -> EntryIter<K, V> {
         EntryIter {
-            cur: Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::new_with_next(self.key.clone(), self.val.clone(), self.next))))),
+            cur: Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry {
+                key: self.key.clone(),
+                val: self.val.clone(),
+                next: self.next }
+            )))),
             _boo: PhantomData,
         }
     }
@@ -58,7 +63,7 @@ impl<K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub fn iter(&self) -> HashIterator<K, V> {
+    pub fn to_iter(&self) -> HashIterator<K, V> {
         unsafe {
             HashIterator {
             dict: self,
@@ -72,7 +77,7 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl<'a, K, V> Iterator for HashIterator<'a, K, V>
-where K: Default + Clone + Eq + Hash + Display,
+where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
     type Item = &'a DictEntry<K, V>;
@@ -98,7 +103,7 @@ where K: Default + Clone + Eq + Hash + Display,
                     }
                 }
                 self.index += 1;
-                if self.index >= (dict_size(*self.dict.ht_size_exp.get_unchecked(self.table)) as i64) {
+                if self.index >= (dict_size(self.dict.ht_size_exp[self.table]) as i64) {
                     if self.dict.dict_is_rehashing() && self.table == 0 {
                         self.table += 1;
                         self.index = 0;
@@ -106,8 +111,8 @@ where K: Default + Clone + Eq + Hash + Display,
                         break;
                     }
                 }
-                let entry_iter = Box::new(self.dict.ht_table.get_unchecked(self.table).get_unchecked(self.index as usize).iter());
-                self.entry = Some(*entry_iter);
+                let entry_iter = (*self.dict.ht_table[self.table][self.index as usize].unwrap().as_ptr()).iter();
+                self.entry = Some(entry_iter);
             }
         }
         None

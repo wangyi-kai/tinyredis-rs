@@ -40,7 +40,7 @@ pub struct List<T> {
     len: usize,
 }
 
-impl<T: std::cmp::PartialEq> List<T> {
+impl<T: PartialEq> List<T> {
     pub fn create() -> List<T> {
         Self {
             head: None,

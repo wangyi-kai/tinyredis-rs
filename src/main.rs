@@ -1,5 +1,5 @@
 mod skiplist;
-mod hash;
+mod dict;
 mod ziplist;
 mod adlist;
 
