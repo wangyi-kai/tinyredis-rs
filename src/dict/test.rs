@@ -5,10 +5,10 @@ use crate::dict::error::HashError;
 mod dict_test {
     use super::*;
     use std::collections::HashMap;
-    use std::fmt::format;
-    use std::time::{Duration, Instant};
-    use crate::dict::dict::DictEntry;
-    use rand::{Rng};
+    use std::time::{Instant};
+    use rand::{Rng, SeedableRng};
+    use rand::rngs::StdRng;
+
     use std::fmt::Write as _;
     use crate::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL};
     use crate::dict::lib::DictResizeFlag::DictResizeEnable;
@@ -25,11 +25,11 @@ mod dict_test {
         const MAX_STRING_SIZE: usize = 500;
 
         let mut large_string = String::with_capacity(LARGE_STRING_SIZE + 1);
-        let mut init = 1;
+        let mut init = 0;
         if init == 0 {
             // Generate a large string
             for i in 0..LARGE_STRING_SIZE {
-                large_string.push((b'0' + (rand::rng().random::<u32>() as u8 % 94)) as char);
+                large_string.push((33 + rand::rng().random::<u32>() as u8 % 94) as char);
             }
             init = 1;
         }
@@ -48,7 +48,9 @@ mod dict_test {
         print!("[TEST] Add 16 keys and verify dict resize is ok: ");
         {
             for j in 0..16 {
-                unsafe { d.add_raw(string_from_long_long(j), j); }
+                unsafe {
+                    d.add_raw(string_from_long_long(j), j)?;
+                }
             }
             while d.dict_is_rehashing() {
                 d.rehash_microseconds(1000)?;
@@ -75,7 +77,7 @@ mod dict_test {
 
         print!("[TEST] Add one more key, trigger the dict resize: ");
         unsafe {
-            let res= d.add_raw(string_from_long_long(current_dict_used as i64), current_dict_used as i64)?;
+            let res = d.add_raw(string_from_long_long(current_dict_used as i64), current_dict_used as i64)?;
             assert_eq!(res, true);
             current_dict_used += 1;
             new_dict_size = 1 << next_exp(current_dict_used as usize);
@@ -94,12 +96,12 @@ mod dict_test {
             println!("PASS");
         }
 
-        print!("Delete keys until we can trigger shrink in next test: ");
+        print!("[TEST] Delete keys until we can trigger shrink in next test: ");
         // Delete keys until we can satisfy (1 / HASHTABLE_MIN_FILL) in the next test.
         unsafe {
             for j in (new_dict_size / HASHTABLE_MIN_FILL + 1)..current_dict_used {
                 let key = string_from_long_long(j as i64);
-                d.generic_delete(&key);
+                let res = d.generic_delete(&key);
             }
             current_dict_used = new_dict_size / HASHTABLE_MIN_FILL + 1;
             assert_eq!(d.dict_size() as u64, current_dict_used);
@@ -107,6 +109,108 @@ mod dict_test {
             assert_eq!(dict_size(d.ht_size_exp[1]), 0);
             println!("PASS");
         }
+
+        print!("[TEST] Delete one more key, trigger the dict resize: ");
+        {
+            current_dict_used -= 1;
+            let key = string_from_long_long(current_dict_used as i64);
+            unsafe {
+                d.generic_delete(&key)?;
+            }
+            let old_dict_size = new_dict_size;
+            new_dict_size = 1 << next_exp(current_dict_used as usize);
+            assert_eq!(d.dict_size() as u64, current_dict_used);
+            assert_eq!(dict_size(d.ht_size_exp[0]), old_dict_size);
+            assert_eq!(dict_size(d.ht_size_exp[1]), new_dict_size);
+
+            // Wait for rehashing
+            while d.dict_is_rehashing() {
+                d.rehash_microseconds(1000)?;
+            }
+            assert_eq!(d.dict_size() as u64, current_dict_used);
+            assert_eq!(dict_size(d.ht_size_exp[0]), new_dict_size);
+            assert_eq!(dict_size(d.ht_size_exp[1]), 0);
+            println!("PASS");
+        }
+
+        print!("[TEST] Empty the dictionary and add 128 keys: ");
+        {
+            d.empty(None);
+            for j in 0..128 {
+                d.add_raw(string_from_long_long(j), j)?;
+            }
+            while d.dict_is_rehashing() {
+                d.rehash_microseconds(1000)?;
+            }
+            assert_eq!(d.dict_size(), 128);
+            assert_eq!(d.dict_buckets(), 128);
+            println!("PASS");
+        }
+
+        print!("[TEST] Use DICT_RESIZE_AVOID to disable the dict resize and reduce to 3: ");
+        {
+            dict_set_resize_enabled(DictResizeAvoid);
+            let remain_keys = dict_size(d.ht_size_exp[0]) / (HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO) + 1;
+            for j in remain_keys..128 {
+                let key = string_from_long_long(j as i64);
+                let res = d.generic_delete(&key);
+            }
+            current_dict_used = remain_keys;
+            assert_eq!(d.dict_size() as u64, remain_keys);
+            assert_eq!(d.dict_buckets(), 128);
+            println!("PASS");
+        }
+
+        print!("[TEST] Delete one more key, trigger the dict resize: ");
+        {
+            current_dict_used -= 1;
+            let key = string_from_long_long(current_dict_used as i64);
+            let res = d.generic_delete(&key)?;
+            new_dict_size = 1 << next_exp(current_dict_used as usize);
+            assert_eq!(d.dict_size() as u64, current_dict_used);
+            assert_eq!(dict_size(d.ht_size_exp[0]), 128);
+            assert_eq!(dict_size(d.ht_size_exp[1]), new_dict_size);
+
+            dict_set_resize_enabled(DictResizeEnable);
+            while d.dict_is_rehashing() {
+                d.rehash_microseconds(1000)?;
+            }
+            assert_eq!(d.dict_size() as u64, current_dict_used);
+            assert_eq!(dict_size(d.ht_size_exp[0]), new_dict_size);
+            assert_eq!(dict_size(d.ht_size_exp[1]), 0);
+            println!("PASS");
+        }
+        Ok(())
+    }
+    #[test]
+    fn restore() -> Result<(), HashError> {
+        let mut d = Dict::new();
+        println!("[TEST] Restore to original state: ");
+        {
+            d.empty(None);
+            dict_set_resize_enabled(DictResizeEnable);
+        }
+        let rng = StdRng::seed_from_u64(12345);
+        let start = Instant::now();
+        let count = 5000;
+        for j in 0..count {
+            let key = string_from_substring();
+            d.add_raw(key, 0)?;
+        }
+        let end = start.elapsed();
+        println!("Inserting random substrings (100-500B) from large string with symbols: {:?}", end);
+        assert!(d.dict_size() <= count);
+        d.empty(None);
+
+        let start = Instant::now();
+        for j in 0..count {
+            let key = string_from_long_long(j as i64);
+            d.add_raw(key, j)?;
+        }
+        let end = start.elapsed();
+        println!("Inserting via dictAdd() non existing: {:?}", end);
+        assert_eq!(d.dict_size(), count);
+        d.empty(None);
 
         Ok(())
     }

@@ -16,4 +16,6 @@ pub enum HashError {
     ExpandErr(String),
     #[error("[Dict]Dict Is Rehashing")]
     IsRehashing,
+    #[error("[Dict]Shrink error({0})")]
+    ShrinkErr(i64),
 }
