@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use rand::Rng;
 use crate::dict::dict::Dict;
 use crate::dict::lib::DictResizeFlag::DictResizeEnable;
 
@@ -50,4 +51,17 @@ pub fn dict_set_resize_enabled(enable: DictResizeFlag) {
     unsafe {
         DICT_CAN_RESIZE = enable
     }
+}
+
+pub fn random_ulong() -> u64 {
+    let random_number: u64 = rand::rng().random_range(0..u64::MAX);
+    random_number
+}
+
+pub fn random_u32() -> u32 {
+    rand::rng().random::<u32>()
+}
+
+pub fn random_i32() -> i32 {
+    rand::rng().random::<i32>()
 }

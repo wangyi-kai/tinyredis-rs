@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::mem;
 use std::time::{Instant};
-
+use rand::{random, Rng, rng};
 use crate::dict::lib::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
 use crate::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
 use crate::dict::error::HashError;
@@ -180,6 +180,7 @@ where K: Default + Clone + Eq + Hash + Display,
         bucket
     }
 
+    #[inline]
     pub fn add_raw(&mut self, key: K, val: V) -> Result<bool, HashError> {
         unsafe {
             let hash = sys_hash(&key);
@@ -216,32 +217,55 @@ where K: Default + Clone + Eq + Hash + Display,
         }
     }
 
-    unsafe fn find_by_hash(&mut self, key: &K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn add_non_exists_by_hash(&mut self, key: K, hash: u64) {
+        unsafe {
+            let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
+
+            self.rehash_step_if_needed(idx);
+            let _ = self.expand_if_needed();
+
+            let table = if self.dict_is_rehashing() {1} else {0};
+            idx = hash & dict_size_mask(self.ht_size_exp[table]);
+            let position = self.ht_table[table][idx as usize];
+            assert!(position.is_some());
+            let entry = NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry {
+                key,
+                val: V::default(),
+                next: position,
+            })));
+            self.ht_table[table][idx as usize] = Some(entry);
+            self.ht_used[table] += 1;
+        }
+    }
+
+    pub fn find_by_hash(&mut self, key: &K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
         if self.dict_size() == 0 {
             return None;
         }
         let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
         self.rehash_step_if_needed(idx);
 
-        for table in 0..2 {
-            if table == 0 && (idx as i64) < self.rehash_idx {
-                continue;
-            }
-            idx = hash & dict_size_mask(self.ht_size_exp[table]);
-
-            let mut he = self.ht_table[table][idx as usize];
-            while *he.unwrap().as_ptr() != DictEntry::default() {
-                let he_key = (*he.unwrap().as_ptr()).get_key();
-                if he_key == key {
-                    return he;
+        unsafe {
+            for table in 0..2 {
+                if table == 0 && (idx as i64) < self.rehash_idx {
+                    continue;
                 }
-                he = (*he.unwrap().as_ptr()).next;
+                idx = hash & dict_size_mask(self.ht_size_exp[table]);
+                let mut he = self.ht_table[table][idx as usize];
+                while *he.unwrap().as_ptr() != DictEntry::default() {
+                    let he_key = (*he.unwrap().as_ptr()).get_key();
+                    if he_key == key {
+                        return he;
+                    }
+                    he = (*he.unwrap().as_ptr()).next;
+                }
+                if !self.dict_is_rehashing() { break; }
             }
         }
         None
     }
 
-    pub unsafe fn find(&mut self, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn find(&mut self, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -344,60 +368,64 @@ where K: Default + Clone + Eq + Hash + Display,
         true
     }
 
-    pub unsafe fn rehash(&mut self, mut n: usize) -> Result<bool, HashError> {
-        let mut empty_visits = n * 10;
-        let s0 = dict_size(self.ht_size_exp[0]);
-        let s1 = dict_size(self.ht_size_exp[1]);
+    pub fn rehash(&mut self, mut n: usize) -> Result<bool, HashError> {
+        unsafe {
+            let mut empty_visits = n * 10;
+            let s0 = dict_size(self.ht_size_exp[0]);
+            let s1 = dict_size(self.ht_size_exp[1]);
 
-        if DICT_CAN_RESIZE == DictResizeForbid || !self.dict_is_rehashing() {
-            return Err(HashError::RehashErr("rehash forbid or is rehashing".to_string()));
-        }
-        // If dict_can_resize is DICT_RESIZE_AVOID, we want to avoid rehashing.
-        // If expanding, the threshold is dict_force_resize_ratio which is 4.
-        // If shrinking, the threshold is 1 / (HASHTABLE_MIN_FILL * dict_force_resize_ratio) which is 1/32.
-        if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0) || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1)) {
-            return Err(HashError::RehashErr("rehash avoid".to_string()));
-        }
-
-        loop {
-            if n == 0 || self.ht_used[0] == 0 {
-                break;
+            if DICT_CAN_RESIZE == DictResizeForbid || !self.dict_is_rehashing() {
+                return Err(HashError::RehashErr("rehash forbid or is rehashing".to_string()));
             }
-            assert!(dict_size(self.ht_size_exp[0]) > self.rehash_idx as u64);
-            while self.ht_table[0][self.rehash_idx as usize] == None {
-                self.rehash_idx += 1;
-                empty_visits -= 1;
-                if empty_visits == 0 {
-                    return Ok(true);
+            // If dict_can_resize is DICT_RESIZE_AVOID, we want to avoid rehashing.
+            // If expanding, the threshold is dict_force_resize_ratio which is 4.
+            // If shrinking, the threshold is 1 / (HASHTABLE_MIN_FILL * dict_force_resize_ratio) which is 1/32.
+            if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0) || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1)) {
+                return Err(HashError::RehashErr("rehash avoid".to_string()));
+            }
+
+            loop {
+                if n == 0 || self.ht_used[0] == 0 {
+                    break;
                 }
+                assert!(dict_size(self.ht_size_exp[0]) > self.rehash_idx as u64);
+                while self.ht_table[0][self.rehash_idx as usize] == None {
+                    self.rehash_idx += 1;
+                    empty_visits -= 1;
+                    if empty_visits == 0 {
+                        return Ok(true);
+                    }
+                }
+                // Move all the keys in this bucket from the old to the new dict HT
+                self.rehash_entries_in_bucket_at_index(self.rehash_idx as u64);
+                self.rehash_idx += 1;
+                n -= 1;
             }
-            // Move all the keys in this bucket from the old to the new dict HT
-            self.rehash_entries_in_bucket_at_index(self.rehash_idx as u64);
-            self.rehash_idx += 1;
-            n -= 1;
         }
 
         Ok(!self.check_rehashing_complete())
     }
 
-    pub unsafe fn rehash_step(&mut self) -> Result<(), HashError> {
+    pub fn rehash_step(&mut self) -> Result<(), HashError> {
         if self.pause_rehash == 0 {
             self.rehash(1)?;
         }
         Ok(())
     }
 
-    pub unsafe fn rehash_step_if_needed(&mut self, visited_index: u64) {
-        if !self.dict_is_rehashing() || self.pause_rehash != 0 {
-            return;
-        }
-        // rehashing not in progress if rehash_idx == -1
-        if visited_index as i64 >= self.rehash_idx && (*self.ht_table[0][visited_index as usize].unwrap().as_ptr()) != DictEntry::default() {
-            // If we have a valid dict entry at `idx` in ht0, we perform rehash on the bucket at `idx` (being more CPU cache friendly)
-            self.bucket_rehash(visited_index);
-        } else {
-            // If the dict entry is not in ht0, we rehash the buckets based on the rehashidx (not CPU cache friendly)
-            let _ = self.rehash(1);
+    pub fn rehash_step_if_needed(&mut self, visited_index: u64) {
+        unsafe {
+            if !self.dict_is_rehashing() || self.pause_rehash != 0 {
+                return;
+            }
+            // rehashing not in progress if rehash_idx == -1
+            if visited_index as i64 >= self.rehash_idx && (*self.ht_table[0][visited_index as usize].unwrap().as_ptr()) != DictEntry::default() {
+                // If we have a valid dict entry at `idx` in ht0, we perform rehash on the bucket at `idx` (being more CPU cache friendly)
+                self.bucket_rehash(visited_index);
+            } else {
+                // If the dict entry is not in ht0, we rehash the buckets based on the rehashidx (not CPU cache friendly)
+                let _ = self.rehash(1);
+            }
         }
     }
 
@@ -469,28 +497,28 @@ where K: Default + Clone + Eq + Hash + Display,
         self.expand_if_needed()
     }
 
-    pub fn _shrink_if_expand(&mut self) -> Result<(), HashError> {
+    pub fn _shrink_if_expand(&mut self) -> Result<bool, HashError> {
         if self.pause_auto_resize > 0 {
-            return Ok(());
+            return Ok(false);
         }
         self.shrink_if_needed()
     }
 
-    pub fn shrink_if_needed(&mut self) -> Result<(), HashError> {
+    pub fn shrink_if_needed(&mut self) -> Result<bool, HashError> {
         if self.dict_is_rehashing() {
-            return Ok(());
+            return Ok(true);
         }
         if dict_size(self.ht_size_exp[0]) <= DICT_HT_INITIAL_SIZE as u64 {
-            return Ok(());
+            return Ok(true);
         }
 
         unsafe {
             if (DICT_CAN_RESIZE == DictResizeEnable && self.ht_used[0] as u64 * HASHTABLE_MIN_FILL <= dict_size(self.ht_size_exp[0])) || (DICT_CAN_RESIZE != DictResizeForbid && self.ht_used[0] as u64 * HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO <= dict_size(self.ht_size_exp[0])) {
                 self.shrink(self.ht_used[0] as u64)?;
-                return Ok(())
+                return Ok(true)
             }
         }
-        Err(HashError::ShrinkErr(-1))
+        Ok(false)
     }
 
     pub fn shrink(&mut self, size: u64) -> Result<(), HashError> {
@@ -535,9 +563,9 @@ where K: Default + Clone + Eq + Hash + Display,
                 if *he.unwrap().as_ptr() == DictEntry::default() { continue; }
 
                 while *he.unwrap().as_ptr() != DictEntry::default() {
-                    let next_he = (*he.unwrap().as_ptr()).next;
+                    let box_node = Box::from_raw(he.unwrap().as_ptr());
+                    he = box_node.next;
                     self.ht_used[ht_idx] -= 1;
-                    he = next_he;
                 }
             }
             self.reset(ht_idx);
@@ -553,6 +581,57 @@ where K: Default + Clone + Eq + Hash + Display,
         self.pause_rehash = 0;
         self.pause_auto_resize = 0;
     }
+
+    pub fn get_random_key(&mut self) -> Option<NonNull<DictEntry<K ,V>>> {
+        unsafe {
+            let mut he;
+            if self.dict_size() == 0 {
+                return None;
+            }
+            if self.dict_is_rehashing() {
+                let _ = self.rehash_step();
+            }
+            if self.dict_is_rehashing() {
+                let s0 = dict_size(self.ht_size_exp[0]) as i64;
+                // We are sure there are no elements in indexes from 0 to rehashidx-1
+                loop {
+                    let h = self.rehash_idx + random_ulong() as i64 % (self.dict_buckets() as i64 - self.rehash_idx);
+                    he = if h >= s0 {
+                        self.ht_table[1][(h - s0) as usize]
+                    } else {
+                        self.ht_table[0][h as usize]
+                    };
+                    if *he.unwrap().as_ptr() != DictEntry::default() {
+                        break;
+                    }
+                }
+            } else {
+                let m = dict_size_mask(self.ht_size_exp[0]);
+                loop {
+                    let h = random_ulong() & m;
+                    he = self.ht_table[0][h as usize];
+                    if *he.unwrap().as_ptr() != DictEntry::default() {
+                        break;
+                    }
+                }
+            }
+
+            let mut list_len = 0;
+            let orig_he = he;
+            while he.is_some() {
+                he = (*he.unwrap().as_ptr()).next;
+                list_len += 1;
+            }
+            let mut list_ele = random_u32() % list_len;
+            he = orig_he;
+
+            while list_ele > 0 {
+                he = (*he.unwrap().as_ptr()).next;
+                list_ele -= 1;
+            }
+            he
+        }
+    }
 }
 
 impl <K, V> Dict<K, V>
@@ -562,10 +641,9 @@ where K: Default + Clone + Eq + Hash,
     #[inline]
     pub fn reset(&mut self, table: usize) {
         unsafe {
-            self.ht_table[table] = vec![Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default())))); 0];
+            self.ht_table[table] = vec![];
             self.ht_used[table] = 0;
             self.ht_size_exp[table] = -1;
-            self.rehash_idx = -1;
         }
     }
 

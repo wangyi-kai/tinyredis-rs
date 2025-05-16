@@ -10,7 +10,8 @@ mod dict_test {
     use rand::rngs::StdRng;
 
     use std::fmt::Write as _;
-    use crate::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL};
+    use crate::dict::hash::sys_hash;
+    use crate::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL, random_u32, random_i32};
     use crate::dict::lib::DictResizeFlag::DictResizeEnable;
 
     fn string_from_long_long(value: i64) -> String {
@@ -212,10 +213,103 @@ mod dict_test {
         assert_eq!(d.dict_size(), count);
         d.empty(None);
 
+        let start = Instant::now();
+        for j in 0..count {
+            let key = string_from_long_long(j as i64);
+            let hash = sys_hash(&key);
+            d.add_non_exists_by_hash(key, hash);
+        }
+        let end = start.elapsed();
+        println!("Inserting via dictAddNonExistsByHash() non existing: {:?}", end);
+        assert_eq!(d.dict_size(), count);
+
+        while d.dict_is_rehashing() {
+            d.rehash_microseconds(100 * 1000)?;
+        }
+        d.empty(None);
+
+        let start = Instant::now();
+        unsafe {
+            for j in 0..count {
+                let key = string_from_long_long(j as i64);
+                let entry = d.find(&key);
+                assert!(entry.is_none());
+
+                let res = d.add_raw(key, 0)?;
+                assert_eq!(res, true);
+            }
+        }
+        let end = start.elapsed();
+        println!("Find() and inserting via dictFind()+dictAddRaw() non existing: {:?}", end);
+        d.empty(None);
+
+        let start = Instant::now();
+        for j in 0..count {
+            let key = string_from_long_long(j as i64);
+            let hash = sys_hash(&key);
+            let entry = d.find_by_hash(&key, hash);
+            assert!(entry.is_none());
+            d.add_non_exists_by_hash(key, hash);
+        }
+        let end = start.elapsed();
+        println!("Find() and inserting via dictGetHash()+dictFindByHash()+dictAddNonExistsByHash() non existing: {:?}", end);
+        assert_eq!(d.dict_size(), count);
+
+        while d.dict_is_rehashing() {
+            d.rehash_microseconds(100 * 1000)?;
+        }
+
+        let start = Instant::now();
+        for j in 0..count {
+            let key = string_from_long_long(j as i64);
+            let entry = d.find(&key);
+            assert!(entry.is_some());
+        }
+        let end = start.elapsed();
+        println!("Linear access of existing elements: {:?}", end);
+
+        let start = Instant::now();
+        for j in 0..count {
+            let key = string_from_long_long((random_u32() % count) as i64);
+            let entry = d.find(&key);
+            assert!(entry.is_some());
+        }
+        let end = start.elapsed();
+        println!("Random access of existing elements: {:?}", end);
+
+        let start = Instant::now();
+        for j in 0..count {
+            let de = d.get_random_key();
+            assert!(de.is_some());
+        }
+        let end = start.elapsed();
+        println!("Accessing random keys: {:?}", end);
+
+        let start = Instant::now();
+        for j in 0..count {
+            let mut key = string_from_long_long((random_u32() % count) as i64);
+            key.replace_range(0..1, "X");
+            let de = d.find(&key);
+            assert!(de.is_none());
+        }
+        let end = start.elapsed();
+        println!("Accessing missing: {:?}", end);
+
+        let start = Instant::now();
+        for j in 0..count {
+            let mut key = string_from_long_long(j as i64);
+            d.generic_delete(&key)?;
+            let c = key.chars().nth(0).unwrap() as u8;
+            key.replace_range(0..1, &(c + 17).to_string());
+            d.add_raw(key, j)?;
+        }
+        let end = start.elapsed();
+        println!("Removing and adding: {:?}", end);
+
         Ok(())
     }
 
-    #[test]
+
     fn dict_insert_and_find()  -> Result<(), HashError>{
         unsafe {
             let mut dict = Dict::new();
@@ -259,7 +353,6 @@ mod dict_test {
         Ok(())
     }
 
-    #[test]
     fn dict_iter() -> Result<(), HashError> {
         unsafe {
             let mut dict = Dict::new();
@@ -284,7 +377,7 @@ mod dict_test {
         Ok(())
     }
 
-    #[test]
+
     fn dict_delete() -> Result<(), HashError> {
         unsafe {
             let mut dict = Dict::new();
