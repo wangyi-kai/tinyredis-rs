@@ -2,21 +2,22 @@ use crate::skiplist::skiplist::SkipList;
 
 mod skiplist;
 mod test;
+mod lib;
 
-const SKIP_LIST_MAX_LEVEL: i32 = 32;
+const SKIP_LIST_MAX_LEVEL: usize = 32;
 const SKIP_LIST_P: f32 = 0.25;
 const SKIP_MAX_SEARCH: usize = 10;
-const RAND_MAX: i32 = i32::MAX;
+const RAND_MAX: i32 = 0x7fff_ffff;
 
 #[derive(Copy, Clone)]
 pub struct RangeSpec {
-    min: i64,
-    max: i64,
+    min: f64,
+    max: f64,
     min_ex: i32,
     max_ex: i32,
 }
 
-pub fn value_gte_min(value: i64, range_spec: RangeSpec) -> bool {
+pub fn value_gte_min(value: f64, range_spec: RangeSpec) -> bool {
     if range_spec.min_ex == 1 {
         value > range_spec.min
     } else {
@@ -24,7 +25,7 @@ pub fn value_gte_min(value: i64, range_spec: RangeSpec) -> bool {
     }
 }
 
-pub fn value_lte_max(value: i64, range_spec: RangeSpec) -> bool {
+pub fn value_lte_max(value: f64, range_spec: RangeSpec) -> bool {
     if range_spec.max_ex == 1 {
         value < range_spec.max
     } else {
