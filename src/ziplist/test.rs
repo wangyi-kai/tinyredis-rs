@@ -398,9 +398,9 @@ mod test {
         print!("[TEST]Replace with same size: ");
         {
             let mut pos = 0;
-            let mut entry = String::default();
-            let mut elen: u32 = 0;
-            let mut value: i64 = 0;
+            let entry = String::default();
+            let elen: u32 = 0;
+            let value: i64 = 0;
 
             zl = create();  /* "hello", "foo", "quux", "1024" */
             pos = zl.zip_index(0);

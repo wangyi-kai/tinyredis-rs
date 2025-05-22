@@ -1,7 +1,6 @@
 use std::ptr::NonNull;
 use crate::skiplist::{SKIP_LIST_MAX_LEVEL};
 use super::lib::{random_level, sds_cmp};
-use rand::Rng;
 
 #[derive(Clone, Debug, Default)]
 pub struct Node {

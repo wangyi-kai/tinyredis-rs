@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ptr::NonNull;

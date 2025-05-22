@@ -1,8 +1,9 @@
 use crate::skiplist::skiplist::SkipList;
+use crate::skiplist::lib::gen_random;
 
 mod skiplist;
 mod test;
-mod lib;
+pub(crate) mod lib;
 
 const SKIP_LIST_MAX_LEVEL: usize = 32;
 const SKIP_LIST_P: f32 = 0.25;

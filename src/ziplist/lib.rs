@@ -279,7 +279,7 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
             let i64 = value.to_le_bytes();
             ptr[..8].copy_from_slice(&i64);
         }
-        IMM if IMM >= ZIP_INT_IMM_MIN && IMM <= ZIP_INT_IMM_MAX => { }
+        imm if imm >= ZIP_INT_IMM_MIN && imm <= ZIP_INT_IMM_MAX => { }
         _ => { panic!("Invalid zip integer encoding"); }
     }
 }

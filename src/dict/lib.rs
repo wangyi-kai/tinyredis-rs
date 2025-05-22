@@ -1,6 +1,4 @@
-use std::hash::Hash;
 use rand::Rng;
-use crate::dict::dict::Dict;
 use crate::dict::lib::DictResizeFlag::DictResizeEnable;
 
 pub(crate) const DICT_HT_INITIAL_EXP: usize = 2;
