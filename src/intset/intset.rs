@@ -124,13 +124,14 @@ impl IntSet {
     pub fn upgrade_and_add(&mut self, value: i64) {
         let cur_encoding = self.encoding as u8;
         let new_encoding = intset_value_encoding(value);
-        let length = self.length;
+        let mut length = self.length;
         let prepend = if value < 0 { 1 } else { 0 };
 
         self.encoding = new_encoding as u32;
         self.resize(self.length + 1);
 
         while length > 0 {
+            length -= 1;
             self.inset_set((length + prepend) as usize, self.get_encoded(length as usize, cur_encoding));
         }
 
@@ -165,14 +166,16 @@ impl IntSet {
         self.contents.copy_within(src..src + bytes, dst);
     }
 
-    pub fn add(&mut self, value: i64) {
+    pub fn add(&mut self, value: i64, success: &mut bool) {
         let value_encoding = intset_value_encoding(value);
         let mut pos = 0;
+        *success = true;
 
         if value_encoding > self.encoding as u8 {
             return self.upgrade_and_add(value)
         } else {
             if self.search(value, Some(&mut pos)) {
+                *success = false;
                 return;
             }
             self.resize(self.length + 1);
@@ -189,9 +192,9 @@ impl IntSet {
         let value_encoding = intset_value_encoding(value);
         let mut pos = 0;
 
-        if value_encoding < self.encoding as u8 && self.search(value, Some(&mut pos)) {
+        if value_encoding <= self.encoding as u8 && self.search(value, Some(&mut pos)) {
             if pos < (self.length - 1) as usize {
-                self.move_tail(pos, pos + 1);
+                self.move_tail(pos + 1, pos);
             }
             self.resize(self.length - 1);
             self.length -= 1;
