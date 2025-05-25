@@ -1,6 +1,9 @@
 use std::hash::Hash;
 use rand::Rng;
-use crate::dict::dict::Dict;
+use std::ffi::c_void;
+
+
+use crate::dict::dict::{Dict, DictEntry};
 use crate::dict::lib::DictResizeFlag::DictResizeEnable;
 use crate::kvstore::kvstore::KvStore;
 
@@ -17,6 +20,9 @@ pub enum DictResizeFlag {
     DictResizeAvoid,
     DictResizeForbid,
 }
+
+pub type DictScanFunction<K, V> = fn(privdata: *c_void, de: &mut DictEntry<K, V>);
+pub type DictDefragAllocFunction = fn(ptr: *mut c_void);
 
 pub struct DictType<K, V>
 where K: Default + Clone + Eq + Hash,
@@ -45,6 +51,10 @@ pub fn dict_size_mask(exp: i32) -> u64 {
     } else {
         dict_size(exp) - 1
     }
+}
+
+pub fn entry_mem_usage<K, V>() -> usize {
+    size_of::<DictEntry<K, V>>()
 }
 
 pub fn next_exp(size: usize) -> i32 {

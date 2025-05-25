@@ -1,9 +1,11 @@
+use std::ffi::c_void;
 use std::hash::Hash;
 use std::ptr::NonNull;
-use crate::adlist::adlist::List;
+use crate::adlist::adlist::{List, Node};
 use crate::dict::dict::{Dict, DictEntry};
-use crate::dict::lib::{dict_size, DictType};
+use crate::dict::lib::{dict_size, DictScanFunction, DictType, entry_mem_usage};
 use crate::kvstore::{KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
+use crate::kvstore::lib::KvStoreScanShouldSkipDict;
 use crate::kvstore::meta::KvStoreDictMetaBase;
 
 #[derive(Clone)]
@@ -38,7 +40,7 @@ where K: Default + Clone + Eq + Hash,
     /// Total number of buckets in this kvstore across dictionaries
     bucket_count: u64,
     /// Binary indexed tree (BIT) that describes cumulative key frequencies up until given dict-index
-    dict_size_index: vec![],
+    dict_size_index: Vec<u64>,
     /// The overhead of all dictionaries
     overhead_hashtable_lut: usize,
     /// The overhead of dictionaries rehashing
@@ -72,9 +74,9 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
             }
             let rehashing = List::create();
             let dict_size_index = if num_dicts > 1 {
-                vec![0; 8 * (1 + num_dicts)];
+                vec![0; 8 * (1 + num_dicts)].to_vec()
             } else {
-                vec![];
+                Vec::new()
             };
 
             Self {
@@ -205,5 +207,51 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
         }
     }
 
+    pub fn mem_usge(&self) -> usize {
+        let mut mem = size_of::<Self>();
+        let keys_count = self.kvstore_size();
+        mem += keys_count as usize * entry_mem_usage();
+        mem += self.kvstore_buckets() as usize * size_of::<&DictEntry<K, V>>();
+        mem += self.allocated_dicts as usize * size_of::<Dict<K, V>>();
+        mem += self.rehashing.length() * size_of::<Node<Dict<K, V>>>();
+        if !self.dict_size_index.is_empty() {
+            mem += (self.num_dicts + 1) as usize * size_of::<u64>();
+        }
 
+        mem
+    }
+
+    pub fn get_and_clear_dict_index_from_cursor(&self, cursor: &mut u64) -> usize {
+        if self.num_dicts == 1 {
+            return 0;
+        }
+        let didx = *cursor & (self.num_dicts - 1);
+        *cursor >>= self.num_dicts_bits;
+        didx as usize
+    }
+
+    pub fn kvstore_scan(
+        &self,
+        mut cursor: u64,
+        only_didx: usize,
+        scan_cb: DictScanFunction<K, V>,
+        skip_cb: KvStoreScanShouldSkipDict<K ,V>,
+        privdata: *c_void,
+    ) -> u64 {
+        let _cursor = 0;
+        let mut didx = self.get_and_clear_dict_index_from_cursor(&mut cursor);
+        if only_didx > 0 {
+            if didx < only_didx {
+                assert!(only_didx < self.num_dicts as usize);
+                didx = only_didx;
+                cursor = 0;
+            } else if didx > only_didx {
+                return 0;
+            }
+        }
+        let d = self.get_dict(didx);
+
+
+        0
+    }
 }

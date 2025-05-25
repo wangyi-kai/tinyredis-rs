@@ -61,26 +61,6 @@ impl <K, V> DictEntry<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone 
 {
-    pub fn new(key: K, val: V) -> Self {
-        Self {
-            key,
-            val,
-            next: None,
-        }
-    }
-
-    #[inline]
-    pub fn push_back(&mut self, entry: DictEntry<K, V>) {
-        unsafe {
-            self.next = Some(NonNull::new_unchecked(Box::into_raw(Box::new(entry))));
-        }
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.key == K::default() && self.val == V::default()
-    }
-
     #[inline]
     pub fn get_key(&self) -> &K {
         &self.key
@@ -89,33 +69,6 @@ where K: Default + Clone + Eq + Hash,
     #[inline]
     pub fn get_val(&self) -> &V {
         &self.val
-    }
-
-    #[inline]
-    pub fn set_key(&mut self, key: K) {
-        self.key = key
-    }
-
-    #[inline]
-    pub fn set_val(&mut self, val: V) {
-        self.val = val
-    }
-
-    #[inline]
-    pub fn get_next(&mut self) -> Option<NonNull<DictEntry<K, V>>> {
-        self.next
-    }
-
-    #[inline]
-    pub fn set_next(&mut self, next: &mut DictEntry<K, V>) {
-        unsafe {
-            self.next = Some(NonNull::new_unchecked(next as *mut DictEntry<K, V>))
-        }
-    }
-
-    #[inline]
-    fn set_next_none(&mut self) {
-        self.next = None
     }
 }
 
@@ -157,6 +110,30 @@ where K: Default + Clone + Eq + Hash + Display,
                 metadata: vec![],
             }
         }
+    }
+
+    pub fn scan(&mut self, v: u64) -> u64 {
+        let mut ht_idx0 = 0;
+        let mut ht_idx1 = 0;
+        let mut m0 = 0;
+        let mut m1 = 0;
+
+        if self.dict_size() == 0 {
+            return 0;
+        }
+        self.pause_rehash();
+        unsafe {
+            if !self.dict_is_rehashing() {
+                m0 = dict_size_mask(self.ht_size_exp[ht_idx0]);
+                let mut de = self.ht_table[ht_idx0][(v & m0) as usize];
+                while de.is_some() {
+                    let next = (*de.unwrap().as_ptr()).next;
+                    de = next;
+                }
+            }
+        }
+
+        v
     }
 
     pub unsafe fn find_position_for_insert(&mut self, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
