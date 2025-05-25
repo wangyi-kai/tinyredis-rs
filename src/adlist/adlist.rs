@@ -157,6 +157,19 @@ impl<T: PartialEq> List<T> {
     pub fn search_key(&self, key: T) -> Option<NonNull<Node<T>>> {
         None
     }
+
+    pub fn empty(&mut self) {
+        unsafe {
+            let mut current = self.head;
+            while self.len > 0 {
+                let box_node = Box::from_raw(current.unwrap().as_ptr());
+                current = box_node.next;
+                self.len -= 1;
+            }
+            self.head = None;
+            self.tail = None;
+        }
+    }
 }
 
 pub struct Iter<'a, T> {

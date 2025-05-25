@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cmp::{ PartialEq};
 use std::ptr::NonNull;
 use std::fmt::{Debug, Display};
@@ -118,11 +119,12 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-#[derive(Clone)]
-pub struct Dict<K, V>
+
+pub struct Dict<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone 
 {
+    pub dict_type: &'a DictType<K, V>,
     /// dict table
     pub ht_table: Vec<Vec<Option<NonNull<DictEntry<K, V>>>>>,
     /// dict table used
@@ -135,21 +137,24 @@ where K: Default + Clone + Eq + Hash,
     pause_auto_resize: u16,
     /// exponent of size. (size = 1<<exp)
     pub ht_size_exp: Vec<i32>,
+    pub metadata: Vec<Box<dyn Any>>,
 }
 
-impl <K, V> Dict<K, V>
+impl <'a, K, V> Dict<'a, K, V>
 where K: Default + Clone + Eq + Hash + Display,
       V: Default + PartialEq + Clone 
 {
-    pub fn new() -> Self {
+    pub fn create(dict_type: &'a DictType<K, V>) -> Self {
         unsafe {
             Self {
+                dict_type,
                 ht_table: vec![vec![Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default())))); DICT_HT_INITIAL_SIZE], vec![]],
                 ht_used: vec![0; 2],
                 rehash_idx: -1,
                 pause_rehash: 0,
                 pause_auto_resize: 0,
                 ht_size_exp: vec![DICT_HT_INITIAL_EXP as i32; 2],
+                metadata: vec![],
             }
         }
     }
@@ -532,6 +537,10 @@ where K: Default + Clone + Eq + Hash + Display,
         self.pause_rehash += 1
     }
 
+    pub fn is_rehash_pause(&self) -> bool {
+        self.pause_rehash > 0
+    }
+
     pub fn rehash_microseconds(&mut self, us: u64) -> Result<i32, HashError> {
         if self.pause_rehash > 0 {
             return Ok(0);
@@ -548,6 +557,11 @@ where K: Default + Clone + Eq + Hash + Display,
             }
         }
         Ok(rehashes)
+    }
+
+    pub fn release(&mut self) {
+        self._clear(0, None);
+        self._clear(1, None);
     }
 
     fn _clear(&mut self, ht_idx: usize, call_back: Option<fn(&mut Dict<K, V>)>) {
@@ -634,7 +648,7 @@ where K: Default + Clone + Eq + Hash + Display,
     }
 }
 
-impl <K, V> Dict<K, V>
+impl <K, V> Dict<'_, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone 
 {
@@ -676,22 +690,22 @@ where K: Default + Clone + Eq + Hash,
     }
 
     #[inline]
-    fn dict_is_empty(&self) -> bool {
+    pub fn dict_is_empty(&self) -> bool {
         self.ht_used[0] == 0 && self.ht_used[1] == 0
     }
 
     #[inline]
-    fn dict_pause_rehash(&mut self) {
+    pub fn dict_pause_rehash(&mut self) {
         self.pause_rehash += 1
     }
 
     #[inline]
-    fn dict_resume_rehash(&mut self) {
+    pub fn dict_resume_rehash(&mut self) {
         self.pause_rehash -= 1
     }
 
     #[inline]
-    fn dict_is_rehash_paused(&self) -> bool {
+    pub fn dict_is_rehash_paused(&self) -> bool {
         self.pause_rehash > 0
     }
 }

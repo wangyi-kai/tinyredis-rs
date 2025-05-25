@@ -47,24 +47,24 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-pub struct HashIterator<'a, K, V>
+pub struct DictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    dict: &'a Dict<K, V>,
+    dict: &'a Dict<'a, K, V>,
     table: usize,
     index: i64,
     safe: i64,
     entry: Option<EntryIter<'a, K, V>>,
 }
 
-impl<K, V> Dict<K, V>
+impl<K, V> Dict<'_, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub fn to_iter(&self) -> HashIterator<K, V> {
+    pub fn to_iter(&self) -> DictIterator<K, V> {
         unsafe {
-            HashIterator {
+            DictIterator {
             dict: self,
             table: 0,
             index: -1,
@@ -75,7 +75,7 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-impl<'a, K, V> Iterator for HashIterator<'a, K, V>
+impl<'a, K, V> Iterator for DictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {

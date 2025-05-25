@@ -11,7 +11,7 @@ mod dict_test {
 
     use std::fmt::Write as _;
     use crate::dict::hash::sys_hash;
-    use crate::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL, random_u32, random_i32};
+    use crate::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL, random_u32, random_i32, DictType};
     use crate::dict::lib::DictResizeFlag::DictResizeEnable;
 
     fn string_from_long_long(value: i64) -> String {
@@ -42,7 +42,13 @@ mod dict_test {
 
     #[test]
     fn insert_test() -> Result<(), HashError> {
-        let mut d = Dict::new();
+        let benchmark_dict_type = DictType {
+            hash_function: None,
+            rehashing_started: None,
+            rehashing_completed: None,
+            dict_meta_data_bytes: None,
+        };
+        let mut d = Dict::create(&benchmark_dict_type);
         let mut current_dict_used = 0;
         let mut new_dict_size = 0;
 
@@ -185,7 +191,13 @@ mod dict_test {
     }
     #[test]
     fn restore() -> Result<(), HashError> {
-        let mut d = Dict::new();
+        let benchmark_dict_type = DictType {
+            hash_function: None,
+            rehashing_started: None,
+            rehashing_completed: None,
+            dict_meta_data_bytes: None,
+        };
+        let mut d = Dict::create(&benchmark_dict_type);
         println!("[TEST] Restore to original state: ");
         {
             d.empty(None);
@@ -312,7 +324,13 @@ mod dict_test {
 
     fn dict_insert_and_find()  -> Result<(), HashError>{
         unsafe {
-            let mut dict = Dict::new();
+            let benchmark_dict_type = DictType {
+                hash_function: None,
+                rehashing_started: None,
+                rehashing_completed: None,
+                dict_meta_data_bytes: None,
+            };
+            let mut dict = Dict::create(&benchmark_dict_type);
             let num = 10;
             let start = Instant::now();
 
@@ -355,7 +373,13 @@ mod dict_test {
 
     fn dict_iter() -> Result<(), HashError> {
         unsafe {
-            let mut dict = Dict::new();
+            let benchmark_dict_type = DictType {
+                hash_function: None,
+                rehashing_started: None,
+                rehashing_completed: None,
+                dict_meta_data_bytes: None,
+            };
+            let mut dict = Dict::create(&benchmark_dict_type);
             let num = 10;
             let start = Instant::now();
 
@@ -380,7 +404,13 @@ mod dict_test {
 
     fn dict_delete() -> Result<(), HashError> {
         unsafe {
-            let mut dict = Dict::new();
+            let benchmark_dict_type = DictType {
+                hash_function: None,
+                rehashing_started: None,
+                rehashing_completed: None,
+                dict_meta_data_bytes: None,
+            };
+            let mut dict = Dict::create(&benchmark_dict_type);
             let num = 10;
 
             for i in 1..num + 1 {

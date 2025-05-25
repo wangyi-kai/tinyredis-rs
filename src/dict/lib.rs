@@ -1,5 +1,8 @@
+use std::hash::Hash;
 use rand::Rng;
+use crate::dict::dict::Dict;
 use crate::dict::lib::DictResizeFlag::DictResizeEnable;
+use crate::kvstore::kvstore::KvStore;
 
 pub(crate) const DICT_HT_INITIAL_EXP: usize = 2;
 pub(crate) const DICT_HT_INITIAL_SIZE: usize = 1 << DICT_HT_INITIAL_EXP;
@@ -13,6 +16,17 @@ pub enum DictResizeFlag {
     DictResizeEnable,
     DictResizeAvoid,
     DictResizeForbid,
+}
+
+pub struct DictType<K, V>
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
+    pub hash_function: Option<Box<dyn Fn(K) -> u64>>,
+    pub rehashing_started: Option<Box<dyn Fn(&Dict<K, V>)>>,
+    pub rehashing_completed: Option<Box<dyn Fn(&Dict<K, V>)>>,
+    pub dict_meta_data_bytes: Option<Box<dyn Fn(&Dict<K, V>) -> usize>>,
+    //pub user_data: Option<KvStore<K, V>>,
 }
 
 #[inline]
