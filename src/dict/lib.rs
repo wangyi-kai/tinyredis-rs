@@ -21,7 +21,7 @@ pub enum DictResizeFlag {
     DictResizeForbid,
 }
 
-pub type DictScanFunction<K, V> = fn(privdata: *c_void, de: &mut DictEntry<K, V>);
+pub type DictScanFunction<K, V> = fn(de: &mut DictEntry<K, V>);
 pub type DictDefragAllocFunction = fn(ptr: *mut c_void);
 
 pub struct DictType<K, V>

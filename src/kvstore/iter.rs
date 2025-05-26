@@ -1,6 +1,6 @@
 use std::hash::Hash;
 use crate::kvstore::kvstore::KvStore;
-use crate::dict::hash_iter::DictIterator;
+use crate::dict::iter::DictIterator;
 
 pub struct KvStoreIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,

@@ -112,7 +112,7 @@ where K: Default + Clone + Eq + Hash + Display,
         }
     }
 
-    pub fn scan(&mut self, v: u64) -> u64 {
+    pub fn scan(&mut self, mut v: u64, scan_fn: DictScanFunction<K, V>) -> u64 {
         let mut ht_idx0 = 0;
         let mut ht_idx1 = 0;
         let mut m0 = 0;
@@ -128,8 +128,25 @@ where K: Default + Clone + Eq + Hash + Display,
                 let mut de = self.ht_table[ht_idx0][(v & m0) as usize];
                 while de.is_some() {
                     let next = (*de.unwrap().as_ptr()).next;
+                    scan_fn(&mut de);
                     de = next;
                 }
+                v |= !m0;
+                v = v.reverse_bits();
+                v += 1;
+                v = v.reverse_bits();
+            } else {
+                ht_idx0 = 0;
+                ht_idx1 = 1;
+
+                if dict_size(self.ht_size_exp[ht_idx0]) > dict_size(self.ht_size_exp[ht_idx1]) {
+                    ht_idx0 = 1;
+                    ht_idx1 = 0;
+                }
+                m0 = dict_size_mask(self.ht_size_exp[ht_idx0]);
+                m1 = dict_size_mask(self.ht_size_exp[ht_idx1]);
+
+                let de = self.ht_table[ht_idx0][(v & m0) as usize];
             }
         }
 
