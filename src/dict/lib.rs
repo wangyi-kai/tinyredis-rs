@@ -13,6 +13,7 @@ pub const DICT_FORCE_RESIZE_RATIO: u64 = 4;
 pub static mut DICT_CAN_RESIZE: DictResizeFlag = DictResizeEnable;
 pub(crate) const HASHTABLE_MIN_FILL: u64 = 8;
 pub(crate) const LONG_MAX: u64 = 0x7FFF_FFFF_FFFF_FFFF;
+pub(crate) const DICT_STATS_VECTLEN: usize = 50;
 
 #[derive(PartialEq)]
 pub enum DictResizeFlag {
@@ -76,8 +77,7 @@ pub fn dict_set_resize_enabled(enable: DictResizeFlag) {
 }
 
 pub fn random_ulong() -> u64 {
-    let random_number: u64 = rand::rng().random_range(0..u64::MAX);
-    random_number
+    rand::rng().random::<u64>()
 }
 
 pub fn random_u32() -> u32 {

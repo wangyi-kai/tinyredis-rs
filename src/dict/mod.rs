@@ -4,3 +4,4 @@ pub mod hash;
 pub mod iter;
 mod test;
 pub mod lib;
+mod stats;

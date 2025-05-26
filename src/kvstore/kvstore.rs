@@ -1,12 +1,15 @@
 use std::ffi::c_void;
 use std::hash::Hash;
+use std::ops::ControlFlow::Continue;
 use std::ptr::NonNull;
+use rand::Rng;
 use crate::adlist::adlist::{List, Node};
 use crate::dict::dict::{Dict, DictEntry};
 use crate::dict::lib::{dict_size, DictScanFunction, DictType, entry_mem_usage};
 use crate::kvstore::{KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
-use crate::kvstore::lib::KvStoreScanShouldSkipDict;
+use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
 use crate::kvstore::meta::KvStoreDictMetaBase;
+use crate::skiplist::lib::gen_random;
 
 #[derive(Clone)]
 pub struct KvStoreMetadata {
@@ -221,37 +224,141 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
         mem
     }
 
-    pub fn get_and_clear_dict_index_from_cursor(&self, cursor: &mut u64) -> usize {
+    pub fn get_and_clear_dict_index_from_cursor(&self, cursor: &mut u64) -> i32 {
         if self.num_dicts == 1 {
             return 0;
         }
         let didx = *cursor & (self.num_dicts - 1);
         *cursor >>= self.num_dicts_bits;
-        didx as usize
+        didx as i32
     }
 
     pub fn kvstore_scan(
-        &self,
+        &mut self,
         mut cursor: u64,
-        only_didx: usize,
-        scan_cb: DictScanFunction<K, V>,
-        skip_cb: KvStoreScanShouldSkipDict<K ,V>,
-        privdata: *c_void,
+        only_didx: i32,
+        scan_cb: Option<DictScanFunction<K, V>>,
+        skip_cb: Option<KvStoreScanShouldSkipDict<K ,V>>,
     ) -> u64 {
-        let _cursor = 0;
-        let mut didx = self.get_and_clear_dict_index_from_cursor(&mut cursor);
-        if only_didx > 0 {
-            if didx < only_didx {
-                assert!(only_didx < self.num_dicts as usize);
-                didx = only_didx;
-                cursor = 0;
-            } else if didx > only_didx {
+        unsafe {
+            let mut _cursor = 0;
+            let mut didx = self.get_and_clear_dict_index_from_cursor(&mut cursor);
+            if only_didx > 0 {
+                if didx < only_didx {
+                    assert!(only_didx < self.num_dicts as i32);
+                    didx = only_didx;
+                    cursor = 0;
+                } else if didx > only_didx {
+                    return 0;
+                }
+            }
+            let d = self.get_dict(didx as usize);
+            let skip = if !d.is_none() || (scan_cb.is_some() && skip_cb.is_some()) { true } else { false };
+            if !skip {
+                _cursor = (*d.unwrap().as_ptr()).scan(cursor, scan_cb.unwrap());
+                self.free_dict_if_needed(didx as usize);
+            }
+            if _cursor == 0 || skip {
+                if only_didx >= 0 {
+                    return 0;
+                }
+                didx = self.get_next_non_empty_dict_index(didx as usize);
+            }
+            if didx == -1 {
                 return 0;
             }
+            self.add_dict_index_to_cursor(didx, &mut _cursor);
+            _cursor
         }
-        let d = self.get_dict(didx);
+    }
 
+    pub fn expand(
+        &mut self,
+        new_size: u64,
+        skip_cb: Option<KvStoreExpandShouldSkipDictIndex>
+    ) -> bool {
+        unsafe {
+            for i in 0..self.num_dicts {
+                let d = self.get_dict(i as usize);
+                if d.is_none() || (skip_cb.is_none() && skip_cb.unwrap()(i as usize) != 0) {
+                    continue;
+                }
+                match (*d.unwrap().as_ptr()).expand(new_size as usize) {
+                    Ok(_) => {}
+                    Err(_) => { return false }
+                }
+            }
+        }
+        true
+    }
 
-        0
+    pub fn get_fair_random_dict_index(&self) -> usize {
+        let target = if self.kvstore_size() > 0 {
+            rand::rng().random::<u64>() % self.kvstore_size() + 1
+        } else {
+            0
+        };
+        self.find_dict_index_by_key_index(target)
+    }
+
+    pub fn get_stats(&self) {
+
+    }
+
+    fn get_next_non_empty_dict_index(&self, didx: usize) -> i32 {
+        if self.num_dicts == 1 {
+            assert_eq!(didx, 0);
+            return -1;
+        }
+        let mut next_key = self.cumulative_key_count_read(didx as i32) + 1;
+        if next_key < self.kvstore_size() {
+            self.find_dict_index_by_key_index(mut next_key) as i32
+        } else {
+            -1
+        }
+    }
+
+    fn cumulative_key_count_read(&self, didx: i32) -> u64 {
+        if self.num_dicts == 1 {
+            assert_eq!(0, didx);
+            return self.kvstore_size()
+        }
+        let mut idx = didx + 1;
+        let mut sum = 0;
+        while idx > 0 {
+            sum += self.dict_size_index[idx as usize];
+            idx -= (idx & -idx);
+        }
+        sum
+    }
+
+    fn find_dict_index_by_key_index(&self, mut target: u64) -> usize {
+        if self.num_dicts == 1 || self.kvstore_size() == 0 {
+            return 0;
+        }
+        assert!(target < self.kvstore_size());
+
+        let mut result = 0;
+        let bit_mask = 1 << self.num_dicts_bits;
+        let mut i = bit_mask;
+        while i != 0 {
+            let current = result + i;
+            if target > self.dict_size_index[current] {
+                target -= self.dict_size_index[current];
+                result = current;
+            }
+            i >>= 1;
+        }
+        result
+    }
+
+    fn add_dict_index_to_cursor(&self, didx: i32, cursor: &mut u64) {
+        if self.num_dicts == 1 {
+            return;
+        }
+        if didx < 0 {
+            return;
+        }
+        *cursor = *cursor << self.num_dicts_bits | didx as u64;
     }
 }

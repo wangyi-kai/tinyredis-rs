@@ -146,10 +146,31 @@ where K: Default + Clone + Eq + Hash + Display,
                 m0 = dict_size_mask(self.ht_size_exp[ht_idx0]);
                 m1 = dict_size_mask(self.ht_size_exp[ht_idx1]);
 
-                let de = self.ht_table[ht_idx0][(v & m0) as usize];
-            }
-        }
+                let mut de = self.ht_table[ht_idx0][(v & m0) as usize];
+                while de.is_some() {
+                    let next = (*de.unwrap().as_ptr()).next;
+                    scan_fn(&mut de);
+                    de = next;
+                }
 
+                loop {
+                    let mut de = self.ht_table[ht_idx1][(v & m1) as usize];
+                    while de.is_some() {
+                        let next = (*de.unwrap().as_ptr()).next;
+                        scan_fn(&mut de);
+                        de = next;
+                    }
+                    v |= !m1;
+                    v = v.reverse_bits();
+                    v += 1;
+                    v = v.reverse_bits();
+                    if v & (m0 ^ m1) == 0 {
+                        break;
+                    }
+                }
+            }
+            self.resume_rehash();
+        }
         v
     }
 
@@ -462,7 +483,7 @@ where K: Default + Clone + Eq + Hash + Display,
         Ok(())
     }
 
-    fn expand(&mut self, size: usize) -> Result<(), HashError> {
+    pub fn expand(&mut self, size: usize) -> Result<(), HashError> {
         if self.dict_is_rehashing() || self.ht_used[0] > (size as u32) || dict_size(self.ht_size_exp[0]) >= (size as u64) {
             return Err(HashError::ExpandErr("size is invalid".to_string()));
         }
@@ -529,6 +550,18 @@ where K: Default + Clone + Eq + Hash + Display,
 
     pub fn pause_rehash(&mut self) {
         self.pause_rehash += 1
+    }
+
+    pub fn resume_rehash(&mut self) {
+        self.pause_rehash -= 1
+    }
+
+    pub fn pause_auto_resize(&mut self) {
+        self.pause_auto_resize += 1
+    }
+
+    pub fn resume_auto_resize(&mut self) {
+        self.pause_auto_resize -= 1
     }
 
     pub fn is_rehash_pause(&self) -> bool {
