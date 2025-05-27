@@ -322,6 +322,7 @@ mod dict_test {
     }
 
 
+    #[test]
     fn dict_insert_and_find()  -> Result<(), HashError>{
         unsafe {
             let benchmark_dict_type = DictType {
@@ -371,6 +372,7 @@ mod dict_test {
         Ok(())
     }
 
+    #[test]
     fn dict_iter() -> Result<(), HashError> {
         unsafe {
             let benchmark_dict_type = DictType {
@@ -391,7 +393,7 @@ mod dict_test {
             let end = start.elapsed();
 
             let mut count = 0;
-            let iter = dict.to_iter();
+            let iter = dict.iter();
             for entry in iter {
                 println!("key: {}, val: {}", entry.get_key(), entry.get_val());
                 count += 1;
@@ -402,6 +404,7 @@ mod dict_test {
     }
 
 
+    #[test]
     fn dict_delete() -> Result<(), HashError> {
         unsafe {
             let benchmark_dict_type = DictType {

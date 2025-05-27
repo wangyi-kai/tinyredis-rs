@@ -1,15 +1,14 @@
 use std::ffi::c_void;
 use std::hash::Hash;
-use std::ops::ControlFlow::Continue;
 use std::ptr::NonNull;
 use rand::Rng;
 use crate::adlist::adlist::{List, Node};
 use crate::dict::dict::{Dict, DictEntry};
 use crate::dict::lib::{dict_size, DictScanFunction, DictType, entry_mem_usage};
 use crate::kvstore::{KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
+use crate::kvstore::iter::KvStoreIterator;
 use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
-use crate::kvstore::meta::KvStoreDictMetaBase;
-use crate::skiplist::lib::gen_random;
+
 
 #[derive(Clone)]
 pub struct KvStoreMetadata {
@@ -28,7 +27,7 @@ where K: Default + Clone + Eq + Hash,
     flag: i32,
     pub(crate) dtype: &'a DictType<K, V>,
     pub(crate) dicts: Vec<Option<NonNull<Dict<'a, K, V>>>>,
-    num_dicts: u64,
+    pub(crate) num_dicts: u64,
     num_dicts_bits: u64,
     /// List of dictionaries in this kvstore that are currently rehashing
     pub rehashing: List<NonNull<Dict<'a, K, V>>>,
@@ -53,7 +52,7 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl<'a, K, V> KvStore<'a, K, V>
-where K: Default + Clone + Eq + Hash + std::fmt::Display,
+where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
     // num_dicts_bits is the log2 of the amount of dictionaries needed
@@ -199,7 +198,7 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
         }
     }
 
-    fn free_dict_if_needed(&mut self, didx: usize) {
+    pub fn free_dict_if_needed(&mut self, didx: usize) {
         unsafe {
             if self.flag & KVSTORE_FREE_EMPTY_DICTS == 0 || self.get_dict(didx).is_none() || self.kvstore_dict_size(didx) != 0 || self.kvstore_dict_is_rehashing_paused(didx) {
                 return;
@@ -213,7 +212,7 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
     pub fn mem_usge(&self) -> usize {
         let mut mem = size_of::<Self>();
         let keys_count = self.kvstore_size();
-        mem += keys_count as usize * entry_mem_usage();
+        mem += keys_count as usize * entry_mem_usage::<K, V>();
         mem += self.kvstore_buckets() as usize * size_of::<&DictEntry<K, V>>();
         mem += self.allocated_dicts as usize * size_of::<Dict<K, V>>();
         mem += self.rehashing.length() * size_of::<Node<Dict<K, V>>>();
@@ -301,21 +300,23 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
         self.find_dict_index_by_key_index(target)
     }
 
-    pub fn get_stats(&self) {
+    pub fn get_stats(&self, buf: &mut String, buf_size: usize, full: bool) {}
 
-    }
-
-    fn get_next_non_empty_dict_index(&self, didx: usize) -> i32 {
+    pub fn get_next_non_empty_dict_index(&self, didx: usize) -> i32 {
         if self.num_dicts == 1 {
             assert_eq!(didx, 0);
             return -1;
         }
         let mut next_key = self.cumulative_key_count_read(didx as i32) + 1;
         if next_key < self.kvstore_size() {
-            self.find_dict_index_by_key_index(mut next_key) as i32
+            self.find_dict_index_by_key_index(next_key) as i32
         } else {
             -1
         }
+    }
+
+    pub fn get_first_non_empty_dict_index(&self) -> usize {
+        self.find_dict_index_by_key_index(1)
     }
 
     fn cumulative_key_count_read(&self, didx: i32) -> u64 {
@@ -332,7 +333,7 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
         sum
     }
 
-    fn find_dict_index_by_key_index(&self, mut target: u64) -> usize {
+    pub fn find_dict_index_by_key_index(&self, mut target: u64) -> usize {
         if self.num_dicts == 1 || self.kvstore_size() == 0 {
             return 0;
         }
@@ -360,5 +361,30 @@ where K: Default + Clone + Eq + Hash + std::fmt::Display,
             return;
         }
         *cursor = *cursor << self.num_dicts_bits | didx as u64;
+    }
+
+    pub fn iter(&self) -> KvStoreIterator<K, V> {
+        KvStoreIterator {
+            kvs: self,
+            didx: -1,
+            next_didx: self.get_first_non_empty_dict_index() as i32,
+            di: None,
+        }
+    }
+
+    pub fn try_resize_dicts(&mut self, mut limit: i32) {
+        if limit > self.num_dicts as i32 {
+            limit = self.num_dicts as i32;
+        }
+        unsafe {
+            for i in 0..limit {
+                let didx = self.resize_cursor;
+                let d = self.get_dict(didx as usize);
+                if d.is_some() && (*d.unwrap().as_ptr()).shrink_if_needed().unwrap() != true {
+                    (*d.unwrap().as_ptr()).expand_if_needed().unwrap();
+                }
+                self.resize_cursor = (didx + 1) % self.num_dicts as i32;
+            }
+        }
     }
 }

@@ -9,7 +9,7 @@ pub struct EntryIter<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    cur: Option<NonNull<DictEntry<K, V>>>,
+    cur: Option<&'a DictEntry<K, V>>,
     _boo: PhantomData<&'a (K, V)>,
 }
 
@@ -17,14 +17,12 @@ impl<K, V> DictEntry<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub unsafe fn iter(&self) -> EntryIter<K, V> {
-        EntryIter {
-            cur: Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry {
-                key: self.key.clone(),
-                val: self.val.clone(),
-                next: self.next }
-            )))),
-            _boo: PhantomData,
+    pub fn iter(&self) -> EntryIter<K, V> {
+        unsafe {
+            EntryIter {
+                cur: Some(self),
+                _boo: PhantomData,
+            }
         }
     }
 }
@@ -38,8 +36,13 @@ where K: Default + Clone + Eq + Hash,
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(cur) = self.cur {
             unsafe {
-                self.cur = (*cur.as_ptr()).next;
-                Some(&(*cur.as_ptr()))
+                let next = cur.next;
+                if next.is_some() {
+                    self.cur = Some(&(*next.unwrap().as_ptr()));
+                } else {
+                    self.cur = None;
+                };
+                Some(cur)
             }
         } else {
             None
@@ -51,26 +54,47 @@ pub struct DictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    dict: &'a Dict<'a, K, V>,
+    dict: Option<&'a mut Dict<'a, K, V>>,
     table: usize,
     index: i64,
     safe: i64,
     entry: Option<EntryIter<'a, K, V>>,
 }
 
-impl<K, V> Dict<'_, K, V>
+impl <K, V> DictIterator<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub fn to_iter(&self) -> DictIterator<K, V> {
-        unsafe {
-            DictIterator {
-            dict: self,
+    pub fn reset(&mut self) {
+        if !(self.index == -1 && self.table == 0) {
+            if self.safe != 0 {
+                self.dict.as_mut().unwrap().resume_rehash()
+            }
+        }
+    }
+}
+
+impl<'a, K, V> Dict<'a, K, V>
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
+    pub fn iter(&'a mut self) -> DictIterator<K, V> {
+        DictIterator {
+            dict: Some(self),
             table: 0,
             index: -1,
             safe: 0,
             entry: None,
         }
+    }
+
+    pub fn safe_iter(&'a mut self) -> DictIterator<K, V> {
+        DictIterator {
+            dict: Some(self),
+            table: 0,
+            index: -1,
+            safe: 1,
+            entry: None,
         }
     }
 }
@@ -93,24 +117,24 @@ where K: Default + Clone + Eq + Hash,
                     self.entry = None;
                 } else {
                     if self.table == 0 && self.index == -1 {
-                        // if self.safe == 1 {
-                        //     self.dict.pause_rehash();
-                        //}
-                        if self.dict.dict_is_rehashing() {
-                            self.index = self.dict.get_rehash_idx() - 1;
+                        if self.safe == 1 {
+                            self.dict.as_mut().unwrap().pause_rehash();
+                        }
+                        if self.dict.as_ref().unwrap().dict_is_rehashing() {
+                            self.index = self.dict.as_ref().unwrap().get_rehash_idx() - 1;
                         }
                     }
                 }
                 self.index += 1;
-                if self.index >= (dict_size(self.dict.ht_size_exp[self.table]) as i64) {
-                    if self.dict.dict_is_rehashing() && self.table == 0 {
+                if self.index >= (dict_size(self.dict.as_ref().unwrap().ht_size_exp[self.table]) as i64) {
+                    if self.dict.as_ref().unwrap().dict_is_rehashing() && self.table == 0 {
                         self.table += 1;
                         self.index = 0;
                     } else {
                         break;
                     }
                 }
-                let entry_iter = (*self.dict.ht_table[self.table][self.index as usize].unwrap().as_ptr()).iter();
+                let entry_iter = (*self.dict.as_ref().unwrap().ht_table[self.table][self.index as usize].unwrap().as_ptr()).iter();
                 self.entry = Some(entry_iter);
             }
         }

@@ -81,7 +81,7 @@ where K: Default + Clone + Eq + Hash,
     /// dict table
     pub ht_table: Vec<Vec<Option<NonNull<DictEntry<K, V>>>>>,
     /// dict table used
-    ht_used: Vec<u32>,
+    pub ht_used: Vec<u32>,
     /// rehashing not in progress if rehash_idx == -1
     rehash_idx: i64,
     /// If >0 rehashing is paused
@@ -94,7 +94,7 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl <'a, K, V> Dict<'a, K, V>
-where K: Default + Clone + Eq + Hash + Display,
+where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone 
 {
     pub fn create(dict_type: &'a DictType<K, V>) -> Self {
@@ -128,7 +128,7 @@ where K: Default + Clone + Eq + Hash + Display,
                 let mut de = self.ht_table[ht_idx0][(v & m0) as usize];
                 while de.is_some() {
                     let next = (*de.unwrap().as_ptr()).next;
-                    scan_fn(&mut de);
+                    scan_fn(&mut *de.unwrap().as_ptr());
                     de = next;
                 }
                 v |= !m0;
@@ -149,7 +149,7 @@ where K: Default + Clone + Eq + Hash + Display,
                 let mut de = self.ht_table[ht_idx0][(v & m0) as usize];
                 while de.is_some() {
                     let next = (*de.unwrap().as_ptr()).next;
-                    scan_fn(&mut de);
+                    scan_fn(&mut *de.unwrap().as_ptr());
                     de = next;
                 }
 
@@ -157,7 +157,7 @@ where K: Default + Clone + Eq + Hash + Display,
                     let mut de = self.ht_table[ht_idx1][(v & m1) as usize];
                     while de.is_some() {
                         let next = (*de.unwrap().as_ptr()).next;
-                        scan_fn(&mut de);
+                        scan_fn(&mut *de.unwrap().as_ptr());
                         de = next;
                     }
                     v |= !m1;
@@ -490,7 +490,7 @@ where K: Default + Clone + Eq + Hash + Display,
         self.resize(size)
     }
 
-    fn expand_if_needed(&mut self) -> Result<bool, HashError> {
+    pub fn expand_if_needed(&mut self) -> Result<bool, HashError> {
         if self.dict_is_rehashing() {
             return Ok(true);
         }

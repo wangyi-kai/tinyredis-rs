@@ -1,8 +1,7 @@
 use std::hash::Hash;
 use rand::Rng;
 use std::ffi::c_void;
-
-
+use std::fmt::Display;
 use crate::dict::dict::{Dict, DictEntry};
 use crate::dict::lib::DictResizeFlag::DictResizeEnable;
 use crate::kvstore::kvstore::KvStore;
@@ -54,7 +53,10 @@ pub fn dict_size_mask(exp: i32) -> u64 {
     }
 }
 
-pub fn entry_mem_usage<K, V>() -> usize {
+pub fn entry_mem_usage<K, V> ()-> usize
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
     size_of::<DictEntry<K, V>>()
 }
 
