@@ -154,6 +154,10 @@ impl<T: PartialEq> List<T> {
         self.len
     }
 
+    pub fn list_first(&self) -> Option<NonNull<Node<T>>> {
+        self.head
+    }
+
     pub fn search_key(&self, key: T) -> Option<NonNull<Node<T>>> {
         None
     }

@@ -15,6 +15,17 @@ pub struct DictStats {
     cl_vector: Vec<u64>,
 }
 
+pub fn dict_combine_stats(from: &mut DictStats, into: &mut DictStats) {
+    into.buckets += from.buckets;
+    into.max_chain_len = from.max_chain_len.max(into.max_chain_len);
+    into.total_chain_len += from.total_chain_len;
+    into.ht_size += from.ht_size;
+    into.ht_used += from.ht_used;
+    for i in 0..DICT_STATS_VECTLEN {
+        into.cl_vector[i] += from.cl_vector[i];
+    }
+}
+
 
 pub fn dict_get_stats_msg(
     buf: &mut String,

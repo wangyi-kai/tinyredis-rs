@@ -11,6 +11,7 @@ use crate::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
 use crate::dict::error::HashError;
 use crate::dict::hash::{sys_hash};
 use crate::dict::lib::{*};
+use crate::skiplist::lib::gen_random;
 
 #[derive(Debug, Copy)]
 pub struct DictEntry<K, V>
@@ -201,7 +202,7 @@ where K: Default + Clone + Eq + Hash,
     }
 
     #[inline]
-    pub fn add_raw(&mut self, key: K, val: V) -> Result<bool, HashError> {
+    pub fn add_raw(&mut self, key: K, val: V) -> Result<NonNull<DictEntry<K, V>>, HashError> {
         unsafe {
             let hash = sys_hash(&key);
             let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
@@ -218,7 +219,7 @@ where K: Default + Clone + Eq + Hash,
                 while he.is_some() {
                     let he_key = (*he.unwrap().as_ptr()).get_key();
                     if key == *he_key {
-                        return Ok(false);
+                        return Err(HashError::DictEntryDup);
                     }
                     he = (*he.unwrap().as_ptr()).next;
                 }
@@ -233,7 +234,7 @@ where K: Default + Clone + Eq + Hash,
             })));
             self.ht_table[ht_idx][idx as usize] = Some(entry);
             self.ht_used[ht_idx] += 1;
-            Ok(true)
+            Ok(entry)
         }
     }
 
@@ -292,6 +293,16 @@ where K: Default + Clone + Eq + Hash,
 
         let hash = sys_hash(key);
         self.find_by_hash(key, hash)
+    }
+
+    pub fn fetch_value(&mut self, key: &K) -> Option<&V> {
+        let he = self.find(key);
+        unsafe {
+            if he.is_some() {
+                return Some((*he.unwrap().as_ptr()).get_val());
+            }
+            None
+        }
     }
 
     pub fn generic_delete(&mut self, key: &K) -> Result<Option<NonNull<DictEntry<K, V>>>, HashError> {
@@ -671,6 +682,162 @@ where K: Default + Clone + Eq + Hash,
                 list_ele -= 1;
             }
             he
+        }
+    }
+
+    pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry<K ,V>>>{
+        let mut entries = Vec::with_capacity(GETFAIR_NUM_ENTRIES);
+        let mut count = GETFAIR_NUM_ENTRIES;
+        let mut cnt = self.get_some_keys(&mut entries, count as u64);
+
+        if cnt == 0 {
+            return self.get_random_key()
+        }
+        let idx = gen_random() % count as u32 ;
+        entries[idx as usize]
+    }
+
+    fn get_some_keys(&mut self, des: &mut Vec<Option<NonNull<DictEntry<K, V>>>>, mut count: u64) -> u64 {
+        let mut stored = 0;
+        if (self.dict_size() as u64) < count {
+            count = self.dict_size() as u64;
+        }
+        let mut max_step = count * 10;
+        for j in 0..count {
+            if self.dict_is_rehashing() {
+                let _ = self.rehash_step();
+            } else {
+                break;
+            }
+        }
+
+        let table = if self.dict_is_rehashing() {2} else {1};
+        let mut max_size_mask = dict_size_mask(self.ht_size_exp[0]);
+        if table > 1 && max_size_mask < dict_size_mask(self.ht_size_exp[1]) {
+            max_size_mask = dict_size_mask(self.ht_size_exp[1]);
+        }
+
+        let mut i = random_ulong() & max_size_mask;
+        let mut empty_len = 0;
+        unsafe {
+            while stored < count && max_step > 0 {
+                max_step -= 1;
+                for j in 0..table {
+                    if table == 2 && j == 0 && i < self.rehash_idx as u64 {
+                        if i >= dict_size(self.ht_size_exp[1]) {
+                            i = self.rehash_idx as u64;
+                        } else {
+                            continue;
+                        }
+                    }
+                    if i >= dict_size(self.ht_size_exp[j]) { continue; }
+                    let mut he = self.ht_table[j][i as usize];
+
+                    if he.is_none() {
+                        empty_len += 1;
+                        if empty_len >= 5 && empty_len > count {
+                            i = random_ulong() & max_size_mask;
+                            empty_len = 0;
+                        }
+                    } else {
+                        empty_len = 0;
+                        while he.is_some() {
+                            if stored < count {
+                                des[stored as usize] = he;
+                            } else {
+                                let r = random_ulong() % (stored + 1);
+                                if r < count {
+                                    des[r as usize] = he;
+                                }
+                            }
+                            he = (*he.unwrap().as_ptr()).next;
+                            stored += 1;
+                        }
+                        if stored >= count {
+                            break;
+                        }
+                    }
+                }
+                i = (i + 1) & max_size_mask;
+            }
+        }
+        return if stored > count { stored } else { count }
+    }
+
+    pub fn find_by_hash_and_ptr<K, V>(&self, key: K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
+        if self.dict_size() == 0 {
+            return None;
+        }
+        unsafe {
+            for table in 0..2 {
+                let idx = hash & dict_size_mask(self.ht_size_exp[table]);
+                if table == 0 && (idx as i64) < self.rehash_idx { continue; }
+                let mut he = self.ht_table[table][idx as usize];
+                while he.is_some() {
+                    if key == (*he.unwrap().as_ptr()).key {
+                        return he;
+                    }
+                    he = (*he.unwrap().as_ptr()).next;
+                }
+                if !self.dict_is_rehashing() {
+                    return None;
+                }
+            }
+        }
+        None
+    }
+
+    pub fn rehash_info(&self, from: &mut u64, to: &mut u64) {
+        assert!(self.dict_is_rehashing());
+        *from = dict_size(self.ht_size_exp[0]);
+        *to = dict_size(self.ht_size_exp[1]);
+    }
+
+    pub fn dict_two_phase_unlink_find(&mut self, key: &K, table_index: &mut usize) -> Option<NonNull<DictEntry<K, V>>> {
+        if self.dict_size() == 0 {
+            return None;
+        }
+        if self.dict_is_rehashing() {
+            let _ = self.rehash_step();
+        }
+        let h = sys_hash(key);
+        unsafe {
+            for table in 0..2 {
+                let idx = h & dict_size_mask(self.ht_size_exp[table]);
+                if table == 0 && (idx as i64) < self.rehash_idx { continue; }
+                let mut he = self.ht_table[table][idx as usize];
+                while he.is_some() {
+                    let he_key = (*he.unwrap().as_ptr()).get_key();
+                    if he_key == key {
+                        *table_index = table;
+                        self.pause_rehash();
+                        return he;
+                    }
+                    he = (*he.unwrap().as_ptr()).next;
+                }
+                if !self.dict_is_rehashing() {
+                    return None;
+                }
+            }
+        }
+        None
+    }
+
+    pub fn dict_two_phase_unlink_free(
+        &mut self,
+        he: Option<NonNull<DictEntry<K, V>>>,
+        mut plink: Option<NonNull<DictEntry<K, V>>>,
+        table_index: usize
+    ) {
+        if he.is_none() {
+            return;
+        }
+        unsafe {
+            let box_node = Box::from_raw(he.unwrap().as_ptr());
+            self.ht_used[table_index] -= 1;
+            plink = (*he.unwrap().as_ptr()).next;
+            let _ = self.shrink_if_needed();
+            self.resume_rehash();
         }
     }
 }

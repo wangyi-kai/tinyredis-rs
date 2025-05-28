@@ -61,9 +61,35 @@ pub struct KvStoreDictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    kvs: &'a KvStore<'a, K, V>,
-    didx: i32,
-    di: Option<&'a DictIterator<'a, K, V>>,
+    pub(crate) kvs: &'a KvStore<'a, K, V>,
+    pub(crate) didx: i32,
+    pub(crate) di: Option<&'a DictIterator<'a, K, V>>,
+}
+
+impl <K, V> KvStoreDictIterator<K, V>
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
+    pub fn release_dict_iterator(&mut self) {
+        if self.kvs.get_dict(self.didx as usize).is_some() {
+            self.di.unwrap().reset();
+            self.kvs.free_dict_if_needed(self.didx as usize);
+        }
+    }
+}
+
+impl <'a, K, V> Iterator for KvStoreDictIterator<'a, K, V>
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
+    type Item = &'a DictEntry<K, V>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let d = self.kvs.get_dict(self.didx as usize);
+        if d.is_none() {
+            return None;
+        }
+        self.di.unwrap().next()
+    }
 }
 
 

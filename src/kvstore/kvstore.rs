@@ -1,12 +1,14 @@
 use std::ffi::c_void;
 use std::hash::Hash;
 use std::ptr::NonNull;
+use std::time::Instant;
 use rand::Rng;
 use crate::adlist::adlist::{List, Node};
 use crate::dict::dict::{Dict, DictEntry};
+use crate::dict::iter::DictIterator;
 use crate::dict::lib::{dict_size, DictScanFunction, DictType, entry_mem_usage};
 use crate::kvstore::{KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
-use crate::kvstore::iter::KvStoreIterator;
+use crate::kvstore::iter::{KvStoreDictIterator, KvStoreIterator};
 use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
 
 
@@ -99,6 +101,19 @@ where K: Default + Clone + Eq + Hash,
                 metadata: Vec::new(),
             }
         }
+    }
+
+    pub fn create_dict_if_needed(&mut self, didx: i32) -> Option<NonNull<Dict<K, V>>> {
+        let d = self.get_dict(didx as usize);
+        if d.is_some() {
+            return d;
+        }
+        unsafe {
+            let dict = Dict::create(&self.dtype);
+            self.dicts[didx] = Some(NonNull::new_unchecked(Box::into_raw(Box::new(dict))));
+            self.allocated_dicts += 1;
+        }
+        self.dicts[didx]
     }
 
     pub fn empty(&mut self, call_back: Option<fn(&mut Dict<K, V>)>) {
@@ -333,6 +348,36 @@ where K: Default + Clone + Eq + Hash,
         sum
     }
 
+    fn cumulative_key_count_add(&mut self, didx: i32, delta: i64) {
+        unsafe {
+            self.key_count += delta as u64;
+            let d = self.get_dict(didx as usize);
+            let dsize = (*d.unwrap().as_ptr()).dict_size();
+            let non_empty_dicts_delta = if dsize == 1 && delta > 0 {
+                1
+            } else {
+                if dsize == 0 {
+                    -1
+                } else {
+                    0
+                }
+            };
+            self.non_empty_dicts += non_empty_dicts_delta;
+
+            if self.num_dicts == 1 {
+                return;
+            }
+            let mut idx = didx + 1;
+            while idx < self.num_dicts as i32 {
+                if delta < 0 {
+                    assert!(self.dict_size_index[idx as usize] >= delta.abs() as u64);
+                }
+                self.dict_size_index[idx as usize] as i64 += delta;
+                idx += (idx & -idx);
+            }
+        }
+    }
+
     pub fn find_dict_index_by_key_index(&self, mut target: u64) -> usize {
         if self.num_dicts == 1 || self.kvstore_size() == 0 {
             return 0;
@@ -384,6 +429,102 @@ where K: Default + Clone + Eq + Hash,
                     (*d.unwrap().as_ptr()).expand_if_needed().unwrap();
                 }
                 self.resize_cursor = (didx + 1) % self.num_dicts as i32;
+            }
+        }
+    }
+
+    pub fn increment_rehash(&self, threshold_us: u64) -> u64 {
+        if self.rehashing.length() == 0 {
+            return 0;
+        }
+        let mut elapsed_us = 0;
+        let start = Instant::now();
+        unsafe {
+            while self.rehashing.list_first().is_some() {
+                let mut node = self.rehashing.list_first();
+                let _ = (*(*node.as_mut().unwrap().as_ptr()).value().as_ptr()).rehash_microseconds(threshold_us - elapsed_us);
+                elapsed_us = start.elapsed().as_secs();
+                if elapsed_us > threshold_us {
+                    break;
+                }
+            }
+        }
+        elapsed_us
+    }
+
+    pub fn kvstore_overhead_hashtable_lut(&self) -> usize {
+        self.overhead_hashtable_lut * size_of::<DictEntry<K, V>>()
+    }
+
+    pub fn kvstore_overhead_hashtable_rehashing(&self) -> usize {
+        self.overhead_hashtable_rehashing * size_of::<DictEntry<K, V>>()
+    }
+
+    pub fn dict_rehashing_count(&self) -> usize {
+        self.rehashing.length()
+    }
+
+    pub fn dict_size(&self, didx: usize) -> u64 {
+        let d = self.get_dict(didx);
+        if d.is_none() {
+            return 0;
+        }
+        unsafe {
+            (*d.unwrap().as_ptr()).dict_size() as u64
+        }
+    }
+
+    pub fn get_dict_iterator(&self, didx: usize) -> KvStoreDictIterator<K, V> {
+        unsafe {
+            let d = self.get_dict(didx);
+            let dict_iter = (*d.unwrap().as_ptr()).iter();
+            let iter = KvStoreDictIterator {
+                kvs: self,
+                didx: didx as i32,
+                di: Some(&dict_iter)
+            };
+            iter
+        }
+    }
+
+    pub fn get_dict_safe_iterator(&self, didx: usize) -> KvStoreDictIterator<K, V> {
+        unsafe {
+            let d = self.get_dict(didx);
+            let dict_iter = (*d.unwrap().as_ptr()).safe_iter();
+            let iter = KvStoreDictIterator {
+                kvs: self,
+                didx: didx as i32,
+                di: Some(&dict_iter)
+            };
+            iter
+        }
+    }
+
+    pub fn get_random_key(&self, didx: i32) -> Option<NonNull<DictEntry<K ,V>>> {
+        unsafe {
+            let d = self.get_dict(didx as usize);
+            if d.is_none() {
+                return None;
+            }
+            (*d.unwrap().as_ptr()).get_random_key()
+        }
+    }
+
+    pub fn get_fair_random_key(&self, didx: i32) -> Option<NonNull<DictEntry<K ,V>>> {
+        unsafe {
+            let d = self.get_dict(didx as usize);
+            if d.is_none() {
+                return None;
+            }
+            (*d.unwrap().as_ptr()).get_fair_random_key()
+        }
+    }
+
+    pub fn dict_add_raw(&mut self, didx: i32, key: K) {
+        unsafe {
+            let mut d = self.create_dict_if_needed(didx);
+            if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw(key, V::default()) {
+                self.cumulative_key_count_add(didx, 1);
             }
         }
     }

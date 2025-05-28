@@ -13,6 +13,7 @@ pub static mut DICT_CAN_RESIZE: DictResizeFlag = DictResizeEnable;
 pub(crate) const HASHTABLE_MIN_FILL: u64 = 8;
 pub(crate) const LONG_MAX: u64 = 0x7FFF_FFFF_FFFF_FFFF;
 pub(crate) const DICT_STATS_VECTLEN: usize = 50;
+pub const GETFAIR_NUM_ENTRIES: usize = 15;
 
 #[derive(PartialEq)]
 pub enum DictResizeFlag {
@@ -28,7 +29,7 @@ pub struct DictType<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub hash_function: Option<Box<dyn Fn(K) -> u64>>,
+    pub hash_function: Option<Box<dyn Fn(&K) -> u64>>,
     pub rehashing_started: Option<Box<dyn Fn(&Dict<K, V>)>>,
     pub rehashing_completed: Option<Box<dyn Fn(&Dict<K, V>)>>,
     pub dict_meta_data_bytes: Option<Box<dyn Fn(&Dict<K, V>) -> usize>>,
