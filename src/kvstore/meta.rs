@@ -7,7 +7,7 @@ pub struct KvStoreDictMetaBase<T> {
 }
 
 pub struct KvStoreDictMetaEx<T> {
-    base: KvStoreDictMetaBase<T>,
-    mata: KvStoreDictMetadata,
+    pub base: KvStoreDictMetaBase<T>,
+    pub mata: KvStoreDictMetadata,
 }
 

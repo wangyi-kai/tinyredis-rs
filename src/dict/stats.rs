@@ -71,7 +71,7 @@ pub fn dict_get_stats_msg(
     buf.len()
 }
 
-impl <'a, K, V> Dict<'a, K, V>
+impl <K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash + Display,
       V: Default + PartialEq + Clone
 {

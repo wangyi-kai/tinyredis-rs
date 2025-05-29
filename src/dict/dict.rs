@@ -4,6 +4,7 @@ use std::ptr::NonNull;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::mem;
+use std::sync::Arc;
 use std::time::{Instant};
 use rand::{random, Rng, rng};
 use crate::dict::lib::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
@@ -74,11 +75,11 @@ where K: Default + Clone + Eq + Hash,
 }
 
 
-pub struct Dict<'a, K, V>
+pub struct Dict<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone 
 {
-    pub dict_type: &'a DictType<K, V>,
+    pub dict_type: Arc<DictType<K, V>>,
     /// dict table
     pub ht_table: Vec<Vec<Option<NonNull<DictEntry<K, V>>>>>,
     /// dict table used
@@ -94,11 +95,11 @@ where K: Default + Clone + Eq + Hash,
     pub metadata: Vec<Box<dyn Any>>,
 }
 
-impl <'a, K, V> Dict<'a, K, V>
+impl <K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone 
 {
-    pub fn create(dict_type: &'a DictType<K, V>) -> Self {
+    pub fn create(dict_type: Arc<DictType<K, V>>) -> Self {
         unsafe {
             Self {
                 dict_type,
@@ -764,7 +765,7 @@ where K: Default + Clone + Eq + Hash,
         return if stored > count { stored } else { count }
     }
 
-    pub fn find_by_hash_and_ptr<K, V>(&self, key: K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn find_by_hash_and_ptr(&self, key: K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -842,7 +843,7 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-impl <K, V> Dict<'_, K, V>
+impl <K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone 
 {

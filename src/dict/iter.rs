@@ -54,14 +54,14 @@ pub struct DictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    dict: Option<&'a mut Dict<'a, K, V>>,
+    dict: Option<&'a mut Dict<K, V>>,
     table: usize,
     index: i64,
     safe: i64,
     entry: Option<EntryIter<'a, K, V>>,
 }
 
-impl <K, V> DictIterator<K, V>
+impl <'a, K, V> DictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
@@ -74,7 +74,7 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-impl<'a, K, V> Dict<'a, K, V>
+impl<'a, K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {

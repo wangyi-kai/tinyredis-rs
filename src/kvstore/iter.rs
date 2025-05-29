@@ -8,10 +8,10 @@ pub struct KvStoreIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub(crate) kvs: &'a KvStore<'a, K, V>,
+    pub(crate) kvs: *mut KvStore<K, V>,
     pub(crate) didx: i32,
     pub(crate) next_didx: i32,
-    pub(crate) di: Option<&'a DictIterator<'a, K, V>>,
+    pub(crate) di: Option<*mut DictIterator<'a, K, V>>,
 }
 
 impl <'a, K, V> KvStoreIterator<'a, K, V>
@@ -22,38 +22,47 @@ where K: Default + Clone + Eq + Hash,
         if self.next_didx == -1 {
             return None;
         }
-        if self.didx != -1 && self.kvs.get_dict(self.didx as usize).is_some() {
-            let iter = self.di;
-            iter.unwrap().reset();
-            self.kvs.free_dict_if_needed(self.didx as usize);
+        unsafe {
+            if self.didx != -1 && (*self.kvs).get_dict(self.didx as usize).is_some() {
+                let mut iter = self.di.unwrap();
+                (*iter).reset();
+                (*self.kvs).free_dict_if_needed(self.didx as usize);
+            }
+            self.didx = self.next_didx;
+            self.next_didx = (*self.kvs).get_next_non_empty_dict_index(self.didx as usize);
+            (*self.kvs).dicts[self.didx as usize]
         }
-        self.didx = self.next_didx;
-        self.next_didx = self.kvs.get_next_non_empty_dict_index(self.didx as usize);
-        self.kvs.dicts[self.didx as usize]
     }
 
     pub fn get_current_dict_index(&self) -> i32 {
-        assert!(self.didx > 0 && self.didx < self.kvs.num_dicts as i32);
-        self.didx
+        unsafe {
+            assert!(self.didx > 0 && self.didx < (*self.kvs).num_dicts as i32);
+            self.didx
+        }
     }
 }
 
-impl <'a, K, V> Iterator for KvStoreIterator<'a, K, V> {
+impl <'a, K, V> Iterator for KvStoreIterator<'a, K, V>
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
     type Item = &'a DictEntry<K, V>;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut de = if self.di.is_some() {
-            self.di.unwrap().next()
-        } else {
-            None
-        };
-        if de.is_none() {
-            let d = self.next_dict();
-            if d.is_none() {
-                return None;
+        unsafe {
+            let mut de = if self.di.is_some() {
+                (*self.di.unwrap()).next()
+            } else {
+                None
+            };
+            if de.is_none() {
+                let d = self.next_dict();
+                if d.is_none() {
+                    return None;
+                }
+                de = (*self.di.unwrap()).next();
             }
-            de = Some(*self.di.iter().next().unwrap());
+            de
         }
-        de
     }
 }
 
@@ -61,19 +70,21 @@ pub struct KvStoreDictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub(crate) kvs: &'a KvStore<'a, K, V>,
+    pub(crate) kvs: *mut KvStore<K, V>,
     pub(crate) didx: i32,
-    pub(crate) di: Option<&'a DictIterator<'a, K, V>>,
+    pub(crate) di: Option<*mut DictIterator<'a, K, V>>,
 }
 
-impl <K, V> KvStoreDictIterator<K, V>
+impl <'a, K, V> KvStoreDictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
     pub fn release_dict_iterator(&mut self) {
-        if self.kvs.get_dict(self.didx as usize).is_some() {
-            self.di.unwrap().reset();
-            self.kvs.free_dict_if_needed(self.didx as usize);
+        unsafe {
+            if (*self.kvs).get_dict(self.didx as usize).is_some() {
+                (*self.di.unwrap()).reset();
+                (*self.kvs).free_dict_if_needed(self.didx as usize);
+            }
         }
     }
 }
@@ -84,11 +95,13 @@ where K: Default + Clone + Eq + Hash,
 {
     type Item = &'a DictEntry<K, V>;
     fn next(&mut self) -> Option<Self::Item> {
-        let d = self.kvs.get_dict(self.didx as usize);
-        if d.is_none() {
-            return None;
+        unsafe {
+            let d = (*self.kvs).get_dict(self.didx as usize);
+            if d.is_none() {
+                return None;
+            }
+            (*self.di.unwrap()).next()
         }
-        self.di.unwrap().next()
     }
 }
 

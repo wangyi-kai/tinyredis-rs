@@ -2,6 +2,7 @@ pub mod kvstore;
 mod iter;
 mod lib;
 mod meta;
+mod test;
 
 const MAX_KEYSIZES_BINS: usize = 60;
 const MAX_KEYSIZES_TYPES: usize = 5;
