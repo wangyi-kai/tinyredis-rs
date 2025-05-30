@@ -44,6 +44,18 @@ mod kvstore_test {
             assert_eq!(kvs1.kvstore_size(), 16);
             assert_eq!(kvs2.dict_size(didx as usize), 16);
             assert_eq!(kvs2.kvstore_size(), 16);
+            println!("PASS");
+        }
+
+        print!("kvstoreIterator case 1: removing all keys does not delete the empty dict ");
+        {
+            let mut iter = kvs1.iter();
+            while let Some(de) = iter.next() {
+                let curr_slot = iter.get_current_dict_index();
+                let key = &de.key;
+                println!("key: {}", key);
+                //assert!(kvs1.dict_delete(curr_slot, key).is_some());
+            }
         }
     }
 }

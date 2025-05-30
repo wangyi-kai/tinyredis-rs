@@ -1,6 +1,5 @@
 use std::hash::Hash;
 use std::marker::PhantomData;
-use std::ptr::NonNull;
 use crate::dict::dict::{Dict, DictEntry};
 use crate::dict::lib::{*};
 
@@ -54,11 +53,11 @@ pub struct DictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    dict: Option<&'a mut Dict<K, V>>,
-    table: usize,
-    index: i64,
-    safe: i64,
-    entry: Option<EntryIter<'a, K, V>>,
+    pub(crate) dict: Option<&'a mut Dict<K, V>>,
+    pub(crate) table: usize,
+    pub(crate) index: i64,
+    pub(crate) safe: i64,
+    pub(crate) entry: Option<EntryIter<'a, K, V>>,
 }
 
 impl <'a, K, V> DictIterator<'a, K, V>

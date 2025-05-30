@@ -410,12 +410,19 @@ where K: Default + Clone + Eq + Hash,
         *cursor = *cursor << self.num_dicts_bits | didx as u64;
     }
 
-    pub fn iter(&'a mut self) -> KvStoreIterator<K, V> {
+    pub fn iter(&mut self) -> KvStoreIterator<K, V> {
+        let mut dict_iter = DictIterator {
+            dict: None,
+            table: 0,
+            safe: 0,
+            index: -1,
+            entry: None,
+        };
         KvStoreIterator {
             kvs: self,
             didx: -1,
             next_didx: self.get_first_non_empty_dict_index() as i32,
-            di: None,
+            di: Some(&mut dict_iter),
         }
     }
 
