@@ -77,7 +77,7 @@ impl<'a, K, V> Dict<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    pub fn iter(&'a mut self) -> DictIterator<K, V> {
+    pub fn iter(&mut self) -> DictIterator<K, V> {
         DictIterator {
             dict: Some(self),
             table: 0,
@@ -87,7 +87,7 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
-    pub fn safe_iter(&'a mut self) -> DictIterator<K, V> {
+    pub fn safe_iter(&mut self) -> DictIterator<K, V> {
         DictIterator {
             dict: Some(self),
             table: 0,

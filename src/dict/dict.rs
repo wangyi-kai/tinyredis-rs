@@ -389,10 +389,8 @@ where K: Default + Clone + Eq + Hash,
 
     fn check_rehashing_complete(&mut self) -> bool {
         if self.ht_used[0] != 0 { return false; }
+        self.ht_table[0] = mem::replace(&mut self.ht_table[1], vec![]);
 
-        unsafe {
-            self.ht_table[0] = mem::replace(&mut self.ht_table[1], vec![]);
-        }
         self.ht_used[0] = self.ht_used[1];
         self.ht_size_exp[0] = self.ht_size_exp[1];
         self.reset(1);
@@ -587,14 +585,13 @@ where K: Default + Clone + Eq + Hash,
 
         let start = Instant::now();
         let mut rehashes = 0;
-        unsafe {
-            while self.rehash(100)? {
-                rehashes += 100;
-                if start.elapsed().as_micros() as u64 >= us {
-                    break;
-                }
+        while self.rehash(100)? {
+            rehashes += 100;
+            if start.elapsed().as_micros() as u64 >= us {
+                break;
             }
         }
+
         Ok(rehashes)
     }
 
@@ -626,10 +623,9 @@ where K: Default + Clone + Eq + Hash,
     }
 
     pub fn empty(&mut self, call_back: Option<fn(&mut Dict<K, V>)>) {
-        unsafe {
-            self._clear(0, call_back);
-            self._clear(1, call_back);
-        }
+        self._clear(0, call_back);
+        self._clear(1, call_back);
+
         self.rehash_idx = -1;
         self.pause_rehash = 0;
         self.pause_auto_resize = 0;
@@ -688,8 +684,8 @@ where K: Default + Clone + Eq + Hash,
 
     pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry<K ,V>>>{
         let mut entries = Vec::with_capacity(GETFAIR_NUM_ENTRIES);
-        let mut count = GETFAIR_NUM_ENTRIES;
-        let mut cnt = self.get_some_keys(&mut entries, count as u64);
+        let count = GETFAIR_NUM_ENTRIES;
+        let cnt = self.get_some_keys(&mut entries, count as u64);
 
         if cnt == 0 {
             return self.get_random_key()
@@ -849,11 +845,9 @@ where K: Default + Clone + Eq + Hash,
 {
     #[inline]
     pub fn reset(&mut self, table: usize) {
-        unsafe {
-            self.ht_table[table] = vec![];
-            self.ht_used[table] = 0;
-            self.ht_size_exp[table] = -1;
-        }
+        self.ht_table[table] = vec![];
+        self.ht_used[table] = 0;
+        self.ht_size_exp[table] = -1;
     }
 
     #[inline]

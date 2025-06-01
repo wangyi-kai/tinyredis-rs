@@ -4,8 +4,9 @@ mod skiplist_test {
     use crate::skiplist::skiplist::SkipList;
 
     #[test]
+    #[warn(unused_unsafe)]
     fn skiplist_insert() {
-        let mut skip_list = unsafe { SkipList::new() };
+        let mut skip_list = SkipList::new();
         let num = 10;
         for i in 0..num {
             let elem = "i".to_string();

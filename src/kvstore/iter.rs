@@ -24,7 +24,7 @@ where K: Default + Clone + Eq + Hash,
         }
         unsafe {
             if self.didx != -1 && (*self.kvs).get_dict(self.didx as usize).is_some() {
-                let mut iter = self.di.as_mut().unwrap();
+                let iter = self.di.as_mut().unwrap();
                 (*iter).reset();
                 (*self.kvs).free_dict_if_needed(self.didx as usize);
             }
@@ -86,9 +86,7 @@ impl<'a, K, V> Drop for KvStoreIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    fn drop(&mut self) {
-
-    }
+    fn drop(&mut self) { }
 }
 
 pub struct KvStoreDictIterator<'a, K, V>
@@ -134,9 +132,7 @@ impl <'a, K, V> Drop for KvStoreDictIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
-    fn drop(&mut self) {
-
-    }
+    fn drop(&mut self) { }
 }
 
 

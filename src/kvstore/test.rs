@@ -101,8 +101,10 @@ mod kvstore_test {
         print!("[TEST] kvstore DictIterator case 1: removing all keys does not delete the empty dict ");
         {
             let mut iter = kvs1.get_dict_safe_iterator(didx as usize);
+            let mut keys = Vec::new();
             while let Some(de) = iter.next() {
                 let key = &de.key;
+                keys.push(key);
                 assert!(kvs1.dict_delete(didx, key).is_some());
             }
             iter.release_dict_iterator();
@@ -112,6 +114,28 @@ mod kvstore_test {
             assert_eq!(kvs1.dict_size(didx as usize), 0);
             assert_eq!(kvs1.kvstore_size(), 0);
             print!("PASS");
+        }
+
+        print!("[TEST] kvstoreDictIterator case 2: removing all keys will delete the empty dict: ");
+        {
+            let mut iter = kvs2.get_dict_safe_iterator(didx as usize);
+            while let Some(de) = iter.next() {
+                let key = &de.key;
+                assert!(kvs2.dict_delete(didx, key).is_some());
+            }
+            iter.release_dict_iterator();
+
+            let d = kvs2.get_dict(didx as usize);
+            assert!(d.is_none());
+            assert_eq!(kvs2.dict_size(didx as usize), 0);
+            assert_eq!(kvs2.kvstore_size(), 0);
+            print!("PASS");
+        }
+
+        print!("[TEST] Verify that a rehashing dict's node in the rehashing list is correctly updated after defragmentation: ");
+        {
+            let cursor = 0;
+
         }
     }
 }

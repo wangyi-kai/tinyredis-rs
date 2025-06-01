@@ -76,7 +76,7 @@ where K: Default + Clone + Eq + Hash + Display,
       V: Default + PartialEq + Clone
 {
     pub fn get_stats_ht(&self, ht_idx: usize, full: bool) -> DictStats {
-        let mut cl_vector = Vec::with_capacity(DICT_STATS_VECTLEN);
+        let cl_vector = Vec::with_capacity(DICT_STATS_VECTLEN);
         let mut stats = DictStats {
             ht_idx,
             buckets: 0,
