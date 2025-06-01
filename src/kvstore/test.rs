@@ -4,7 +4,7 @@ mod kvstore_test {
     use std::fmt::Write as _;
     use std::sync::Arc;
     use crate::kvstore::kvstore::KvStore;
-    use crate::kvstore::KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
+    use crate::kvstore::{KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
 
     fn test_name(name: &str) {
         print!("test-{}", name);
@@ -30,9 +30,9 @@ mod kvstore_test {
         let dict_type = Arc::new(dict_type);
 
         let mut kvs1 = KvStore::create(dict_type.clone(), 0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND);
-        let mut kvs2 = KvStore::create(dict_type.clone(), 0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND);
+        let mut kvs2 = KvStore::create(dict_type.clone(), 0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND | KVSTORE_FREE_EMPTY_DICTS);
 
-        print!("[TEST] Add 16 keys");
+        print!("[TEST] Add 16 keys: ");
         {
             for i in 0..16 {
                 let de = kvs1.dict_add_raw(didx, string_from_int(i));
@@ -47,15 +47,71 @@ mod kvstore_test {
             println!("PASS");
         }
 
-        print!("kvstoreIterator case 1: removing all keys does not delete the empty dict ");
+        print!("[TEST] kvstore Iterator case 1: removing all keys does not delete the empty dict: ");
         {
             let mut iter = kvs1.iter();
             while let Some(de) = iter.next() {
-                let curr_slot = iter.get_current_dict_index();
+                curr_slot = iter.get_current_dict_index();
                 let key = &de.key;
-                println!("key: {}", key);
-                //assert!(kvs1.dict_delete(curr_slot, key).is_some());
+                assert!(kvs1.dict_delete(curr_slot, key).is_some())
             }
+
+            iter.release();
+
+            let d = kvs1.get_dict(didx as usize);
+            assert!(d.is_some());
+            assert_eq!(kvs1.dict_size(didx as usize), 0);
+            assert_eq!(kvs1.kvstore_size(), 0);
+            println!("PASS");
+        }
+
+        print!("[TEST] kvstore Iterator case 2: removing all keys will delete the empty dict: ");
+        {
+            let mut iter = kvs2.iter();
+            while let Some(de) = iter.next() {
+                curr_slot = iter.get_current_dict_index();
+                let key = &de.key;
+                assert!(kvs2.dict_delete(curr_slot, key).is_some())
+            }
+            iter.release();
+
+            while kvs2.increment_rehash(1000) != 0 { }
+            let d = kvs2.get_dict(didx as usize);
+            assert!(d.is_none());
+            assert_eq!(kvs2.dict_size(didx as usize), 0);
+            assert_eq!(kvs2.kvstore_size(), 0);
+            println!("PASS");
+        }
+
+        print!("[TEST] Add 16 keys again: ");
+        {
+            for i in 0..16 {
+                let de = kvs1.dict_add_raw(didx, string_from_int(i));
+                assert!(de.is_some());
+                let de = kvs2.dict_add_raw(didx, string_from_int(i));
+                assert!(de.is_some());
+            }
+            assert_eq!(kvs1.dict_size(didx as usize), 16);
+            assert_eq!(kvs1.kvstore_size(), 16);
+            assert_eq!(kvs2.dict_size(didx as usize), 16);
+            assert_eq!(kvs2.kvstore_size(), 16);
+            println!("PASS");
+        }
+
+        print!("[TEST] kvstore DictIterator case 1: removing all keys does not delete the empty dict ");
+        {
+            let mut iter = kvs1.get_dict_safe_iterator(didx as usize);
+            while let Some(de) = iter.next() {
+                let key = &de.key;
+                assert!(kvs1.dict_delete(didx, key).is_some());
+            }
+            iter.release_dict_iterator();
+
+            let d = kvs1.get_dict(didx as usize);
+            assert!(d.is_some());
+            assert_eq!(kvs1.dict_size(didx as usize), 0);
+            assert_eq!(kvs1.kvstore_size(), 0);
+            print!("PASS");
         }
     }
 }

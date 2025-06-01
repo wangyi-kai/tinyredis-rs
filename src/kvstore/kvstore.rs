@@ -1,7 +1,7 @@
 use std::any::Any;
-use std::ffi::c_void;
 use std::hash::Hash;
 use std::ptr::NonNull;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 use rand::Rng;
@@ -207,7 +207,7 @@ where K: Default + Clone + Eq + Hash,
     fn kvstore_dict_is_rehashing_paused(&self, didx: usize) -> bool {
         unsafe {
             let d = self.dicts[didx];
-            return if d.is_some() {
+            if d.is_some() {
                 (*d.unwrap().as_ptr()).dict_is_rehash_paused()
             } else {
                 false
@@ -352,7 +352,7 @@ where K: Default + Clone + Eq + Hash,
 
     fn cumulative_key_count_add(&mut self, didx: i32, delta: i64) {
         unsafe {
-            self.key_count += delta as u64;
+            self.key_count = (self.key_count as i64 + delta) as u64;
             let d = self.get_dict(didx as usize);
             let dsize = (*d.unwrap().as_ptr()).dict_size();
             let non_empty_dicts_delta = if dsize == 1 && delta > 0 {
@@ -370,12 +370,12 @@ where K: Default + Clone + Eq + Hash,
                 return;
             }
             let mut idx = didx + 1;
-            while idx < self.num_dicts as i32 {
+            while idx <= self.num_dicts as i32 {
                 if delta < 0 {
                     assert!(self.dict_size_index[idx as usize] >= delta.abs() as u64);
                 }
                 self.dict_size_index[idx as usize] += delta as u64;
-                idx += (idx & -idx);
+                idx += idx & -idx;
             }
         }
     }
@@ -410,19 +410,20 @@ where K: Default + Clone + Eq + Hash,
         *cursor = *cursor << self.num_dicts_bits | didx as u64;
     }
 
-    pub fn iter(&mut self) -> KvStoreIterator<K, V> {
-        let mut dict_iter = DictIterator {
+    pub fn iter(&mut self) -> KvStoreIterator<'a, K, V> {
+        let dict_iter = DictIterator {
             dict: None,
             table: 0,
             safe: 0,
             index: -1,
             entry: None,
         };
+        let next_didx = self.get_first_non_empty_dict_index() as i32;
         KvStoreIterator {
             kvs: self,
             didx: -1,
-            next_didx: self.get_first_non_empty_dict_index() as i32,
-            di: Some(&mut dict_iter),
+            next_didx,
+            di: Some(dict_iter),
         }
     }
 
@@ -486,26 +487,25 @@ where K: Default + Clone + Eq + Hash,
     pub fn get_dict_iterator(&'a mut self, didx: usize) -> KvStoreDictIterator<K, V> {
         unsafe {
             let d = self.dicts[didx];
-            let mut dict_iter = (*d.unwrap().as_ptr()).iter();
+            let dict_iter = (*d.unwrap().as_ptr()).iter();
             let iter = KvStoreDictIterator {
                 kvs: self,
                 didx: didx as i32,
-                di: Some(&mut dict_iter),
+                di: Some(dict_iter),
             };
             iter
         }
     }
 
-    pub fn get_dict_safe_iterator(&'a mut self, didx: usize) -> KvStoreDictIterator<K, V> {
+    pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<K, V> {
         unsafe {
-            let d = self.dicts[didx];
-            let mut dict_iter = (*d.unwrap().as_ptr()).safe_iter();
-            let iter = KvStoreDictIterator {
+            let mut d = self.dicts[didx];
+            let dict_iter = (*d.unwrap().as_ptr()).safe_iter();
+            KvStoreDictIterator {
                 kvs: self,
                 didx: didx as i32,
-                di: Some(&mut dict_iter)
-            };
-            iter
+                di: Some(dict_iter)
+            }
         }
     }
 
@@ -576,7 +576,7 @@ where K: Default + Clone + Eq + Hash,
                 return None;
             }
             let ret = (*d.unwrap().as_ptr()).generic_delete(key);
-            return match ret {
+            match ret {
                 Ok(ret) => {
                     self.cumulative_key_count_add(didx, -1);
                     self.free_dict_if_needed(didx as usize);
