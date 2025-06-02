@@ -5,6 +5,8 @@ mod adlist;
 mod intset;
 mod endianconv;
 mod kvstore;
+mod server;
+mod quicklist;
 
 fn main() {
 
