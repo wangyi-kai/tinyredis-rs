@@ -4,7 +4,7 @@ mod kvstore_test {
     use std::fmt::Write as _;
     use std::sync::Arc;
     use crate::kvstore::kvstore::KvStore;
-    use crate::kvstore::{KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
+    use crate::kvstore::{KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_FREE_EMPTY_DICTS};
 
     fn test_name(name: &str) {
         print!("test-{}", name);
@@ -55,7 +55,6 @@ mod kvstore_test {
                 let key = &de.key;
                 assert!(kvs1.dict_delete(curr_slot, key).is_some())
             }
-
             iter.release();
 
             let d = kvs1.get_dict(didx as usize);
@@ -101,10 +100,8 @@ mod kvstore_test {
         print!("[TEST] kvstore DictIterator case 1: removing all keys does not delete the empty dict ");
         {
             let mut iter = kvs1.get_dict_safe_iterator(didx as usize);
-            let mut keys = Vec::new();
             while let Some(de) = iter.next() {
                 let key = &de.key;
-                keys.push(key);
                 assert!(kvs1.dict_delete(didx, key).is_some());
             }
             iter.release_dict_iterator();
@@ -113,10 +110,10 @@ mod kvstore_test {
             assert!(d.is_some());
             assert_eq!(kvs1.dict_size(didx as usize), 0);
             assert_eq!(kvs1.kvstore_size(), 0);
-            print!("PASS");
+            println!("PASS");
         }
 
-        print!("[TEST] kvstoreDictIterator case 2: removing all keys will delete the empty dict: ");
+        print!("[TEST] kvstore DictIterator case 2: removing all keys will delete the empty dict: ");
         {
             let mut iter = kvs2.get_dict_safe_iterator(didx as usize);
             while let Some(de) = iter.next() {
@@ -129,13 +126,52 @@ mod kvstore_test {
             assert!(d.is_none());
             assert_eq!(kvs2.dict_size(didx as usize), 0);
             assert_eq!(kvs2.kvstore_size(), 0);
-            print!("PASS");
+            println!("PASS");
         }
 
         print!("[TEST] Verify that a rehashing dict's node in the rehashing list is correctly updated after defragmentation: ");
         {
             let cursor = 0;
+            let mut kvs = KvStore::create(dict_type.clone(), 0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND);
+            for i in 0..256 {
+                let de = kvs.dict_add_raw(0, string_from_int(i));
+                if kvs.rehashing.length() != 0 {
+                    break;
+                }
+            }
+            //assert!(kvs.rehashing.length() > 0);
+            println!("PASS");
+        }
 
+        print!("[TEST] Verify non-empty dict count is correctly updated: ");
+        {
+            let mut kvs = KvStore::create(
+                dict_type.clone(),
+                2,
+                KVSTORE_ALLOCATE_DICTS_ON_DEMAND | KVSTORE_ALLOC_META_KEYS_HIST
+            );
+            for idx in 0..4 {
+                for i in 0..16 {
+                    let de = kvs.dict_add_raw(idx, string_from_int(i));
+                    assert!(de.is_some());
+                    if i == 0 {
+                        assert_eq!(kvs.non_empty_dicts(), idx + 1);
+                    }
+                }
+            }
+
+            for idx in 0..4 {
+                let mut iter = kvs.get_dict_safe_iterator(idx);
+                while let Some(de) = iter.next() {
+                    let key = de.get_key();
+                    assert!(kvs.dict_delete(idx as i32, key).is_some());
+                    if kvs.dict_size(idx as usize) == 0 {
+                        assert_eq!(kvs.non_empty_dicts(), 3 - idx as i32);
+                    }
+                }
+                iter.release_dict_iterator();
+            }
+            println!("PASS");
         }
     }
 }

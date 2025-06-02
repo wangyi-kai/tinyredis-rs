@@ -1,14 +1,13 @@
 use std::any::Any;
 use std::hash::Hash;
 use std::ptr::NonNull;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 use rand::Rng;
 use crate::adlist::adlist::{List, Node};
 use crate::dict::dict::{Dict, DictEntry};
 use crate::dict::iter::DictIterator;
-use crate::dict::lib::{dict_size, DictScanFunction, DictType, entry_mem_usage};
+use crate::dict::lib::{DictScanFunction, DictType, entry_mem_usage};
 use crate::kvstore::{KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
 use crate::kvstore::iter::{KvStoreDictIterator, KvStoreIterator};
 use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
@@ -72,7 +71,7 @@ where K: Default + Clone + Eq + Hash,
             let mut dicts = Vec::new();
             let mut allocated_dicts = 0;
             if flag & KVSTORE_ALLOCATE_DICTS_ON_DEMAND != 0 {
-                for i in 0..num_dicts {
+                for _ in 0..num_dicts {
                     let d = Dict::create(dict_type.clone());
                     dicts.push(Some(NonNull::new_unchecked(Box::into_raw(Box::new(d)))));
                     allocated_dicts += 1;
@@ -345,7 +344,7 @@ where K: Default + Clone + Eq + Hash,
         let mut sum = 0;
         while idx > 0 {
             sum += self.dict_size_index[idx as usize];
-            idx -= (idx & -idx);
+            idx -= idx & -idx;
         }
         sum
     }
@@ -374,7 +373,7 @@ where K: Default + Clone + Eq + Hash,
                 if delta < 0 {
                     assert!(self.dict_size_index[idx as usize] >= delta.abs() as u64);
                 }
-                self.dict_size_index[idx as usize] += delta as u64;
+                self.dict_size_index[idx as usize] = (self.dict_size_index[idx as usize] as i64 + delta) as u64;
                 idx += idx & -idx;
             }
         }
@@ -432,7 +431,7 @@ where K: Default + Clone + Eq + Hash,
             limit = self.num_dicts as i32;
         }
         unsafe {
-            for i in 0..limit {
+            for _ in 0..limit {
                 let didx = self.resize_cursor;
                 let d = self.get_dict(didx as usize);
                 if d.is_some() && (*d.unwrap().as_ptr()).shrink_if_needed().unwrap() != true {
@@ -484,7 +483,7 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
-    pub fn get_dict_iterator(&'a mut self, didx: usize) -> KvStoreDictIterator<K, V> {
+    pub fn get_dict_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, K, V> {
         unsafe {
             let d = self.dicts[didx];
             let dict_iter = (*d.unwrap().as_ptr()).iter();
@@ -497,7 +496,7 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
-    pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<K, V> {
+    pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, K, V> {
         unsafe {
             let mut d = self.dicts[didx];
             let dict_iter = (*d.unwrap().as_ptr()).safe_iter();
@@ -585,6 +584,10 @@ where K: Default + Clone + Eq + Hash,
                 Err(_) => { None }
             }
         }
+    }
+
+    pub fn non_empty_dicts(&self) -> i32 {
+        self.non_empty_dicts
     }
 
     // pub fn get_dict_metadata<T>(&self, didx: i32) -> Option<KvStoreDictMetadata> {
