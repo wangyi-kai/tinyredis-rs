@@ -406,7 +406,7 @@ impl ZipList {
         }
         if tail == prev_offset {
             if (extra - delta) != 0 {
-                self.update_tail_offset((self.tail_offset() as u32 + (extra - delta)));
+                self.update_tail_offset(self.tail_offset() as u32 + (extra - delta));
             }
         } else {
             self.update_tail_offset(self.tail_offset() as u32 + extra);
@@ -607,11 +607,9 @@ impl ZipList {
             } else {
                 return false;
             }
-        } else {
-            if let Some((value, _)) = try_encoding(sstr) {
-                let zval = load_integer(&self.data[pos + entry.head_size as usize..], entry.encoding);
-                return zval == value;
-            }
+        } else if let Some((value, _)) = try_encoding(sstr) {
+            let zval = load_integer(&self.data[pos + entry.head_size as usize..], entry.encoding);
+            return zval == value;
         }
         false
     }

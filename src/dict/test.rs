@@ -1,9 +1,9 @@
-use crate::dict::dict::Dict;
-use crate::dict::error::HashError;
 
 #[cfg(test)]
 mod dict_test {
-    use super::*;
+    use crate::dict::dict::Dict;
+    use crate::dict::error::HashError;
+
     use std::collections::HashMap;
     use std::time::{Instant};
     use rand::{Rng, SeedableRng};

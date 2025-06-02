@@ -1,12 +1,12 @@
 use std::any::Any;
 use std::cmp::{ PartialEq};
 use std::ptr::NonNull;
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug};
 use std::hash::Hash;
 use std::mem;
 use std::sync::Arc;
 use std::time::{Instant};
-use rand::{random, Rng, rng};
+use rand::{Rng};
 use crate::dict::lib::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
 use crate::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
 use crate::dict::error::HashError;

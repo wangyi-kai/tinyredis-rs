@@ -65,7 +65,7 @@ where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
     pub fn reset(&mut self) {
-        if !(self.index == -1 && self.table == 0) {
+        if !(self.index == -1 && self.table == 0)  {
             if self.safe != 0 {
                 self.dict.as_mut().unwrap().resume_rehash()
             }

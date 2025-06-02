@@ -2,7 +2,7 @@ use std::cmp;
 use std::str::from_utf8;
 use crate::ziplist::{*};
 use crate::ziplist::error::ZipListError;
-use crate::ziplist::ziplist::{ZipList, ZlEntry};
+use crate::ziplist::ziplist::{ZipList};
 
 #[derive(Debug)]
 pub enum Content {
@@ -200,12 +200,10 @@ pub fn store_prev_entry_length(data: Option<&mut [u8]>, len: u32) -> u32 {
         } else {
             store_prev_entry_length_large(Some(p), len)
         }
+    } else if len < ZIP_BIG_PREVLEN as u32 {
+        1
     } else {
-        if len < ZIP_BIG_PREVLEN as u32 {
-            1
-        } else {
-            (1 + size_of::<u32>()) as u32
-        }
+        (1 + size_of::<u32>()) as u32
     }
 }
 
@@ -357,7 +355,6 @@ pub fn ziplist_repr(zl: &mut ZipList) {
 
 type ZiplistValidateEntryCb = fn(pos: usize, head_count: u32, user_dara: *mut c_void) -> i32;
 use std::ffi::c_void;
-use std::ops::Deref;
 
 pub fn ziplist_valid_integerity(zl: &mut ZipList, size: usize, deep: i32, entry_cb: Option<ZiplistValidateEntryCb>, user_data: Option<*mut c_void>) -> i32 {
     if size < (ZIPLIST_HEADER_SIZE + ZIPLIST_END_SIZE) as usize {

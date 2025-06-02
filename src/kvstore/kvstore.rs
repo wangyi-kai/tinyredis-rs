@@ -11,7 +11,6 @@ use crate::dict::lib::{DictScanFunction, DictType, entry_mem_usage};
 use crate::kvstore::{KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
 use crate::kvstore::iter::{KvStoreDictIterator, KvStoreIterator};
 use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
-use crate::kvstore::meta::KvStoreDictMetaEx;
 
 #[derive(Clone)]
 pub struct KvStoreMetadata {

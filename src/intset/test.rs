@@ -1,4 +1,5 @@
 
+#[cfg(test)]
 mod intset_test {
     use std::time::Instant;
     use crate::intset::intset::IntSet;

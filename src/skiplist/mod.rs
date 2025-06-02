@@ -1,5 +1,4 @@
 use crate::skiplist::skiplist::SkipList;
-use crate::skiplist::lib::gen_random;
 
 mod skiplist;
 mod test;
