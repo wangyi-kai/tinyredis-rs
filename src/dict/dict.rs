@@ -198,7 +198,7 @@ where K: Default + Clone + Eq + Hash,
             if !self.dict_is_rehashing() { break; }
         }
         let ht_idx = if self.dict_is_rehashing() { 1 } else { 0 };
-        let mut bucket = self.ht_table[ht_idx][idx as usize];
+        let bucket = self.ht_table[ht_idx][idx as usize];
         bucket
     }
 

@@ -1,9 +1,13 @@
+use std::hash::Hash;
 use crate::dict::dict::Dict;
 use crate::kvstore::kvstore::KvStore;
 
 const LRU_BITS: usize = 24;
 
-pub struct RedisDb<K, V> {
+pub struct RedisDb<K, V>
+where K: Default + Clone + Eq + Hash,
+      V: Default + PartialEq + Clone
+{
     /// The keyspace for this DB. As metadata, holds key sizes histogram
     keys: KvStore<K, V>,
     /// Timeout of keys with a timeout set

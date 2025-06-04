@@ -1,4 +1,4 @@
-mod ziplist;
+pub mod ziplist;
 mod lib;
 mod error;
 mod test;

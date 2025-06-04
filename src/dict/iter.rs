@@ -17,11 +17,9 @@ where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
     pub fn iter(&self) -> EntryIter<K, V> {
-        unsafe {
-            EntryIter {
-                cur: Some(self),
-                _boo: PhantomData,
-            }
+        EntryIter {
+            cur: Some(self),
+            _boo: PhantomData,
         }
     }
 }

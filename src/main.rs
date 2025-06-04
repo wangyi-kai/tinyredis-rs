@@ -7,6 +7,7 @@ mod endianconv;
 mod kvstore;
 mod server;
 mod quicklist;
+mod listpack;
 
 fn main() {
 

@@ -322,7 +322,7 @@ where K: Default + Clone + Eq + Hash,
             assert_eq!(didx, 0);
             return -1;
         }
-        let mut next_key = self.cumulative_key_count_read(didx as i32) + 1;
+        let next_key = self.cumulative_key_count_read(didx as i32) + 1;
         if next_key < self.kvstore_size() {
             self.find_dict_index_by_key_index(next_key) as i32
         } else {
@@ -497,7 +497,7 @@ where K: Default + Clone + Eq + Hash,
 
     pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, K, V> {
         unsafe {
-            let mut d = self.dicts[didx];
+            let d = self.dicts[didx];
             let dict_iter = (*d.unwrap().as_ptr()).safe_iter();
             KvStoreDictIterator {
                 kvs: self,
@@ -529,7 +529,7 @@ where K: Default + Clone + Eq + Hash,
 
     pub fn dict_add_raw(&mut self, didx: i32, key: K) -> Option<NonNull<DictEntry<K, V>>> {
         unsafe {
-            let mut d = self.create_dict_if_needed(didx);
+            let d = self.create_dict_if_needed(didx);
             if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw(key, V::default()) {
                 self.cumulative_key_count_add(didx, 1);
                 return Some(ret);

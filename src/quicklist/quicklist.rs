@@ -1,11 +1,14 @@
+use std::iter::Zip;
 use std::ptr::NonNull;
-use crate::quicklist::{COMPRESS_MAX, FILL_MAX, MIN_COMPRESS_BYTES, MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN, QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW};
+
+use crate::quicklist::{COMPRESS_MAX, FILL_MAX, is_large_element, MIN_COMPRESS_BYTES, MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN, QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW, quicklist_node_exceed_limit, SIZE_ESTIMATE_OVERHEAD};
 use crate::quicklist::lib::QuickListLzf;
+use crate::ziplist::ziplist::ZipList;
 
 pub struct QuickListNode {
     prev: Option<NonNull<QuickListNode>>,
     next: Option<NonNull<QuickListNode>>,
-    entry: Vec<u8>,
+    entry: ZipList,
     /// entry size in bytes
     sz: usize,
     /// count of items in listpack
@@ -29,7 +32,7 @@ impl QuickListNode {
         Self {
             prev: None,
             next: None,
-            entry: Vec::new(),
+            entry: ZipList::new(),
             sz: 0,
             count: 0,
             encoding: QUICKLIST_NODE_ENCODING_RAW,
@@ -51,7 +54,7 @@ impl QuickListNode {
             return;
         }
 
-        let compress = match lzf::compress(&self.entry) {
+        let compress = match lzf::compress(&self.entry.data) {
             Ok(lzf) => {
                 lzf
             }
@@ -64,26 +67,74 @@ impl QuickListNode {
         if lzf.sz == 0 || (lzf.sz + MIN_COMPRESS_IMPROVE) >= self.sz {
             return;
         }
-        self.entry = lzf.to_u8();
+        self.entry = ZipList::create(lzf.to_u8());
         self.encoding = QUICKLIST_NODE_ENCODING_LZF;
     }
 
     pub fn get_lzf(&self) -> QuickListLzf {
-        let lzf = QuickListLzf::from_u8(&self.entry);
+        let lzf = QuickListLzf::from_u8(&self.entry.data);
         lzf
     }
 
     pub fn decompress(&mut self) {
         self.recompress = 0;
-        let lzf = QuickListLzf::from_u8(&self.entry);
+        let lzf = QuickListLzf::from_u8(&self.entry.data);
         let decompress = lzf::decompress(&lzf.compressed, lzf.sz).unwrap();
         let len = decompress.len();
         if len == 0 {
             return;
         }
         self.sz = len;
-        self.entry = decompress;
+        self.entry = ZipList::create(decompress);
         self.encoding = QUICKLIST_NODE_ENCODING_RAW;
+    }
+
+    pub fn _allow_insert(&self, fill: i32, sz: usize) -> bool {
+        let new_sz = sz + SIZE_ESTIMATE_OVERHEAD;
+
+        if std::hint::unlikely(self.is_plain() || is_large_element(sz, fill)) {
+            return false;
+        }
+
+        if std::hint::unlikely(quicklist_node_exceed_limit(fill, new_sz, self.count + 1)) {
+            return false;
+        }
+        return true;
+    }
+
+    pub fn _allow_merge(
+        a: Option<NonNull<QuickListNode>>,
+        b: Option<NonNull<QuickListNode>>,
+        fill: i32
+    ) -> bool {
+        if a.is_none() || b.is_none() {
+            return false;
+        }
+        unsafe {
+            if std::hint::unlikely((*a.unwrap().as_ptr()).is_plain() || (*b.unwrap().as_ptr()).is_plain()) {
+                return false;
+            }
+            let merge_sz = (*a.unwrap().as_ptr()).sz + (*b.unwrap().as_ptr()).sz - 7;
+            if std::hint::unlikely(quicklist_node_exceed_limit(fill, merge_sz, (*a.unwrap().as_ptr()).count + (*b.unwrap().as_ptr()).count)) {
+                return false;
+            }
+            return true;
+        }
+    }
+
+    fn is_plain(&self) -> bool {
+        self.container == QUICKLIST_NODE_CONTAINER_PLAIN
+    }
+
+    pub fn create_node(container: i32, value: Vec<u8>, sz: usize) {
+        let mut new_node = QuickListNode::create();
+        new_node.container = container as u32;
+        if container == QUICKLIST_NODE_CONTAINER_PLAIN as i32 {
+            //new_node.entry = Vec::with_capacity(sz);
+            new_node.entry = ZipList::create(value);
+        } else {
+
+        }
     }
 }
 
@@ -100,6 +151,14 @@ pub fn decompress_node_for_use(node: Option<NonNull<QuickListNode>>) {
         if node.is_some() && (*node.unwrap().as_ptr()).encoding == QUICKLIST_NODE_ENCODING_LZF {
             (*node.unwrap().as_ptr()).decompress();
             (*node.unwrap().as_ptr()).recompress = 1;
+        }
+    }
+}
+
+pub fn compress_node(node: Option<NonNull<QuickListNode>>) {
+    unsafe {
+        if node.is_some() && (*node.unwrap().as_ptr()).encoding == QUICKLIST_NODE_ENCODING_RAW {
+            (*node.unwrap().as_ptr()).compressed();
         }
     }
 }
@@ -186,7 +245,7 @@ impl QuickList {
         }
     }
 
-    pub fn compress(&self, node: QuickListNode) {
+    pub fn _compress(&self, node: Option<NonNull<QuickListNode>>) {
         if self.len == 0 {
             return;
         }
@@ -196,12 +255,96 @@ impl QuickList {
         if self.compress != 0 || self.len < (self.compress * 2) as u64 {
             return;
         }
-        let forward = self.head;
-        let reverse = self.tail;
+        let mut forward = self.head;
+        let mut reverse = self.tail;
         let mut depth = 0;
-        while depth < self.compress {
+        let mut in_depth = 0;
+        unsafe {
+            while depth < self.compress {
+                depth += 1;
+                decompress_node(forward);
+                decompress_node(reverse);
 
+                if forward == node || reverse == node {
+                    in_depth = 1;
+                }
+                if forward == reverse || (*forward.unwrap().as_ptr()).next == reverse {
+                    return;
+                }
+                forward = (*forward.unwrap().as_ptr()).next;
+                reverse = (*reverse.unwrap().as_ptr()).prev;
+            }
+            if in_depth == 0 {
+                compress_node(node);
+            }
+            compress_node(forward);
+            compress_node(reverse);
         }
     }
+
+    pub fn _insert_node(
+        &mut self,
+        old_node: Option<NonNull<QuickListNode>>,
+        new_node: Option<NonNull<QuickListNode>>,
+        after: bool
+    ) {
+        unsafe {
+            if after {
+                (*new_node.unwrap().as_ptr()).prev = old_node;
+                if old_node.is_some() {
+                    (*new_node.unwrap().as_ptr()).next = (*old_node.unwrap().as_ptr()).next;
+                    if (*old_node.unwrap().as_ptr()).next.is_some() {
+                        (*(*old_node.unwrap().as_ptr()).next.unwrap().as_ptr()).prev = new_node;
+                    }
+                    (*old_node.unwrap().as_ptr()).next = new_node;
+                }
+                if self.tail == old_node {
+                    self.tail = new_node;
+                }
+            } else {
+                (*new_node.unwrap().as_ptr()).next = old_node;
+                if old_node.is_some() {
+                    (*new_node.unwrap().as_ptr()).prev = (*old_node.unwrap().as_ptr()).prev;
+                    if (*old_node.unwrap().as_ptr()).prev.is_some() {
+                        (*(*old_node.unwrap().as_ptr()).prev.unwrap().as_ptr()).next = new_node;
+                    }
+                    (*old_node.unwrap().as_ptr()).prev = new_node;
+                }
+                if self.head == old_node {
+                    self.head = new_node;
+                }
+            }
+
+            if self.len == 0 {
+                self.head = new_node;
+                self.tail = new_node;
+            }
+            self.len += 1;
+            if old_node.is_some() {
+                self.compress(old_node);
+            }
+            self.compress(new_node);
+        }
+    }
+
+    fn compress(&mut self, node: Option<NonNull<QuickListNode>>) {
+        unsafe {
+            if (*node.unwrap().as_ptr()).recompress != 0 {
+                compress_node(node);
+            } else {
+                self._compress(node);
+            }
+        }
+    }
+
+    pub fn insert_node_before(&mut self, old_node: Option<NonNull<QuickListNode>>, new_node: Option<NonNull<QuickListNode>>) {
+        self._insert_node(old_node, new_node, false);
+    }
+
+    pub fn insert_node_after(&mut self, old_node: Option<NonNull<QuickListNode>>, new_node: Option<NonNull<QuickListNode>>) {
+        self._insert_node(old_node, new_node, true);
+    }
+
+
 }
 

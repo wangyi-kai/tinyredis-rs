@@ -59,6 +59,12 @@ impl ZipList {
         Self { data: zl }
     }
 
+    pub fn create(data: Vec<u8>) -> Self {
+        Self {
+            data
+        }
+    }
+
     pub fn resize(&mut self, len: u32) {
         assert!(len < u32::MAX);
         self.data.resize(len as usize, 0);

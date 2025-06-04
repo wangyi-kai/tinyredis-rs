@@ -431,7 +431,7 @@ pub fn ziplist_merge(first: &mut Option<ZipList>, second: &mut Option<ZipList>) 
     let source_bytes = source.ziplist_len();
 
     let zl_bytes = first_bytes as u32 + second_bytes as u32 - ZIPLIST_HEADER_SIZE - ZIPLIST_END_SIZE;
-    let mut zl_len = cmp::min(first_len + second_len, u16::MAX as u32) as u16;
+    let zl_len = cmp::min(first_len + second_len, u16::MAX as u32) as u16;
     assert!(zl_bytes < u32::MAX);
 
     target.resize(zl_bytes);
