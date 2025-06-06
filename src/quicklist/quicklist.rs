@@ -1,4 +1,3 @@
-use std::iter::Zip;
 use std::ptr::NonNull;
 
 use crate::quicklist::{COMPRESS_MAX, FILL_MAX, is_large_element, MIN_COMPRESS_BYTES, MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN, QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW, quicklist_node_exceed_limit, SIZE_ESTIMATE_OVERHEAD};
@@ -237,7 +236,7 @@ impl QuickList {
             while len > 0 {
                 len -= 1;
                 let next = (*current.unwrap().as_ptr()).next;
-                (*current.unwrap().as_ptr()).entry = Vec::new();
+                (*current.unwrap().as_ptr()).entry = ZipList::new();
                 self.count -= (*current.unwrap().as_ptr()).count as u64;
                 self.len -= 1;
                 current = next;
@@ -344,7 +343,5 @@ impl QuickList {
     pub fn insert_node_after(&mut self, old_node: Option<NonNull<QuickListNode>>, new_node: Option<NonNull<QuickListNode>>) {
         self._insert_node(old_node, new_node, true);
     }
-
-
 }
 

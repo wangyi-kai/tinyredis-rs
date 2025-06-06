@@ -1,37 +1,28 @@
+use std::any::Any;
 use std::hash::Hash;
-use crate::dict::dict::Dict;
-use crate::kvstore::kvstore::KvStore;
+
+/// A redis object, that is a type able to hold a string / list / set
+
+/// The actual Redis Object
+/// String object
+const OBJ_STRING: usize = 0;
+/// List object
+const OBJ_LIST: usize = 1;
+/// Set object
+const OBJ_SET: usize = 2;
+/// Sorted set object
+const OBJ_ZSET: usize = 3;
+/// Hash object
+const OBJ_HASH: usize = 4;
+/// Max number of basic object types
+const OBJ_TYPE_BASIC_MAX: usize = 5;
 
 const LRU_BITS: usize = 24;
-
-pub struct RedisDb<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
-{
-    /// The keyspace for this DB. As metadata, holds key sizes histogram
-    keys: KvStore<K, V>,
-    /// Timeout of keys with a timeout set
-    expires: KvStore<K, V>,
-    /// Keys with clients waiting for data (BLPOP)
-    blocking_keys: Dict<K, V>,
-    /// Keys with clients waiting for data,
-    /// and should be unblocked if key is deleted (XREADEDGROUP)
-    blocking_keys_unblock_on_nokey: Dict<K, V>,
-    /// Blocked keys that received a PUSH
-    read_keys: Dict<K, V>,
-    /// WATCHED keys for MULTI/EXEC CAS
-    watched_keys: Dict<K, V>,
-    /// Database ID
-    id: i32,
-    /// Average TTL, just for stats
-    avg_ttl: i64,
-    /// Cursor of the active expire cycle
-    expires_cursor: u64,
-}
 
 pub struct RedisObject {
     object_type: usize,
     encoding: usize,
     lru: usize,
     ref_count: i32,
+    pub ptr: Box<dyn Any>,
 }

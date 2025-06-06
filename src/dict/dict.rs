@@ -6,13 +6,21 @@ use std::hash::Hash;
 use std::mem;
 use std::sync::Arc;
 use std::time::{Instant};
-use rand::{Rng};
 use crate::dict::lib::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
 use crate::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
 use crate::dict::error::HashError;
 use crate::dict::hash::{sys_hash};
 use crate::dict::lib::{*};
 use crate::skiplist::lib::gen_random;
+
+#[derive(Default, Clone)]
+pub enum Value {
+    #[default]
+    Val(Box<dyn Any>),
+    U64(u64),
+    S64(i64),
+    F(f64),
+}
 
 #[derive(Debug, Copy)]
 pub struct DictEntry<K, V>
@@ -73,6 +81,7 @@ where K: Default + Clone + Eq + Hash,
         &self.val
     }
 }
+
 
 
 pub struct Dict<K, V>
@@ -220,6 +229,7 @@ where K: Default + Clone + Eq + Hash,
                 while he.is_some() {
                     let he_key = (*he.unwrap().as_ptr()).get_key();
                     if key == *he_key {
+                        return Ok(he.unwrap());
                         return Err(HashError::DictEntryDup);
                     }
                     he = (*he.unwrap().as_ptr()).next;
@@ -700,7 +710,7 @@ where K: Default + Clone + Eq + Hash,
             count = self.dict_size() as u64;
         }
         let mut max_step = count * 10;
-        for j in 0..count {
+        for _ in 0..count {
             if self.dict_is_rehashing() {
                 let _ = self.rehash_step();
             } else {

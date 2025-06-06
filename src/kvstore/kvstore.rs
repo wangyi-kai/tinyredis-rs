@@ -527,6 +527,16 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
+    pub fn dict_find(&self, didx: i32, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
+        let d = self.get_dict(didx as usize);
+        if d.is_none() {
+            return None;
+        }
+        unsafe {
+            (*d.unwrap().as_ptr()).find(key)
+        }
+    }
+
     pub fn dict_add_raw(&mut self, didx: i32, key: K) -> Option<NonNull<DictEntry<K, V>>> {
         unsafe {
             let d = self.create_dict_if_needed(didx);
