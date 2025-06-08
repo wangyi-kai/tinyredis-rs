@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use std::marker::PhantomData;
-use crate::dict::dict::{Dict, DictEntry};
-use crate::dict::lib::{*};
+use crate::data_structure::dict::dict::{Dict, DictEntry};
+use crate::data_structure::dict::lib::{*};
 
 #[derive(Debug)]
 pub struct EntryIter<'a, K, V>

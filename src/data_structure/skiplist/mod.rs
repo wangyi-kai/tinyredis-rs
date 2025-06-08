@@ -1,4 +1,4 @@
-use crate::skiplist::skiplist::SkipList;
+use super::skiplist::skiplist::SkipList;
 
 mod skiplist;
 mod test;

@@ -1,8 +1,8 @@
 use std::hash::Hash;
 use std::ptr::NonNull;
-use crate::dict::dict::{Dict, DictEntry};
+use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::kvstore::kvstore::KvStore;
-use crate::dict::iter::DictIterator;
+use crate::data_structure::dict::iter::DictIterator;
 
 pub struct KvStoreIterator<'a, K, V>
 where K: Default + Clone + Eq + Hash,

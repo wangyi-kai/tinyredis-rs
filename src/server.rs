@@ -1,28 +1,127 @@
 use std::any::Any;
 use std::hash::Hash;
+use std::sync::Arc;
+use crate::dict::dict::Dict;
+use crate::dict::lib::DictType;
+use crate::intset::intset::IntSet;
+use crate::quicklist::quicklist::QuickList;
 
 /// A redis object, that is a type able to hold a string / list / set
 
 /// The actual Redis Object
 /// String object
-const OBJ_STRING: usize = 0;
+const OBJ_STRING: u32 = 0;
 /// List object
-const OBJ_LIST: usize = 1;
+const OBJ_LIST: u32 = 1;
 /// Set object
-const OBJ_SET: usize = 2;
+const OBJ_SET: u32 = 2;
 /// Sorted set object
-const OBJ_ZSET: usize = 3;
+const OBJ_ZSET: u32 = 3;
 /// Hash object
-const OBJ_HASH: usize = 4;
+const OBJ_HASH: u32 = 4;
 /// Max number of basic object types
-const OBJ_TYPE_BASIC_MAX: usize = 5;
+const OBJ_TYPE_BASIC_MAX: u32 = 5;
+/// Raw representation
+pub const OBJ_ENCODING_RAW: u32 = 0;
+/// Encoded as integer
+pub const OBJ_ENCODING_INT: u32 = 1;
+/// Encoded as hash table
+pub const OBJ_ENCODING_HT: u32 = 2;
+/// Encoded as intset
+pub const OBJ_ENCODING_INTSET: u32 = 6;
+/// Encoded as skiplist
+pub const OBJ_ENCODING_SKIPLIST: u32 = 7;
+/// Embedded sds string encoding
+pub const OBJ_ENCODING_EMBSTR: u32 = 8;
+const OBJ_ENCODING_QUICKLIST: u32 = 9;
+const LRU_BITS: u32 = 24;
+/// Max value of obj->lru
+const LRU_CLOCK_MAX: u32 = (1 << LRU_BITS) - 1;
 
-const LRU_BITS: usize = 24;
+const OBJ_SHARED_REFCOUNT: i32 = i32::MAX;
+const OBJ_STATIC_REFCOUNT: i32 = i32::MAX - 1;
+const OBJ_FIRST_SPECIAL_REFCOUNT: i32 = OBJ_STATIC_REFCOUNT;
 
 pub struct RedisObject {
-    object_type: usize,
-    encoding: usize,
-    lru: usize,
+    /// object type
+    object_type: u32,
+    /// object encoding
+    encoding: u32,
+    /// object last visit time
+    lru: u32,
+    /// object reference count
     ref_count: i32,
+    /// actual object
     pub ptr: Box<dyn Any>,
+}
+
+impl RedisObject {
+    fn create(object_type: u32, ptr: Box<dyn Any>) -> Self {
+        Self {
+            object_type,
+            encoding: OBJ_ENCODING_RAW,
+            lru: 0,
+            ref_count: 1,
+            ptr,
+        }
+    }
+
+    fn create_raw_string_object(s: String) -> Self {
+        let s_object = Box::new(s);
+        RedisObject::create(OBJ_STRING, s_object)
+    }
+
+    pub fn create_string_object(s: String) -> Self {
+        RedisObject::create_raw_string_object(s)
+    }
+
+    pub fn create_quicklist_object(fill: i32, compress: i32) -> Self {
+        let l = QuickList::new(fill, compress);
+        let mut o = RedisObject::create(OBJ_LIST, Box::new(l));
+        o.encoding = OBJ_ENCODING_QUICKLIST;
+        o
+    }
+
+    pub fn create_set_object() -> Self {
+        let dict_type = DictType {
+            hash_function: None,
+            rehashing_started: None,
+            rehashing_completed: None,
+            dict_meta_data_bytes: None,
+        };
+        let d = Dict::create(Arc::new(dict_type));
+        let mut o = RedisObject::create(OBJ_SET, Box::new(d));
+        o.encoding = OBJ_ENCODING_HT;
+        o
+    }
+
+    pub fn create_inset_object() -> Self {
+        let is = IntSet::new();
+        let mut o = RedisObject::create(OBJ_SET, Box::new(is));
+        o.encoding = OBJ_ENCODING_INTSET;
+        o
+    }
+
+    pub fn incr_ref_count(&mut self) {
+        if self.ref_count > OBJ_FIRST_SPECIAL_REFCOUNT {
+            self.ref_count += 1;
+        } else {
+            if self.ref_count == OBJ_SHARED_REFCOUNT {
+
+            } else if self.ref_count == OBJ_STATIC_REFCOUNT {
+                panic!("You tried to retain an object allocated in the stack");
+            }
+        }
+    }
+
+    pub fn decr_ref_count(&mut self) {
+        if self.ref_count == OBJ_SHARED_REFCOUNT {
+            return;
+        }
+        if self.ref_count < 0 {
+            panic!("llegal decrRefCount for object with: type {}, encoding {}, refcount {}", self.object_type, self.encoding, self.ref_count);
+        }
+
+        self.ref_count -= 1;
+    }
 }

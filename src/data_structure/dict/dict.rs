@@ -6,12 +6,13 @@ use std::hash::Hash;
 use std::mem;
 use std::sync::Arc;
 use std::time::{Instant};
-use crate::dict::lib::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
-use crate::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
-use crate::dict::error::HashError;
-use crate::dict::hash::{sys_hash};
-use crate::dict::lib::{*};
-use crate::skiplist::lib::gen_random;
+use crate::data_structure::dict::lib::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
+use crate::data_structure::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
+use crate::data_structure::dict::error::HashError;
+use crate::data_structure::dict::hash::{sys_hash};
+use crate::data_structure::dict::lib::{*};
+use crate::data_structure::skiplist::lib::gen_random;
+
 
 #[derive(Default, Clone)]
 pub enum Value {
@@ -20,6 +21,13 @@ pub enum Value {
     U64(u64),
     S64(i64),
     F(f64),
+}
+
+impl Default for Value {
+    fn default() -> Self {
+        // 默认使用 Val 包装一个具体类型，比如 0u64
+        Value::Val(Box::new(0u64))
+    }
 }
 
 #[derive(Debug, Copy)]
@@ -77,11 +85,10 @@ where K: Default + Clone + Eq + Hash,
     }
 
     #[inline]
-    pub fn get_val(&self) -> &V {
+    pub fn get_val(&self) -> V {
         &self.val
     }
 }
-
 
 
 pub struct Dict<K, V>
@@ -800,7 +807,7 @@ where K: Default + Clone + Eq + Hash,
         *to = dict_size(self.ht_size_exp[1]);
     }
 
-    pub fn dict_two_phase_unlink_find(&mut self, key: &K, table_index: &mut usize) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn dict_two_phase_unlink_find(&mut self, key: &K, table_index: &mut i32) -> Option<NonNull<DictEntry<K, V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -816,7 +823,7 @@ where K: Default + Clone + Eq + Hash,
                 while he.is_some() {
                     let he_key = (*he.unwrap().as_ptr()).get_key();
                     if he_key == key {
-                        *table_index = table;
+                        *table_index = table as i32;
                         self.pause_rehash();
                         return he;
                     }

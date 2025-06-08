@@ -1,8 +1,8 @@
 use std::cmp;
 use std::str::from_utf8;
-use crate::ziplist::{*};
-use crate::ziplist::error::ZipListError;
-use crate::ziplist::ziplist::{ZipList};
+use crate::data_structure::ziplist::{*};
+use crate::data_structure::ziplist::error::ZipListError;
+use crate::data_structure::ziplist::ziplist::{ZipList};
 
 #[derive(Debug)]
 pub enum Content {

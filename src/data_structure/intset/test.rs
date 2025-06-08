@@ -2,10 +2,10 @@
 #[cfg(test)]
 mod intset_test {
     use std::time::Instant;
-    use crate::intset::intset::IntSet;
-    use crate::skiplist::lib::gen_random;
-    use crate::intset::{INTSET_ENC_INT16, INTSET_ENC_INT32, INTSET_ENC_INT64};
-    use crate::intset::lib::intset_value_encoding;
+    use crate::data_structure::intset::intset::IntSet;
+    use crate::data_structure::skiplist::lib::gen_random;
+    use crate::data_structure::intset::{INTSET_ENC_INT16, INTSET_ENC_INT32, INTSET_ENC_INT64};
+    use crate::data_structure::intset::lib::intset_value_encoding;
 
     fn intset_repr(is: &IntSet) {
         for i in 0..is.get_length() {

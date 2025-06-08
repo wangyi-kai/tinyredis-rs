@@ -1,12 +1,9 @@
 mod crc;
 mod server;
 mod cluster;
-mod ziplist;
 mod db;
-mod dict;
-mod skiplist;
 mod kvstore;
-mod adlist;
+mod data_structure;
 
 fn main() {
 

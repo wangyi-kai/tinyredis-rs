@@ -1,9 +1,9 @@
 use std::str::{from_utf8};
 
-use crate::ziplist::{ZIP_ENCODING_SIZE_INVALID, ZIP_END, ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE, ZIPLIST_LENGTH_OFFSET};
-use crate::ziplist::error::ZipListError;
-use crate::ziplist::lib::{*};
-use crate::ziplist::lib::Content::{Integer, Char};
+use crate::data_structure::ziplist::{ZIP_ENCODING_SIZE_INVALID, ZIP_END, ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE, ZIPLIST_LENGTH_OFFSET};
+use crate::data_structure::ziplist::error::ZipListError;
+use crate::data_structure::ziplist::lib::{*};
+use crate::data_structure::ziplist::lib::Content::{Integer, Char};
 
 #[derive(Clone, Debug)]
 pub struct ZipListEntry {

@@ -1,5 +1,5 @@
 use std::ptr::NonNull;
-use crate::adlist::adlist::{Node};
+use crate::data_structure::adlist::adlist::{Node};
 use crate::kvstore::kvstore::KvStoreDictMetadata;
 
 pub struct KvStoreDictMetaBase<T> {

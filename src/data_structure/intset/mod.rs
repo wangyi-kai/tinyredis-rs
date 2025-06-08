@@ -1,5 +1,5 @@
 mod test;
-mod intset;
+pub mod intset;
 mod lib;
 
 const INTSET_ENC_INT16: u8 = 2;

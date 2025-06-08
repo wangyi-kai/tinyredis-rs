@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::hash::Hash;
-use crate::dict::dict::Dict;
-use crate::dict::lib::{dict_size, DICT_STATS_VECTLEN};
+use crate::data_structure::dict::dict::Dict;
+use crate::data_structure::dict::lib::{dict_size, DICT_STATS_VECTLEN};
 
 use std::fmt::Write as _;
 

@@ -1,5 +1,5 @@
 use std::ptr::NonNull;
-use crate::skiplist::{SKIP_LIST_MAX_LEVEL};
+use super::{SKIP_LIST_MAX_LEVEL};
 use super::lib::{random_level, sds_cmp};
 
 #[derive(Clone, Debug, Default)]

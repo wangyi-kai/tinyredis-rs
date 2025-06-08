@@ -1,8 +1,11 @@
 
 #[cfg(test)]
 mod dict_test {
-    use crate::dict::dict::Dict;
-    use crate::dict::error::HashError;
+    use crate::data_structure::dict::dict::Dict;
+    use crate::data_structure::dict::error::HashError;
+    use crate::data_structure::dict::hash::sys_hash;
+    use crate::data_structure::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL, random_u32, random_i32, DictType};
+    use crate::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
 
     use std::collections::HashMap;
     use std::time::{Instant};
@@ -11,9 +14,6 @@ mod dict_test {
 
     use std::fmt::Write as _;
     use std::sync::Arc;
-    use crate::dict::hash::sys_hash;
-    use crate::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL, random_u32, random_i32, DictType};
-    use crate::dict::lib::DictResizeFlag::DictResizeEnable;
 
     fn string_from_long_long(value: i64) -> String {
         let mut s = String::with_capacity(32);

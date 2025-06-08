@@ -1,7 +1,7 @@
 
 #[cfg(test)]
 mod test {
-    use crate::adlist::adlist::List;
+    use crate::data_structure::adlist::adlist::List;
 
     #[test]
     fn list_insert() {

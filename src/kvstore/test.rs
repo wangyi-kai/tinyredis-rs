@@ -1,6 +1,6 @@
 
 mod kvstore_test {
-    use crate::dict::lib::DictType;
+    use crate::data_structure::dict::lib::DictType;
     use std::fmt::Write as _;
     use std::sync::Arc;
     use crate::kvstore::kvstore::KvStore;

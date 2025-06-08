@@ -1,11 +1,7 @@
-use std::mem::offset_of;
-use crate::quicklist::quicklist::QuickListNode;
-
-mod quicklist;
+pub mod quicklist;
 mod iter;
 mod bookmark;
 mod lib;
-mod listpack;
 
 const QL_FILL_BITS: i32 = 16;
 const QL_COMP_BITS: u32 = 16;

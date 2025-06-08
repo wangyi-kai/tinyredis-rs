@@ -1,6 +1,8 @@
 use std::hash::Hash;
 use std::ptr::NonNull;
-use crate::dict::dict::{Dict, DictEntry, Value};
+use std::sync::Arc;
+use crate::data_structure::dict::dict::{Dict, DictEntry, Value};
+use crate::data_structure::dict::lib::DictType;
 use crate::kvstore::kvstore::KvStore;
 use crate::server::RedisObject;
 
@@ -39,6 +41,20 @@ impl<K, V> RedisDb<K, V>
 where K: Default + Clone + Eq + Hash,
       V: Default + PartialEq + Clone
 {
+    pub fn create(dict_type: DictType<K, V>, slot_count_bits: u64, flag: i32, id: i32) -> Self<K, V> {
+        let dict_type = Arc::new(dict_type);
+        Self {
+            keys: KvStore::create(dict_type.clone(), slot_count_bits, flag),
+            expires: KvStore::create(dict_type.clone(), slot_count_bits, flag),
+            blocking_keys: Dict::create(dict_type.clone()),
+            blocking_keys_unblock_on_nokey: Dict::create(dict_type.clone()),
+            read_keys: Dict::create(dict_type.clone()),
+            watched_keys: Dict::create(dict_type.clone()),
+            id,
+            avg_ttl: 0,
+            expires_cursor: 0,
+        }
+    }
     pub fn find(&self, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
         self.keys.dict_find(0, key)
     }
@@ -53,17 +69,32 @@ where K: Default + Clone + Eq + Hash,
         de
     }
 
+    fn generic_delete(&mut self, key: &RedisObject) {
+        let mut table = 0;
+        let slot = 0;
+        let de = self.keys.dict_delete(slot, &key.ptr as K);
+        if de.is_some() {
+            self.expires.dict_delete(slot, &key.ptr as K);
+        }
+    }
+
     fn set_val(
         &mut self,
         key: RedisObject,
         val: RedisObject,
         overwrite: i32,
-        mut de: Option<NonNull<DictEntry<K, V>>>,
+        mut de: Option<NonNull<DictEntry<K, Value>>>,
     ) {
         let slot = 0;
         if de.is_some() {
             de = self.keys.dict_find(slot, key.ptr as K);
         }
+        unsafe {
+            let old = (*de.unwrap().as_ptr()).get_val();
+        }
+    }
 
+    pub fn db_size(&self) -> u64 {
+        self.keys.kvstore_size()
     }
 }

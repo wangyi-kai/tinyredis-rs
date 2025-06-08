@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 
-use crate::quicklist::{COMPRESS_MAX, FILL_MAX, is_large_element, MIN_COMPRESS_BYTES, MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN, QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW, quicklist_node_exceed_limit, SIZE_ESTIMATE_OVERHEAD};
-use crate::quicklist::lib::QuickListLzf;
-use crate::ziplist::ziplist::ZipList;
+use crate::data_structure::quicklist::{COMPRESS_MAX, FILL_MAX, is_large_element, MIN_COMPRESS_BYTES, MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN, QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW, quicklist_node_exceed_limit, SIZE_ESTIMATE_OVERHEAD};
+use crate::data_structure::quicklist::lib::QuickListLzf;
+use crate::data_structure::ziplist::ziplist::ZipList;
 
 pub struct QuickListNode {
     prev: Option<NonNull<QuickListNode>>,

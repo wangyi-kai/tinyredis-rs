@@ -1,14 +1,14 @@
 
 #[cfg(test)]
 mod test {
-    use crate::ziplist::error::ZipListError;
-    use crate::ziplist::ziplist::{ZipList, ZlEntry};
-    use crate::ziplist::{ZIP_BIG_PREVLEN, ZIP_END, ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL};
-    use crate::adlist::adlist::{*};
+    use crate::data_structure::ziplist::error::ZipListError;
+    use crate::data_structure::ziplist::ziplist::{ZipList, ZlEntry};
+    use crate::data_structure::ziplist::{ZIP_BIG_PREVLEN, ZIP_END, ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL};
+    use crate::data_structure::adlist::adlist::{*};
 
     use std::time::{SystemTime, UNIX_EPOCH, Instant};
     use rand::{Rng};
-    use crate::ziplist::lib::{store_entry_encoding, store_prev_entry_length, ziplist_merge, ziplist_repr, ziplist_valid_integerity};
+    use crate::data_structure::ziplist::lib::{store_entry_encoding, store_prev_entry_length, ziplist_merge, ziplist_repr, ziplist_valid_integerity};
     use std::fmt::Write as _;
 
     fn create() -> ZipList {

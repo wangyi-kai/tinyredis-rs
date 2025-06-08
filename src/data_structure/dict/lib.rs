@@ -1,8 +1,8 @@
 use std::hash::Hash;
 use rand::Rng;
 use std::ffi::c_void;
-use crate::dict::dict::{Dict, DictEntry};
-use crate::dict::lib::DictResizeFlag::DictResizeEnable;
+use crate::data_structure::dict::dict::{Dict, DictEntry};
+use crate::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
 
 pub(crate) const DICT_HT_INITIAL_EXP: usize = 2;
 pub(crate) const DICT_HT_INITIAL_SIZE: usize = 1 << DICT_HT_INITIAL_EXP;
