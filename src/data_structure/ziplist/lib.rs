@@ -343,7 +343,7 @@ pub fn ziplist_repr(zl: &mut ZipList) {
             }
         };
         //println!("addr: {}, index: {}, offset: {}, hdr+entry len: {}, hdr len: {}, prevrawlen: {}, prevrawlensize: {}, payload: {}", pos, index, pos, entry.head_size+entry.len, entry.head_size, entry.prev_raw_len, entry.prev_raw_len_size, entry.len);
-        for i in 0..(entry.head_size + entry.len) {
+        for _i in 0..(entry.head_size + entry.len) {
             //print!("{:02x}|", zl.data[pos]);
         }
         //print!("\n");
@@ -476,7 +476,7 @@ pub fn ziplist_merge(first: &mut Option<ZipList>, second: &mut Option<ZipList>) 
 
 #[cfg(test)]
 mod test {
-    use crate::ziplist::lib::string_to_number;
+    use crate::data_structure::ziplist::lib::string_to_number;
 
     #[test]
     fn to_number() {

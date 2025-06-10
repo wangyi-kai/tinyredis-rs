@@ -506,7 +506,7 @@ impl ZipList {
         let first = self.zip_entry(pos);
         let mut next_dif = 0;
 
-        for i in 0..num {
+        for _i in 0..num {
             if self.data[pos] == ZIP_END {
                 break;
             }
