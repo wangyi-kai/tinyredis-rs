@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 mod skiplist_test {
     use crate::data_structure::skiplist::skiplist::SkipList;
@@ -10,7 +9,9 @@ mod skiplist_test {
         let num = 10;
         for i in 0..num {
             let elem = "i".to_string();
-            unsafe { skip_list.insert(i as f64, elem); }
+            unsafe {
+                skip_list.insert(i as f64, elem);
+            }
         }
     }
 
@@ -39,7 +40,9 @@ mod skiplist_test {
         let num = 10000;
         for i in 0..num {
             let elem = i.to_string();
-            unsafe { skip_list.insert(i as f64, elem); }
+            unsafe {
+                skip_list.insert(i as f64, elem);
+            }
         }
 
         unsafe {
@@ -63,7 +66,9 @@ mod skiplist_test {
         let num = 100;
         for i in 0..num {
             let elem = i.to_string();
-            unsafe { skip_list.insert(i as f64, elem); }
+            unsafe {
+                skip_list.insert(i as f64, elem);
+            }
         }
         for i in 0..num {
             let elem = i.to_string();

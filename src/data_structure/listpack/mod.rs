@@ -1,6 +1,5 @@
 mod listpack;
 
-
 const LP_HDR_SIZE: usize = 6;
 const LP_HDR_NUMELE_UNKNOWN: u16 = u16::MAX;
 const LP_MAX_INT_ENCODING_LEN: usize = 9;

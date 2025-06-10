@@ -1,10 +1,10 @@
-use std::hash::Hash;
-use std::ptr::NonNull;
-use std::sync::Arc;
 use crate::data_structure::dict::dict::{Dict, DictEntry, Value};
 use crate::data_structure::dict::lib::DictType;
 use crate::kvstore::kvstore::KvStore;
 use crate::server::RedisObject;
+use std::hash::Hash;
+use std::ptr::NonNull;
+use std::sync::Arc;
 
 pub enum KeyStatus {
     KeyValid = 0,
@@ -13,8 +13,9 @@ pub enum KeyStatus {
 }
 
 pub struct RedisDb<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     /// The keyspace for this DB. As metadata, holds key sizes histogram
     keys: KvStore<K, V>,
@@ -38,10 +39,16 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl<K, V> RedisDb<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
-    pub fn create(dict_type: DictType<K, V>, slot_count_bits: u64, flag: i32, id: i32) -> Self<K, V> {
+    pub fn create(
+        dict_type: DictType<K, V>,
+        slot_count_bits: u64,
+        flag: i32,
+        id: i32,
+    ) -> Self<K, V> {
         let dict_type = Arc::new(dict_type);
         Self {
             keys: KvStore::create(dict_type.clone(), slot_count_bits, flag),
@@ -63,7 +70,12 @@ where K: Default + Clone + Eq + Hash,
         self.add_internal(key, val, 0)
     }
 
-    fn add_internal(&mut self, key: RedisObject, val: RedisObject, update_if_exist: i32) -> Option<NonNull<DictEntry<K, V>>> {
+    fn add_internal(
+        &mut self,
+        key: RedisObject,
+        val: RedisObject,
+        update_if_exist: i32,
+    ) -> Option<NonNull<DictEntry<K, V>>> {
         let slot = 0;
         let de = self.keys.dict_add_raw(slot, key.ptr);
         de

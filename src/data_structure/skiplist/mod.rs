@@ -1,8 +1,8 @@
 use super::skiplist::skiplist::SkipList;
 
-mod skiplist;
-mod test;
 pub(crate) mod lib;
+pub mod skiplist;
+mod test;
 
 const SKIP_LIST_MAX_LEVEL: usize = 32;
 const SKIP_LIST_P: f32 = 0.25;
@@ -34,7 +34,9 @@ pub fn value_lte_max(value: f64, range_spec: RangeSpec) -> bool {
 }
 
 pub fn is_in_range(zsl: SkipList, range_spec: RangeSpec) -> bool {
-    if range_spec.min > range_spec.max || (range_spec.min == range_spec.max && (range_spec.min_ex != 0 || range_spec.max_ex != 0)) {
+    if range_spec.min > range_spec.max
+        || (range_spec.min == range_spec.max && (range_spec.min_ex != 0 || range_spec.max_ex != 0))
+    {
         return false;
     }
     let x = zsl.tail;
@@ -57,4 +59,3 @@ pub fn is_in_range(zsl: SkipList, range_spec: RangeSpec) -> bool {
         true
     }
 }
-

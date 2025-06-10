@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 mod test {
     use crate::data_structure::adlist::adlist::List;

@@ -1,5 +1,5 @@
-pub mod kvstore;
 mod iter;
+pub mod kvstore;
 mod lib;
 mod meta;
 mod test;

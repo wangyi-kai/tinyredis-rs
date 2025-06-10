@@ -1,10 +1,8 @@
-mod crc;
-mod server;
 mod cluster;
+mod crc;
+mod data_structure;
 mod db;
 mod kvstore;
-mod data_structure;
+mod server;
 
-fn main() {
-
-}
+fn main() {}

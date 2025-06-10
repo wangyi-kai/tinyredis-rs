@@ -1,11 +1,10 @@
-
 #[cfg(test)]
 mod intset_test {
-    use std::time::Instant;
     use crate::data_structure::intset::intset::IntSet;
-    use crate::data_structure::skiplist::lib::gen_random;
-    use crate::data_structure::intset::{INTSET_ENC_INT16, INTSET_ENC_INT32, INTSET_ENC_INT64};
     use crate::data_structure::intset::lib::intset_value_encoding;
+    use crate::data_structure::intset::{INTSET_ENC_INT16, INTSET_ENC_INT32, INTSET_ENC_INT64};
+    use crate::data_structure::skiplist::lib::gen_random;
+    use std::time::Instant;
 
     fn intset_repr(is: &IntSet) {
         for i in 0..is.get_length() {
@@ -19,7 +18,7 @@ mod intset_test {
         let mut is = IntSet::new();
         let mut value = 0;
 
-        for i in 0.. size {
+        for i in 0..size {
             if bits > 32 {
                 value = (gen_random() as u64 * gen_random() as u64) & mask;
             } else {
@@ -38,21 +37,30 @@ mod intset_test {
                 INTSET_ENC_INT16 => {
                     assert_eq!(is.contents.len() % 2, 0, "unaligned");
                     let slice = unsafe {
-                        std::slice::from_raw_parts(is.contents.as_ptr() as *const i16, is.contents.len() / 2)
+                        std::slice::from_raw_parts(
+                            is.contents.as_ptr() as *const i16,
+                            is.contents.len() / 2,
+                        )
                     };
                     assert!(slice[i] < slice[i + 1]);
                 }
                 INTSET_ENC_INT32 => {
                     assert_eq!(is.contents.len() % 4, 0, "unaligned");
                     let slice = unsafe {
-                        std::slice::from_raw_parts(is.contents.as_ptr() as *const i32, is.contents.len() / 4)
+                        std::slice::from_raw_parts(
+                            is.contents.as_ptr() as *const i32,
+                            is.contents.len() / 4,
+                        )
                     };
                     assert!(slice[i] < slice[i + 1]);
                 }
                 INTSET_ENC_INT64 => {
                     assert_eq!(is.contents.len() % 8, 0, "unaligned");
                     let slice = unsafe {
-                        std::slice::from_raw_parts(is.contents.as_ptr() as *const i64, is.contents.len() / 8)
+                        std::slice::from_raw_parts(
+                            is.contents.as_ptr() as *const i64,
+                            is.contents.len() / 8,
+                        )
                     };
                     assert!(slice[i] < slice[i + 1]);
                 }
@@ -74,10 +82,11 @@ mod intset_test {
             assert_eq!(intset_value_encoding(2147483647), INTSET_ENC_INT32);
             assert_eq!(intset_value_encoding(-2147483649), INTSET_ENC_INT64);
             assert_eq!(intset_value_encoding(2147483648), INTSET_ENC_INT64);
-            assert_eq!(intset_value_encoding(-9223372036854775808),
-                    INTSET_ENC_INT64);
-            assert_eq!(intset_value_encoding(9223372036854775807),
-                    INTSET_ENC_INT64);
+            assert_eq!(
+                intset_value_encoding(-9223372036854775808),
+                INTSET_ENC_INT64
+            );
+            assert_eq!(intset_value_encoding(9223372036854775807), INTSET_ENC_INT64);
             println!("PASS");
         }
 

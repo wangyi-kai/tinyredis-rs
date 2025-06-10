@@ -18,15 +18,11 @@ impl<T> Node<T> {
     }
 
     pub fn prev_value(&self) -> Option<&T> {
-        unsafe {
-            self.prev.map(|node| &(*node.as_ptr()).value)
-        }
+        unsafe { self.prev.map(|node| &(*node.as_ptr()).value) }
     }
 
     pub fn next_value(&self) -> Option<&T> {
-        unsafe {
-            self.next.map(|node| &(*node.as_ptr()).value)
-        }
+        unsafe { self.next.map(|node| &(*node.as_ptr()).value) }
     }
 
     pub fn value(&self) -> &T {
@@ -49,24 +45,24 @@ impl<T: PartialEq> List<T> {
         }
     }
 
-     pub fn add_node_head(&mut self, elem: T) {
-         unsafe {
-             let new_node = NonNull::new_unchecked(Box::into_raw(Box::new(Node {
-                 value: elem,
-                 prev: None,
-                 next: None,
-             })));
-             if self.len == 0 {
-                 self.head = Some(new_node);
-                 self.tail = Some(new_node);
-             } else {
-                 (*new_node.as_ptr()).prev = None;
-                 (*new_node.as_ptr()).next = self.head;
-                 (*self.head.unwrap().as_ptr()).prev = Some(new_node);
-                 self.head = Some(new_node);
-             }
-             self.len += 1;
-         }
+    pub fn add_node_head(&mut self, elem: T) {
+        unsafe {
+            let new_node = NonNull::new_unchecked(Box::into_raw(Box::new(Node {
+                value: elem,
+                prev: None,
+                next: None,
+            })));
+            if self.len == 0 {
+                self.head = Some(new_node);
+                self.tail = Some(new_node);
+            } else {
+                (*new_node.as_ptr()).prev = None;
+                (*new_node.as_ptr()).next = self.head;
+                (*self.head.unwrap().as_ptr()).prev = Some(new_node);
+                self.head = Some(new_node);
+            }
+            self.len += 1;
+        }
     }
 
     pub fn add_node_tail(&mut self, elem: T) {
@@ -232,6 +228,3 @@ impl<'a, T> ExactSizeIterator for Iter<'a, T> {
         self.len
     }
 }
-
-
-

@@ -1,7 +1,11 @@
 use std::ptr::NonNull;
 
-use crate::data_structure::quicklist::{COMPRESS_MAX, FILL_MAX, is_large_element, MIN_COMPRESS_BYTES, MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN, QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW, quicklist_node_exceed_limit, SIZE_ESTIMATE_OVERHEAD};
 use crate::data_structure::quicklist::lib::QuickListLzf;
+use crate::data_structure::quicklist::{
+    is_large_element, quicklist_node_exceed_limit, COMPRESS_MAX, FILL_MAX, MIN_COMPRESS_BYTES,
+    MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN,
+    QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW, SIZE_ESTIMATE_OVERHEAD,
+};
 use crate::data_structure::ziplist::ziplist::ZipList;
 
 pub struct QuickListNode {
@@ -54,12 +58,8 @@ impl QuickListNode {
         }
 
         let compress = match lzf::compress(&self.entry.data) {
-            Ok(lzf) => {
-                lzf
-            }
-            Err(_) => {
-                return
-            }
+            Ok(lzf) => lzf,
+            Err(_) => return,
         };
         let mut lzf = QuickListLzf::new();
         lzf.set(compress.len(), compress);
@@ -104,17 +104,23 @@ impl QuickListNode {
     pub fn _allow_merge(
         a: Option<NonNull<QuickListNode>>,
         b: Option<NonNull<QuickListNode>>,
-        fill: i32
+        fill: i32,
     ) -> bool {
         if a.is_none() || b.is_none() {
             return false;
         }
         unsafe {
-            if std::hint::unlikely((*a.unwrap().as_ptr()).is_plain() || (*b.unwrap().as_ptr()).is_plain()) {
+            if std::hint::unlikely(
+                (*a.unwrap().as_ptr()).is_plain() || (*b.unwrap().as_ptr()).is_plain(),
+            ) {
                 return false;
             }
             let merge_sz = (*a.unwrap().as_ptr()).sz + (*b.unwrap().as_ptr()).sz - 7;
-            if std::hint::unlikely(quicklist_node_exceed_limit(fill, merge_sz, (*a.unwrap().as_ptr()).count + (*b.unwrap().as_ptr()).count)) {
+            if std::hint::unlikely(quicklist_node_exceed_limit(
+                fill,
+                merge_sz,
+                (*a.unwrap().as_ptr()).count + (*b.unwrap().as_ptr()).count,
+            )) {
                 return false;
             }
             return true;
@@ -132,7 +138,6 @@ impl QuickListNode {
             //new_node.entry = Vec::with_capacity(sz);
             new_node.entry = ZipList::create(value);
         } else {
-
         }
     }
 }
@@ -249,7 +254,10 @@ impl QuickList {
             return;
         }
         unsafe {
-            assert!((*self.head.unwrap().as_ptr()).recompress == 0 && (*self.tail.unwrap().as_ptr()).recompress == 0);
+            assert!(
+                (*self.head.unwrap().as_ptr()).recompress == 0
+                    && (*self.tail.unwrap().as_ptr()).recompress == 0
+            );
         }
         if self.compress != 0 || self.len < (self.compress * 2) as u64 {
             return;
@@ -285,7 +293,7 @@ impl QuickList {
         &mut self,
         old_node: Option<NonNull<QuickListNode>>,
         new_node: Option<NonNull<QuickListNode>>,
-        after: bool
+        after: bool,
     ) {
         unsafe {
             if after {
@@ -336,12 +344,19 @@ impl QuickList {
         }
     }
 
-    pub fn insert_node_before(&mut self, old_node: Option<NonNull<QuickListNode>>, new_node: Option<NonNull<QuickListNode>>) {
+    pub fn insert_node_before(
+        &mut self,
+        old_node: Option<NonNull<QuickListNode>>,
+        new_node: Option<NonNull<QuickListNode>>,
+    ) {
         self._insert_node(old_node, new_node, false);
     }
 
-    pub fn insert_node_after(&mut self, old_node: Option<NonNull<QuickListNode>>, new_node: Option<NonNull<QuickListNode>>) {
+    pub fn insert_node_after(
+        &mut self,
+        old_node: Option<NonNull<QuickListNode>>,
+        new_node: Option<NonNull<QuickListNode>>,
+    ) {
         self._insert_node(old_node, new_node, true);
     }
 }
-

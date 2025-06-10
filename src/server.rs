@@ -1,10 +1,10 @@
+use crate::data_structure::dict::dict::Dict;
+use crate::data_structure::dict::lib::DictType;
+use crate::data_structure::intset::intset::IntSet;
+use crate::data_structure::quicklist::quicklist::QuickList;
 use std::any::Any;
 use std::hash::Hash;
 use std::sync::Arc;
-use crate::dict::dict::Dict;
-use crate::dict::lib::DictType;
-use crate::intset::intset::IntSet;
-use crate::quicklist::quicklist::QuickList;
 
 /// A redis object, that is a type able to hold a string / list / set
 
@@ -107,7 +107,6 @@ impl RedisObject {
             self.ref_count += 1;
         } else {
             if self.ref_count == OBJ_SHARED_REFCOUNT {
-
             } else if self.ref_count == OBJ_STATIC_REFCOUNT {
                 panic!("You tried to retain an object allocated in the stack");
             }
@@ -119,9 +118,14 @@ impl RedisObject {
             return;
         }
         if self.ref_count < 0 {
-            panic!("llegal decrRefCount for object with: type {}, encoding {}, refcount {}", self.object_type, self.encoding, self.ref_count);
+            panic!(
+                "illegal decrRefCount for object with: type {}, encoding {}, refcount {}",
+                self.object_type, self.encoding, self.ref_count
+            );
         }
 
         self.ref_count -= 1;
     }
 }
+
+pub struct Command {}

@@ -5,3 +5,4 @@ pub mod listpack;
 pub mod quicklist;
 pub mod skiplist;
 pub mod ziplist;
+pub mod zset;

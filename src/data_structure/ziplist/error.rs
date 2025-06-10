@@ -1,4 +1,3 @@
-
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum ZipListError {
     #[error("Position out of range(0)")]

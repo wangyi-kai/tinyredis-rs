@@ -1,4 +1,3 @@
-
 pub struct QuickListLzf {
     pub sz: usize,
     pub compressed: Vec<u8>,

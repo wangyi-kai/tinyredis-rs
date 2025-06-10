@@ -1,8 +1,8 @@
-use std::hash::Hash;
-use rand::Rng;
-use std::ffi::c_void;
 use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
+use rand::Rng;
+use std::ffi::c_void;
+use std::hash::Hash;
 
 pub(crate) const DICT_HT_INITIAL_EXP: usize = 2;
 pub(crate) const DICT_HT_INITIAL_SIZE: usize = 1 << DICT_HT_INITIAL_EXP;
@@ -24,8 +24,9 @@ pub type DictScanFunction<K, V> = fn(de: &mut DictEntry<K, V>);
 pub type DictDefragAllocFunction = fn(ptr: *mut c_void);
 
 pub struct DictType<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub hash_function: Option<Box<dyn Fn(&K) -> u64>>,
     pub rehashing_started: Option<Box<dyn Fn(&Dict<K, V>)>>,
@@ -36,25 +37,18 @@ where K: Default + Clone + Eq + Hash,
 
 #[inline]
 pub fn dict_size(exp: i32) -> u64 {
-    return if exp == -1 {
-        0
-    } else {
-        1 << exp
-    }
+    return if exp == -1 { 0 } else { 1 << exp };
 }
 
 #[inline]
 pub fn dict_size_mask(exp: i32) -> u64 {
-    return if exp == -1 {
-        0
-    } else {
-        dict_size(exp) - 1
-    }
+    return if exp == -1 { 0 } else { dict_size(exp) - 1 };
 }
 
-pub fn entry_mem_usage<K, V> ()-> usize
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+pub fn entry_mem_usage<K, V>() -> usize
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     size_of::<DictEntry<K, V>>()
 }
@@ -72,9 +66,7 @@ pub fn next_exp(size: usize) -> i32 {
 }
 
 pub fn dict_set_resize_enabled(enable: DictResizeFlag) {
-    unsafe {
-        DICT_CAN_RESIZE = enable
-    }
+    unsafe { DICT_CAN_RESIZE = enable }
 }
 
 pub fn random_ulong() -> u64 {

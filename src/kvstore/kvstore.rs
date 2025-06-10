@@ -1,16 +1,18 @@
+use crate::data_structure::adlist::adlist::{List, Node};
+use crate::data_structure::dict::dict::{Dict, DictEntry};
+use crate::data_structure::dict::iter::DictIterator;
+use crate::data_structure::dict::lib::{entry_mem_usage, DictScanFunction, DictType};
+use crate::kvstore::iter::{KvStoreDictIterator, KvStoreIterator};
+use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
+use crate::kvstore::{
+    KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_FREE_EMPTY_DICTS,
+};
+use rand::Rng;
 use std::any::Any;
 use std::hash::Hash;
 use std::ptr::NonNull;
 use std::sync::Arc;
 use std::time::Instant;
-use rand::Rng;
-use crate::data_structure::adlist::adlist::{List, Node};
-use crate::data_structure::dict::dict::{Dict, DictEntry};
-use crate::data_structure::dict::iter::DictIterator;
-use crate::data_structure::dict::lib::{DictScanFunction, DictType, entry_mem_usage};
-use crate::kvstore::{KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_FREE_EMPTY_DICTS};
-use crate::kvstore::iter::{KvStoreDictIterator, KvStoreIterator};
-use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
 
 #[derive(Clone)]
 pub struct KvStoreMetadata {
@@ -19,12 +21,13 @@ pub struct KvStoreMetadata {
 
 #[derive(Clone)]
 pub struct KvStoreDictMetadata {
-    key_size_hits: Vec<Vec<u64>>
+    key_size_hits: Vec<Vec<u64>>,
 }
 
 pub struct KvStore<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     flag: i32,
     pub(crate) dtype: Arc<DictType<K, V>>,
@@ -50,12 +53,13 @@ where K: Default + Clone + Eq + Hash,
     /// The overhead of dictionaries rehashing
     overhead_hashtable_rehashing: usize,
     /// conditionally allocated based on "flags"
-    metadata: Vec<Box<dyn Any>>
+    metadata: Vec<Box<dyn Any>>,
 }
 
 impl<'a, K, V> KvStore<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     // num_dicts_bits is the log2 of the amount of dictionaries needed
     // (e.g. 0 for 1 dict, 3 for 8 dicts)
@@ -215,7 +219,11 @@ where K: Default + Clone + Eq + Hash,
 
     pub fn free_dict_if_needed(&mut self, didx: usize) {
         unsafe {
-            if self.flag & KVSTORE_FREE_EMPTY_DICTS == 0 || self.get_dict(didx).is_none() || self.kvstore_dict_size(didx) != 0 || self.kvstore_dict_is_rehashing_paused(didx) {
+            if self.flag & KVSTORE_FREE_EMPTY_DICTS == 0
+                || self.get_dict(didx).is_none()
+                || self.kvstore_dict_size(didx) != 0
+                || self.kvstore_dict_is_rehashing_paused(didx)
+            {
                 return;
             }
             (*self.dicts[didx].unwrap().as_ptr()).release();
@@ -252,7 +260,7 @@ where K: Default + Clone + Eq + Hash,
         mut cursor: u64,
         only_didx: i32,
         scan_cb: Option<DictScanFunction<K, V>>,
-        skip_cb: Option<KvStoreScanShouldSkipDict<K ,V>>,
+        skip_cb: Option<KvStoreScanShouldSkipDict<K, V>>,
     ) -> u64 {
         unsafe {
             let mut _cursor = 0;
@@ -267,7 +275,11 @@ where K: Default + Clone + Eq + Hash,
                 }
             }
             let d = self.get_dict(didx as usize);
-            let skip = if !d.is_none() || (scan_cb.is_some() && skip_cb.is_some()) { true } else { false };
+            let skip = if !d.is_none() || (scan_cb.is_some() && skip_cb.is_some()) {
+                true
+            } else {
+                false
+            };
             if !skip {
                 _cursor = (*d.unwrap().as_ptr()).scan(cursor, scan_cb.unwrap());
                 self.free_dict_if_needed(didx as usize);
@@ -289,7 +301,7 @@ where K: Default + Clone + Eq + Hash,
     pub fn expand(
         &mut self,
         new_size: u64,
-        skip_cb: Option<KvStoreExpandShouldSkipDictIndex>
+        skip_cb: Option<KvStoreExpandShouldSkipDictIndex>,
     ) -> bool {
         unsafe {
             for i in 0..self.num_dicts {
@@ -299,7 +311,7 @@ where K: Default + Clone + Eq + Hash,
                 }
                 match (*d.unwrap().as_ptr()).expand(new_size as usize) {
                     Ok(_) => {}
-                    Err(_) => { return false }
+                    Err(_) => return false,
                 }
             }
         }
@@ -337,7 +349,7 @@ where K: Default + Clone + Eq + Hash,
     fn cumulative_key_count_read(&self, didx: i32) -> u64 {
         if self.num_dicts == 1 {
             assert_eq!(0, didx);
-            return self.kvstore_size()
+            return self.kvstore_size();
         }
         let mut idx = didx + 1;
         let mut sum = 0;
@@ -372,7 +384,8 @@ where K: Default + Clone + Eq + Hash,
                 if delta < 0 {
                     assert!(self.dict_size_index[idx as usize] >= delta.abs() as u64);
                 }
-                self.dict_size_index[idx as usize] = (self.dict_size_index[idx as usize] as i64 + delta) as u64;
+                self.dict_size_index[idx as usize] =
+                    (self.dict_size_index[idx as usize] as i64 + delta) as u64;
                 idx += idx & -idx;
             }
         }
@@ -450,7 +463,8 @@ where K: Default + Clone + Eq + Hash,
         unsafe {
             while self.rehashing.list_first().is_some() {
                 let mut node = self.rehashing.list_first();
-                let _ = (*(*node.as_mut().unwrap().as_ptr()).value().as_ptr()).rehash_microseconds(threshold_us - elapsed_us);
+                let _ = (*(*node.as_mut().unwrap().as_ptr()).value().as_ptr())
+                    .rehash_microseconds(threshold_us - elapsed_us);
                 elapsed_us = start.elapsed().as_secs();
                 if elapsed_us > threshold_us {
                     break;
@@ -477,9 +491,7 @@ where K: Default + Clone + Eq + Hash,
         if d.is_none() {
             return 0;
         }
-        unsafe {
-            (*d.unwrap().as_ptr()).dict_size() as u64
-        }
+        unsafe { (*d.unwrap().as_ptr()).dict_size() as u64 }
     }
 
     pub fn get_dict_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, K, V> {
@@ -502,12 +514,12 @@ where K: Default + Clone + Eq + Hash,
             KvStoreDictIterator {
                 kvs: self,
                 didx: didx as i32,
-                di: Some(dict_iter)
+                di: Some(dict_iter),
             }
         }
     }
 
-    pub fn get_random_key(&self, didx: i32) -> Option<NonNull<DictEntry<K ,V>>> {
+    pub fn get_random_key(&self, didx: i32) -> Option<NonNull<DictEntry<K, V>>> {
         unsafe {
             let d = self.get_dict(didx as usize);
             if d.is_none() {
@@ -517,7 +529,7 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
-    pub fn get_fair_random_key(&self, didx: i32) -> Option<NonNull<DictEntry<K ,V>>> {
+    pub fn get_fair_random_key(&self, didx: i32) -> Option<NonNull<DictEntry<K, V>>> {
         unsafe {
             let d = self.get_dict(didx as usize);
             if d.is_none() {
@@ -532,15 +544,24 @@ where K: Default + Clone + Eq + Hash,
         if d.is_none() {
             return None;
         }
-        unsafe {
-            (*d.unwrap().as_ptr()).find(key)
-        }
+        unsafe { (*d.unwrap().as_ptr()).find(key) }
     }
 
     pub fn dict_add_raw(&mut self, didx: i32, key: K) -> Option<NonNull<DictEntry<K, V>>> {
         unsafe {
             let d = self.create_dict_if_needed(didx);
             if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw(key, V::default()) {
+                self.cumulative_key_count_add(didx, 1);
+                return Some(ret);
+            }
+            None
+        }
+    }
+
+    pub fn add(&mut self, didx: i32, key: K, val: V) -> Option<NonNull<DictEntry<K, V>>> {
+        unsafe {
+            let d = self.create_dict_if_needed(didx);
+            if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw(key, val) {
                 self.cumulative_key_count_add(didx, 1);
                 return Some(ret);
             }
@@ -555,7 +576,7 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
-    pub fn dict_set_val(&mut self, didx: i32, de:NonNull<DictEntry<K, V>>, val: V) {
+    pub fn dict_set_val(&mut self, didx: i32, de: NonNull<DictEntry<K, V>>, val: V) {
         unsafe {
             let d = self.get_dict(didx as usize);
             (*de.as_ptr()).val = val;
@@ -567,7 +588,7 @@ where K: Default + Clone + Eq + Hash,
         didx: i32,
         he: Option<NonNull<DictEntry<K, V>>>,
         plink: Option<NonNull<DictEntry<K, V>>>,
-        table_index: usize
+        table_index: usize,
     ) {
         unsafe {
             let d = self.get_dict(didx as usize);
@@ -590,7 +611,7 @@ where K: Default + Clone + Eq + Hash,
                     self.free_dict_if_needed(didx as usize);
                     ret
                 }
-                Err(_) => { None }
+                Err(_) => None,
             }
         }
     }

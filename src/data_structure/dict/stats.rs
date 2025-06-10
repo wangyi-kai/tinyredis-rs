@@ -1,7 +1,7 @@
-use std::fmt::Display;
-use std::hash::Hash;
 use crate::data_structure::dict::dict::Dict;
 use crate::data_structure::dict::lib::{dict_size, DICT_STATS_VECTLEN};
+use std::fmt::Display;
+use std::hash::Hash;
 
 use std::fmt::Write as _;
 
@@ -26,12 +26,11 @@ pub fn dict_combine_stats(from: &mut DictStats, into: &mut DictStats) {
     }
 }
 
-
 pub fn dict_get_stats_msg(
     buf: &mut String,
     buf_size: usize,
     stats: &DictStats,
-    full: bool
+    full: bool,
 ) -> usize {
     if stats.ht_used == 0 {
         let table_type = if stats.ht_idx == 0 {
@@ -39,14 +38,19 @@ pub fn dict_get_stats_msg(
         } else {
             "rehashing target"
         };
-        write!(buf, "Hash table {} stats ({}): No stats available for empty dictionaries\n", stats.ht_idx, table_type).unwrap();
-        return buf.len()
+        write!(
+            buf,
+            "Hash table {} stats ({}): No stats available for empty dictionaries\n",
+            stats.ht_idx, table_type
+        )
+        .unwrap();
+        return buf.len();
     }
     let table_type = if stats.ht_idx == 0 {
-            "main hash table"
-        } else {
-            "rehashing target"
-        };
+        "main hash table"
+    } else {
+        "rehashing target"
+    };
     let mut l = 0;
     write!(buf, "Hash table {} stats ({}): No stats available for empty dictionaries\n, table size: {}\n number of elements: {}\n", stats.ht_idx, table_type, stats.ht_size, stats.ht_used).unwrap();
     l += buf.len();
@@ -64,16 +68,24 @@ pub fn dict_get_stats_msg(
             }
 
             let before_len = buf.len();
-            write!(&mut buf[l..].to_string(), " {}: {}({})\n", i, stats.cl_vector[i], stats.cl_vector[i] / stats.ht_size + 1).unwrap();
+            write!(
+                &mut buf[l..].to_string(),
+                " {}: {}({})\n",
+                i,
+                stats.cl_vector[i],
+                stats.cl_vector[i] / stats.ht_size + 1
+            )
+            .unwrap();
             l += buf.len() - before_len;
         }
     }
     buf.len()
 }
 
-impl <K, V> Dict<K, V>
-where K: Default + Clone + Eq + Hash + Display,
-      V: Default + PartialEq + Clone
+impl<K, V> Dict<K, V>
+where
+    K: Default + Clone + Eq + Hash + Display,
+    V: Default + PartialEq + Clone,
 {
     pub fn get_stats_ht(&self, ht_idx: usize, full: bool) -> DictStats {
         let cl_vector = Vec::with_capacity(DICT_STATS_VECTLEN);

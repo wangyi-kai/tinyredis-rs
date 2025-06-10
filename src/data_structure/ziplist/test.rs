@@ -1,15 +1,19 @@
-
 #[cfg(test)]
 mod test {
+    use crate::data_structure::adlist::adlist::*;
     use crate::data_structure::ziplist::error::ZipListError;
     use crate::data_structure::ziplist::ziplist::{ZipList, ZlEntry};
-    use crate::data_structure::ziplist::{ZIP_BIG_PREVLEN, ZIP_END, ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL};
-    use crate::data_structure::adlist::adlist::{*};
+    use crate::data_structure::ziplist::{
+        ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL, ZIP_BIG_PREVLEN, ZIP_END,
+    };
 
-    use std::time::{SystemTime, UNIX_EPOCH, Instant};
-    use rand::{Rng};
-    use crate::data_structure::ziplist::lib::{store_entry_encoding, store_prev_entry_length, ziplist_merge, ziplist_repr, ziplist_valid_integerity};
+    use crate::data_structure::ziplist::lib::{
+        store_entry_encoding, store_prev_entry_length, ziplist_merge, ziplist_repr,
+        ziplist_valid_integerity,
+    };
+    use rand::Rng;
     use std::fmt::Write as _;
+    use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
     fn create() -> ZipList {
         let mut zl = ZipList::new();
@@ -50,7 +54,12 @@ mod test {
                 let _ = zl.delete_range(0, 1);
             }
             let end = start.elapsed();
-            println!("List size: {i}, bytes: {}, push+pop: {}, time: {:?}", zl.ziplist_len(), num, end);
+            println!(
+                "List size: {i}, bytes: {}, push+pop: {}, time: {:?}",
+                zl.ziplist_len(),
+                num,
+                end
+            );
         }
     }
 
@@ -211,7 +220,10 @@ mod test {
             if pos == 0 {
                 println!("No entry");
             } else {
-                println!("ERROR: Out of range index should return NULL, returned offset: {}", pos);
+                println!(
+                    "ERROR: Out of range index should return NULL, returned offset: {}",
+                    pos
+                );
                 return;
             }
         }
@@ -381,7 +393,7 @@ mod test {
             while zl.get(pos, &mut entry, &mut elen, &mut value) {
                 if elen > 0 && entry == "foo" {
                     print!("[foo(delete)] ");
-                    let _= zl.delete(&mut pos);
+                    let _ = zl.delete(&mut pos);
                 } else {
                     if !entry.is_empty() {
                         print!("{} ", entry);
@@ -402,7 +414,7 @@ mod test {
             let elen: u32 = 0;
             let value: i64 = 0;
 
-            zl = create();  /* "hello", "foo", "quux", "1024" */
+            zl = create(); /* "hello", "foo", "quux", "1024" */
             pos = zl.zip_index(0);
             let _ = zl.replace(pos, "zoink");
             pos = zl.zip_index(3);
@@ -475,7 +487,7 @@ mod test {
                 row.fill(b'a' + i as u8);
             }
             v[0][256] = 0;
-            v[1][  1] = 0;
+            v[1][1] = 0;
             v[2][256] = 0;
 
             let mut zl = ZipList::new();
@@ -508,12 +520,18 @@ mod test {
 
             for i in 0..1000 {
                 let mut pos = zl.zip_index(i);
-                assert_eq!(true, zl.get(pos, &mut String::default(), &mut 0, &mut value));
+                assert_eq!(
+                    true,
+                    zl.get(pos, &mut String::default(), &mut 0, &mut value)
+                );
                 assert_eq!(i as i64, value);
 
-                pos = zl.zip_index(-i-1);
-                assert_eq!(true, zl.get(pos, &mut String::default(), &mut 0, &mut value));
-                assert_eq!(999-i as i64, value);
+                pos = zl.zip_index(-i - 1);
+                assert_eq!(
+                    true,
+                    zl.get(pos, &mut String::default(), &mut 0, &mut value)
+                );
+                assert_eq!(999 - i as i64, value);
             }
 
             let end = start.elapsed();
@@ -602,10 +620,10 @@ mod test {
             let mut list_value = 0;
             let iteration = 200;
 
-            for i in 0.. iteration {
+            for i in 0..iteration {
                 let mut zl = ZipList::new();
                 let mut list = List::create();
-                let len= rand::rng().random::<u32>() % 256;
+                let len = rand::rng().random::<u32>() % 256;
 
                 for j in 0..len {
                     let is_head = if rand::rng().random::<u32>() & 1 == 1 {
@@ -629,7 +647,7 @@ mod test {
                                 list_value = (rand::rng().random::<u32>() as i64) << 20;
                                 let _ = write!(&mut buf, "{}", list_value);
                             }
-                            _ => { }
+                            _ => {}
                         }
                     }
                     /* Add to ziplist */
@@ -683,7 +701,7 @@ mod test {
     fn benchmark() -> Result<(), ZipListError> {
         let mut zl = ZipList::new();
         let iteration = 1000;
-        for i in 0.. iteration {
+        for i in 0..iteration {
             let mut buf = vec![0u8; 4096];
             buf[..4].copy_from_slice(b"asdf");
             let s = String::from_utf8(buf).unwrap();
@@ -778,7 +796,12 @@ mod test {
             println!("Done, time = {:?}", end);
         }
 
-        fn insert_helper(zl: &mut ZipList, ch: char, len: usize, pos: usize) -> Result<(), ZipListError> {
+        fn insert_helper(
+            zl: &mut ZipList,
+            ch: char,
+            len: usize,
+            pos: usize,
+        ) -> Result<(), ZipListError> {
             assert!(len <= ZIP_BIG_PREVLEN as usize);
             let mut data = vec![b'0'; ZIP_BIG_PREVLEN as usize];
             data[..len].fill(u8::try_from(ch).unwrap());
@@ -797,11 +820,13 @@ mod test {
         }
 
         fn str_entry_bytes_small(len: usize) -> usize {
-            len + store_prev_entry_length(None, 0) as usize + store_entry_encoding(None, 0, len as u32) as usize
+            len + store_prev_entry_length(None, 0) as usize
+                + store_entry_encoding(None, 0, len as u32) as usize
         }
 
         fn str_entry_bytes_big(len: usize) -> usize {
-            len + store_prev_entry_length(None, ZIP_BIG_PREVLEN as u32) as usize + store_entry_encoding(None, 0, len as u32) as usize
+            len + store_prev_entry_length(None, ZIP_BIG_PREVLEN as u32) as usize
+                + store_entry_encoding(None, 0, len as u32) as usize
         }
 
         println!("Edge cases of ziplist CascadeUpdate: ");
@@ -826,7 +851,10 @@ mod test {
             assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
             assert!(compare_help(&zl, 'b', s1, 0));
 
-            assert!(e[1].prev_raw_len_size == 1 && e[1].prev_raw_len == str_entry_bytes_small(s1) as u32);
+            assert!(
+                e[1].prev_raw_len_size == 1
+                    && e[1].prev_raw_len == str_entry_bytes_small(s1) as u32
+            );
             assert!(compare_help(&zl, 'a', s1, 1));
 
             ziplist_repr(&mut zl);
@@ -838,10 +866,15 @@ mod test {
             assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
             assert!(compare_help(&zl, 'c', s2, 0));
 
-            assert!(e[1].prev_raw_len_size == 5 && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32);
+            assert!(
+                e[1].prev_raw_len_size == 5
+                    && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32
+            );
             assert!(compare_help(&zl, 'b', s1, 1));
 
-            assert!(e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s1) as u32);
+            assert!(
+                e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s1) as u32
+            );
             assert!(compare_help(&zl, 'a', s1, 2));
 
             ziplist_repr(&mut zl);
@@ -853,13 +886,20 @@ mod test {
             assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
             assert!(compare_help(&zl, 'd', s2, 0));
 
-            assert!(e[1].prev_raw_len_size == 5 && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32);
+            assert!(
+                e[1].prev_raw_len_size == 5
+                    && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32
+            );
             assert!(compare_help(&zl, 'c', s2, 1));
 
-            assert!(e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s2) as u32);
+            assert!(
+                e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s2) as u32
+            );
             assert!(compare_help(&zl, 'b', s1, 2));
 
-            assert!(e[3].prev_raw_len_size == 5 && e[3].prev_raw_len == str_entry_bytes_big(s1) as u32);
+            assert!(
+                e[3].prev_raw_len_size == 5 && e[3].prev_raw_len == str_entry_bytes_big(s1) as u32
+            );
             assert!(compare_help(&zl, 'a', s1, 3));
 
             ziplist_repr(&mut zl);
@@ -872,10 +912,15 @@ mod test {
             assert!(e[0].prev_raw_len_size == 1 && e[0].prev_raw_len == 0);
             assert!(compare_help(&zl, 'd', s2, 0));
 
-            assert!(e[1].prev_raw_len_size == 5 && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32);
+            assert!(
+                e[1].prev_raw_len_size == 5
+                    && e[1].prev_raw_len == str_entry_bytes_small(s2) as u32
+            );
             assert!(compare_help(&zl, 'c', s2, 1));
 
-            assert!(e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s2) as u32);
+            assert!(
+                e[2].prev_raw_len_size == 5 && e[2].prev_raw_len == str_entry_bytes_big(s2) as u32
+            );
             assert!(compare_help(&zl, 'a', s1, 2));
 
             ziplist_repr(&mut zl);

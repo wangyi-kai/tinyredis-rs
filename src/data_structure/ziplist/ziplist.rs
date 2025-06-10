@@ -1,9 +1,12 @@
-use std::str::{from_utf8};
+use std::str::from_utf8;
 
-use crate::data_structure::ziplist::{ZIP_ENCODING_SIZE_INVALID, ZIP_END, ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE, ZIPLIST_LENGTH_OFFSET};
 use crate::data_structure::ziplist::error::ZipListError;
-use crate::data_structure::ziplist::lib::{*};
-use crate::data_structure::ziplist::lib::Content::{Integer, Char};
+use crate::data_structure::ziplist::lib::Content::{Char, Integer};
+use crate::data_structure::ziplist::lib::*;
+use crate::data_structure::ziplist::{
+    ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE, ZIPLIST_LENGTH_OFFSET, ZIP_ENCODING_SIZE_INVALID,
+    ZIP_END,
+};
 
 #[derive(Clone, Debug)]
 pub struct ZipListEntry {
@@ -30,7 +33,15 @@ pub struct ZlEntry {
 }
 
 impl ZlEntry {
-    pub fn new(prev_raw_len_size: u32, prev_raw_len: u32, len_size: u32, len: u32, head_size: u32, encoding: u8, pos: usize) -> Self {
+    pub fn new(
+        prev_raw_len_size: u32,
+        prev_raw_len: u32,
+        len_size: u32,
+        len: u32,
+        head_size: u32,
+        encoding: u8,
+        pos: usize,
+    ) -> Self {
         Self {
             prev_raw_len_size,
             prev_raw_len,
@@ -49,7 +60,7 @@ pub struct ZipList {
 
 impl ZipList {
     pub fn new() -> Self {
-        let bytes= ZIPLIST_HEADER_SIZE + ZIPLIST_END_SIZE;
+        let bytes = ZIPLIST_HEADER_SIZE + ZIPLIST_END_SIZE;
         let mut zl = vec![0u8; bytes as usize];
         zl[0..4].copy_from_slice(&bytes.to_le_bytes());
         zl[4..8].copy_from_slice(&ZIPLIST_HEADER_SIZE.to_le_bytes());
@@ -60,9 +71,7 @@ impl ZipList {
     }
 
     pub fn create(data: Vec<u8>) -> Self {
-        Self {
-            data
-        }
+        Self { data }
     }
 
     pub fn resize(&mut self, len: u32) {
@@ -89,7 +98,11 @@ impl ZipList {
     }
 
     pub fn entry_num(&mut self) -> u32 {
-        let mut len= u16::from_le_bytes(self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].try_into().unwrap());
+        let mut len = u16::from_le_bytes(
+            self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2]
+                .try_into()
+                .unwrap(),
+        );
         return if len < u16::MAX {
             len as u32
         } else {
@@ -100,17 +113,19 @@ impl ZipList {
                 pos += self.raw_entry_length_safe(zl_bytes, pos).unwrap() as usize;
                 len += 1;
             }
-            if len < u16::MAX as u32{
-                self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&(len as u16).to_le_bytes());
+            if len < u16::MAX as u32 {
+                self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2]
+                    .copy_from_slice(&(len as u16).to_le_bytes());
             }
             len
-        }
+        };
     }
 
     fn incr_length(&mut self, incr: i32) {
         let len = self.entry_num();
         if len < u16::MAX as u32 {
-            self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&((len as i32 + incr) as u16).to_le_bytes());
+            self.data[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2]
+                .copy_from_slice(&((len as i32 + incr) as u16).to_le_bytes());
         }
     }
 
@@ -175,7 +190,10 @@ impl ZipList {
             self.data.copy_within(src_start..src_end, dst_start);
 
             if force_large {
-                store_prev_entry_length_large(Some(&mut self.data[pos + req_len as usize..]), req_len);
+                store_prev_entry_length_large(
+                    Some(&mut self.data[pos + req_len as usize..]),
+                    req_len,
+                );
             } else {
                 store_prev_entry_length(Some(&mut self.data[pos + req_len as usize..]), req_len);
             }
@@ -219,17 +237,18 @@ impl ZipList {
     fn raw_entry_length_safe(&self, zl_bytes: usize, pos: usize) -> Result<u32, ZipListError> {
         let entry = self.entry_safe(zl_bytes, pos, 0);
         match entry {
-            Ok(entry) => {
-                Ok(entry.head_size + entry.len)
-            }
-            Err(e) => {
-                Err(e)
-            }
+            Ok(entry) => Ok(entry.head_size + entry.len),
+            Err(e) => Err(e),
         }
     }
 
     #[inline]
-    pub fn entry_safe(&self, zl_bytes: usize, pos: usize, validate_len: i32) -> Result<ZlEntry, ZipListError> {
+    pub fn entry_safe(
+        &self,
+        zl_bytes: usize,
+        pos: usize,
+        validate_len: i32,
+    ) -> Result<ZlEntry, ZipListError> {
         fn out_of_range(pos: usize, first: usize, last: usize) -> bool {
             if pos < first || pos > last {
                 return true;
@@ -244,7 +263,8 @@ impl ZipList {
         if pos >= zl_first && pos + 10 < zl_last {
             let (prev_raw_len_size, prev_raw_len) = decode_prev_len(&self.data[pos..]);
             let encoding = entry_encoding(&self.data[pos + prev_raw_len_size as usize..]);
-            let (len_size, len) = decode_length(&self.data[pos + prev_raw_len_size as usize..], encoding);
+            let (len_size, len) =
+                decode_length(&self.data[pos + prev_raw_len_size as usize..], encoding);
             if len_size == 0 {
                 panic!("decode len_size error!");
             }
@@ -256,8 +276,16 @@ impl ZipList {
             if validate_len != 0 && out_of_range(pos - prev_raw_len as usize, zl_first, zl_last) {
                 return Err(ZipListError::OutOfRange(2));
             }
-            let entry = ZlEntry::new(prev_raw_len_size, prev_raw_len, len_size, len, head_size, encoding, pos);
-            return Ok(entry)
+            let entry = ZlEntry::new(
+                prev_raw_len_size,
+                prev_raw_len,
+                len_size,
+                len,
+                head_size,
+                encoding,
+                pos,
+            );
+            return Ok(entry);
         }
 
         if out_of_range(pos, zl_first, zl_last) {
@@ -267,16 +295,21 @@ impl ZipList {
         if out_of_range(pos + prev_raw_len_size as usize, zl_first, zl_last) {
             return Err(ZipListError::OutOfRange(4));
         }
-        let encoding= entry_encoding(&self.data[pos + prev_raw_len_size as usize..]);
+        let encoding = entry_encoding(&self.data[pos + prev_raw_len_size as usize..]);
         let len_size = encoding_len_size(encoding);
         if len_size == ZIP_ENCODING_SIZE_INVALID as u32 {
             return Err(ZipListError::InValidLenSize);
         }
-        if out_of_range(pos + (prev_raw_len_size + len_size) as usize, zl_first, zl_last) {
+        if out_of_range(
+            pos + (prev_raw_len_size + len_size) as usize,
+            zl_first,
+            zl_last,
+        ) {
             return Err(ZipListError::OutOfRange(5));
         }
         let (prev_raw_len_size, prev_raw_len) = decode_prev_len(&self.data[pos..]);
-        let (len_size, len) = decode_length(&self.data[pos + prev_raw_len_size as usize..], encoding);
+        let (len_size, len) =
+            decode_length(&self.data[pos + prev_raw_len_size as usize..], encoding);
         let head_size = prev_raw_len_size + len_size;
 
         if out_of_range(pos + (head_size + len) as usize, zl_first, zl_last) {
@@ -285,7 +318,15 @@ impl ZipList {
         if validate_len != 0 && out_of_range(pos - prev_raw_len as usize, zl_first, zl_last) {
             return Err(ZipListError::OutOfRange(7));
         }
-        let entry = ZlEntry::new(prev_raw_len_size, prev_raw_len, len_size, len, head_size, encoding, pos);
+        let entry = ZlEntry::new(
+            prev_raw_len_size,
+            prev_raw_len,
+            len_size,
+            len,
+            head_size,
+            encoding,
+            pos,
+        );
 
         Ok(entry)
     }
@@ -350,11 +391,20 @@ impl ZipList {
     pub fn zip_entry(&self, pos: usize) -> ZlEntry {
         let (prev_raw_len_size, prev_raw_len) = decode_prev_len(&self.data[pos..]);
         let encoding = entry_encoding(&self.data[pos + prev_raw_len_size as usize..]);
-        let (len_size, len) = decode_length(&self.data[pos + prev_raw_len_size as usize..], encoding);
+        let (len_size, len) =
+            decode_length(&self.data[pos + prev_raw_len_size as usize..], encoding);
 
         assert_ne!(len_size, 0);
         let header_size = prev_raw_len_size + len_size;
-        let entry = ZlEntry::new(prev_raw_len_size, prev_raw_len, len_size, len, header_size, encoding, pos);
+        let entry = ZlEntry::new(
+            prev_raw_len_size,
+            prev_raw_len,
+            len_size,
+            len,
+            header_size,
+            encoding,
+            pos,
+        );
         entry
     }
 
@@ -419,13 +469,17 @@ impl ZipList {
         }
 
         self.resize(cur_len as u32 + extra);
-        self.data.copy_within(pos..cur_len - 1, pos + extra as usize);
+        self.data
+            .copy_within(pos..cur_len - 1, pos + extra as usize);
         pos += extra as usize;
 
         while cnt > 0 {
             let cur = self.zip_entry(prev_offset);
             raw_len = cur.head_size + cur.len;
-            self.data.copy_within(prev_offset + cur.prev_raw_len_size as usize..prev_offset + raw_len as usize, pos - (raw_len - cur.prev_raw_len_size) as usize);
+            self.data.copy_within(
+                prev_offset + cur.prev_raw_len_size as usize..prev_offset + raw_len as usize,
+                pos - (raw_len - cur.prev_raw_len_size) as usize,
+            );
             pos -= (raw_len + delta) as usize;
 
             if cur.prev_raw_len == 0 {
@@ -465,7 +519,7 @@ impl ZipList {
             let mut set_tail = 0;
             if self.data[pos] != ZIP_END {
                 next_dif = prev_len_bytes_diff(&self.data[pos..], first.prev_raw_len);
-                pos = (pos as i32 -  next_dif) as usize;
+                pos = (pos as i32 - next_dif) as usize;
                 assert!(pos >= first.pos && pos < zl_bytes - 1);
                 store_prev_entry_length(Some(&mut self.data[pos..]), first.prev_raw_len);
                 // update offset for tail
@@ -476,7 +530,7 @@ impl ZipList {
                     set_tail = (set_tail as i32 + next_dif) as usize;
                 }
                 let bytes_to_move = zl_bytes - pos - 1;
-                self.data.copy_within(pos..pos+bytes_to_move, first.pos);
+                self.data.copy_within(pos..pos + bytes_to_move, first.pos);
             } else {
                 set_tail = first.pos - first.prev_raw_len as usize;
             }
@@ -511,7 +565,10 @@ impl ZipList {
                 while prev_len > 0 && index != 0 {
                     index -= 1;
                     pos -= prev_len as usize;
-                    assert!(pos >= ZIPLIST_HEADER_SIZE as usize && pos < (bytes - ZIPLIST_END_SIZE as usize));
+                    assert!(
+                        pos >= ZIPLIST_HEADER_SIZE as usize
+                            && pos < (bytes - ZIPLIST_END_SIZE as usize)
+                    );
                     (prev_len_size, prev_len) = decode_prev_len(&self.data[pos..]);
                 }
             }
@@ -533,7 +590,7 @@ impl ZipList {
             return 0;
         }
         match self.entry_safe(bytes, pos, 1) {
-            Ok(_) => { }
+            Ok(_) => {}
             Err(_) => {
                 return 0;
             }
@@ -544,7 +601,7 @@ impl ZipList {
     pub fn delete_range(&mut self, index: i32, num: usize) -> Result<(), ZipListError> {
         let pos = self.zip_index(index);
         if pos == 0 {
-            return Ok(())
+            return Ok(());
         } else {
             self._delete(pos, num)
         }
@@ -561,7 +618,9 @@ impl ZipList {
         if is_string(entry.encoding) {
             *slen = entry.len;
             let start = pos + entry.head_size as usize;
-            let content = from_utf8(&self.data[start..start + entry.len as usize]).unwrap().to_string();
+            let content = from_utf8(&self.data[start..start + entry.len as usize])
+                .unwrap()
+                .to_string();
             *sstr = content;
         } else {
             *sval = load_integer(&self.data[pos + entry.head_size as usize..], entry.encoding);
@@ -586,7 +645,8 @@ impl ZipList {
 
         if req_len == (entry.len_size + entry.len) {
             pos += entry.prev_raw_len_size as usize;
-            pos += store_entry_encoding(Some(&mut self.data[pos..]), encoding, s.len() as u32) as usize;
+            pos += store_entry_encoding(Some(&mut self.data[pos..]), encoding, s.len() as u32)
+                as usize;
             if is_string(encoding) {
                 self.data[pos..pos + s.len()].copy_from_slice(s.as_bytes());
             } else {
@@ -608,7 +668,11 @@ impl ZipList {
         let entry = self.zip_entry(pos);
         if is_string(entry.encoding) {
             if entry.len == sstr.len() as u32 {
-                let s = from_utf8(&self.data[pos + entry.head_size as usize..pos + (entry.head_size + entry.len) as usize]).unwrap();
+                let s = from_utf8(
+                    &self.data[pos + entry.head_size as usize
+                        ..pos + (entry.head_size + entry.len) as usize],
+                )
+                .unwrap();
                 return s == sstr;
             } else {
                 return false;
@@ -620,4 +684,3 @@ impl ZipList {
         false
     }
 }
-

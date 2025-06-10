@@ -1,18 +1,20 @@
+use crate::data_structure::dict::error::HashError;
+use crate::data_structure::dict::hash::sys_hash;
+use crate::data_structure::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
+use crate::data_structure::dict::lib::*;
+use crate::data_structure::dict::lib::{
+    DictResizeFlag, DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP,
+    DICT_HT_INITIAL_SIZE, HASHTABLE_MIN_FILL,
+};
+use crate::data_structure::skiplist::lib::gen_random;
 use std::any::Any;
-use std::cmp::{ PartialEq};
-use std::ptr::NonNull;
-use std::fmt::{Debug};
+use std::cmp::PartialEq;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::mem;
+use std::ptr::NonNull;
 use std::sync::Arc;
-use std::time::{Instant};
-use crate::data_structure::dict::lib::{DICT_CAN_RESIZE, DICT_FORCE_RESIZE_RATIO, DICT_HT_INITIAL_EXP, DICT_HT_INITIAL_SIZE, DictResizeFlag, HASHTABLE_MIN_FILL};
-use crate::data_structure::dict::lib::DictResizeFlag::{DictResizeEnable, DictResizeForbid};
-use crate::data_structure::dict::error::HashError;
-use crate::data_structure::dict::hash::{sys_hash};
-use crate::data_structure::dict::lib::{*};
-use crate::data_structure::skiplist::lib::gen_random;
-
+use std::time::Instant;
 
 #[derive(Default, Clone)]
 pub enum Value {
@@ -32,8 +34,9 @@ impl Default for Value {
 
 #[derive(Debug, Copy)]
 pub struct DictEntry<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub(crate) key: K,
     pub(crate) val: V,
@@ -41,8 +44,9 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl<K, V> Default for DictEntry<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     fn default() -> Self {
         Self {
@@ -53,9 +57,10 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-impl <K, V> Clone for DictEntry<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone 
+impl<K, V> Clone for DictEntry<K, V>
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -66,18 +71,20 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-impl <K, V> PartialEq for DictEntry<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+impl<K, V> PartialEq for DictEntry<K, V>
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.val == other.val
     }
 }
 
-impl <K, V> DictEntry<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone 
+impl<K, V> DictEntry<K, V>
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     #[inline]
     pub fn get_key(&self) -> &K {
@@ -90,10 +97,10 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-
 pub struct Dict<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone 
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub dict_type: Arc<DictType<K, V>>,
     /// dict table
@@ -111,15 +118,24 @@ where K: Default + Clone + Eq + Hash,
     pub metadata: Vec<Box<dyn Any>>,
 }
 
-impl <K, V> Dict<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone 
+impl<K, V> Dict<K, V>
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub fn create(dict_type: Arc<DictType<K, V>>) -> Self {
         unsafe {
             Self {
                 dict_type,
-                ht_table: vec![vec![Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default())))); DICT_HT_INITIAL_SIZE], vec![]],
+                ht_table: vec![
+                    vec![
+                        Some(NonNull::new_unchecked(Box::into_raw(Box::new(
+                            DictEntry::default()
+                        ))));
+                        DICT_HT_INITIAL_SIZE
+                    ],
+                    vec![],
+                ],
                 ht_used: vec![0; 2],
                 rehash_idx: -1,
                 pause_rehash: 0,
@@ -200,10 +216,12 @@ where K: Default + Clone + Eq + Hash,
         let _ = self._expand_if_needed();
 
         for table in 0..2 {
-            if table == 0 && (idx as i64) < self.rehash_idx { continue; }
+            if table == 0 && (idx as i64) < self.rehash_idx {
+                continue;
+            }
             idx = hash & dict_size_mask(self.ht_size_exp[table]);
             // Search if this slot does not already contain the given key
-            let mut he= self.ht_table[table][idx as usize];
+            let mut he = self.ht_table[table][idx as usize];
             while he.is_some() {
                 let he_key = (*he.unwrap().as_ptr()).get_key();
                 if *key == *he_key {
@@ -211,7 +229,9 @@ where K: Default + Clone + Eq + Hash,
                 }
                 he = (*he.unwrap().as_ptr()).next;
             }
-            if !self.dict_is_rehashing() { break; }
+            if !self.dict_is_rehashing() {
+                break;
+            }
         }
         let ht_idx = if self.dict_is_rehashing() { 1 } else { 0 };
         let bucket = self.ht_table[ht_idx][idx as usize];
@@ -229,7 +249,9 @@ where K: Default + Clone + Eq + Hash,
             self._expand_if_needed()?;
 
             for table in 0..2 {
-                if table == 0 && (idx as i64) < self.rehash_idx { continue; }
+                if table == 0 && (idx as i64) < self.rehash_idx {
+                    continue;
+                }
                 idx = hash & dict_size_mask(self.ht_size_exp[table]);
                 // Search if this slot does not already contain the given key
                 let mut he = self.ht_table[table][idx as usize];
@@ -241,7 +263,9 @@ where K: Default + Clone + Eq + Hash,
                     }
                     he = (*he.unwrap().as_ptr()).next;
                 }
-                if !self.dict_is_rehashing() { break; }
+                if !self.dict_is_rehashing() {
+                    break;
+                }
             }
 
             let ht_idx: usize = if self.dict_is_rehashing() { 1 } else { 0 };
@@ -263,7 +287,7 @@ where K: Default + Clone + Eq + Hash,
             self.rehash_step_if_needed(idx);
             let _ = self.expand_if_needed();
 
-            let table = if self.dict_is_rehashing() {1} else {0};
+            let table = if self.dict_is_rehashing() { 1 } else { 0 };
             idx = hash & dict_size_mask(self.ht_size_exp[table]);
             let position = self.ht_table[table][idx as usize];
             assert!(position.is_some());
@@ -298,7 +322,9 @@ where K: Default + Clone + Eq + Hash,
                     }
                     he = (*he.unwrap().as_ptr()).next;
                 }
-                if !self.dict_is_rehashing() { break; }
+                if !self.dict_is_rehashing() {
+                    break;
+                }
             }
         }
         None
@@ -323,7 +349,10 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
-    pub fn generic_delete(&mut self, key: &K) -> Result<Option<NonNull<DictEntry<K, V>>>, HashError> {
+    pub fn generic_delete(
+        &mut self,
+        key: &K,
+    ) -> Result<Option<NonNull<DictEntry<K, V>>>, HashError> {
         unsafe {
             if self.dict_size() == 0 {
                 return Ok(None);
@@ -339,7 +368,9 @@ where K: Default + Clone + Eq + Hash,
                 }
                 idx = h & dict_size_mask(self.ht_size_exp[table]);
                 let mut he = self.ht_table[table][idx as usize];
-                let mut prev_he = Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default()))));
+                let mut prev_he = Some(NonNull::new_unchecked(Box::into_raw(Box::new(
+                    DictEntry::default(),
+                ))));
                 while *he.unwrap().as_ptr() != DictEntry::default() {
                     let next_de = (*he.unwrap().as_ptr()).next;
                     let he_key = (*he.unwrap().as_ptr()).get_key();
@@ -356,9 +387,11 @@ where K: Default + Clone + Eq + Hash,
                     prev_he = he;
                     he = next_de;
                 }
-                if !self.dict_is_rehashing() { break; }
+                if !self.dict_is_rehashing() {
+                    break;
+                }
             }
-            return Ok(None)
+            return Ok(None);
         }
     }
 
@@ -369,7 +402,8 @@ where K: Default + Clone + Eq + Hash,
             while *de.unwrap().as_ptr() != DictEntry::default() {
                 let next_de = (*de.unwrap().as_ptr()).next;
                 if self.ht_size_exp[1] > self.ht_size_exp[0] {
-                    h = sys_hash((*de.unwrap().as_ptr()).get_key()) & dict_size_mask(self.ht_size_exp[1]);
+                    h = sys_hash((*de.unwrap().as_ptr()).get_key())
+                        & dict_size_mask(self.ht_size_exp[1]);
                 } else {
                     // shrinking the table.
                     h = idx & dict_size_mask(self.ht_size_exp[1]);
@@ -380,7 +414,9 @@ where K: Default + Clone + Eq + Hash,
                 self.ht_used[1] += 1;
                 de = next_de;
             }
-            self.ht_table[0][idx as usize] = Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default()))));
+            self.ht_table[0][idx as usize] = Some(NonNull::new_unchecked(Box::into_raw(Box::new(
+                DictEntry::default(),
+            ))));
         }
     }
 
@@ -395,7 +431,10 @@ where K: Default + Clone + Eq + Hash,
                 return false;
             }
 
-            if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0) || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1)) {
+            if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid
+                && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0)
+                    || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1))
+            {
                 return false;
             }
             self.rehash_entries_in_bucket_at_index(idx);
@@ -405,7 +444,9 @@ where K: Default + Clone + Eq + Hash,
     }
 
     fn check_rehashing_complete(&mut self) -> bool {
-        if self.ht_used[0] != 0 { return false; }
+        if self.ht_used[0] != 0 {
+            return false;
+        }
         self.ht_table[0] = mem::replace(&mut self.ht_table[1], vec![]);
 
         self.ht_used[0] = self.ht_used[1];
@@ -422,12 +463,17 @@ where K: Default + Clone + Eq + Hash,
             let s1 = dict_size(self.ht_size_exp[1]);
 
             if DICT_CAN_RESIZE == DictResizeForbid || !self.dict_is_rehashing() {
-                return Err(HashError::RehashErr("rehash forbid or is rehashing".to_string()));
+                return Err(HashError::RehashErr(
+                    "rehash forbid or is rehashing".to_string(),
+                ));
             }
             // If dict_can_resize is DICT_RESIZE_AVOID, we want to avoid rehashing.
             // If expanding, the threshold is dict_force_resize_ratio which is 4.
             // If shrinking, the threshold is 1 / (HASHTABLE_MIN_FILL * dict_force_resize_ratio) which is 1/32.
-            if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0) || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1)) {
+            if DICT_CAN_RESIZE == DictResizeFlag::DictResizeAvoid
+                && ((s1 > s0 && s1 < DICT_FORCE_RESIZE_RATIO * s0)
+                    || (s1 < s0 && s0 < HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO * s1))
+            {
                 return Err(HashError::RehashErr("rehash avoid".to_string()));
             }
 
@@ -466,7 +512,10 @@ where K: Default + Clone + Eq + Hash,
                 return;
             }
             // rehashing not in progress if rehash_idx == -1
-            if visited_index as i64 >= self.rehash_idx && (*self.ht_table[0][visited_index as usize].unwrap().as_ptr()) != DictEntry::default() {
+            if visited_index as i64 >= self.rehash_idx
+                && (*self.ht_table[0][visited_index as usize].unwrap().as_ptr())
+                    != DictEntry::default()
+            {
                 // If we have a valid dict entry at `idx` in ht0, we perform rehash on the bucket at `idx` (being more CPU cache friendly)
                 self.bucket_rehash(visited_index);
             } else {
@@ -482,15 +531,26 @@ where K: Default + Clone + Eq + Hash,
         let new_ht_size_exp = next_exp(size);
         let new_size = dict_size(new_ht_size_exp);
         if new_size < size as u64 {
-            return Err(HashError::RehashErr(format!("new size: {} is less resize size:{}", new_size, size)));
+            return Err(HashError::RehashErr(format!(
+                "new size: {} is less resize size:{}",
+                new_size, size
+            )));
         }
 
         if new_ht_size_exp == self.ht_size_exp[0] {
-            return Err(HashError::RehashErr(format!("old dict size: {} is equal to new dict size:{}", self.ht_used[0], new_ht_size_exp)));
+            return Err(HashError::RehashErr(format!(
+                "old dict size: {} is equal to new dict size:{}",
+                self.ht_used[0], new_ht_size_exp
+            )));
         }
 
         unsafe {
-            let new_ht_table = vec![Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default())))); new_size as usize];
+            let new_ht_table = vec![
+                Some(NonNull::new_unchecked(Box::into_raw(Box::new(
+                    DictEntry::default()
+                ))));
+                new_size as usize
+            ];
             let new_ht_used = 0;
             self.ht_size_exp[1] = new_ht_size_exp;
             self.ht_used[1] = new_ht_used;
@@ -511,7 +571,10 @@ where K: Default + Clone + Eq + Hash,
     }
 
     pub fn expand(&mut self, size: usize) -> Result<(), HashError> {
-        if self.dict_is_rehashing() || self.ht_used[0] > (size as u32) || dict_size(self.ht_size_exp[0]) >= (size as u64) {
+        if self.dict_is_rehashing()
+            || self.ht_used[0] > (size as u32)
+            || dict_size(self.ht_size_exp[0]) >= (size as u64)
+        {
             return Err(HashError::ExpandErr("size is invalid".to_string()));
         }
         self.resize(size)
@@ -529,7 +592,10 @@ where K: Default + Clone + Eq + Hash,
 
         let ht_used = self.ht_used[0] as u64;
         unsafe {
-            if DICT_CAN_RESIZE == DictResizeEnable && ht_used >= dict_size(self.ht_size_exp[0]) || (DICT_CAN_RESIZE != DictResizeForbid && ht_used >= DICT_FORCE_RESIZE_RATIO * dict_size(self.ht_size_exp[0])) {
+            if DICT_CAN_RESIZE == DictResizeEnable && ht_used >= dict_size(self.ht_size_exp[0])
+                || (DICT_CAN_RESIZE != DictResizeForbid
+                    && ht_used >= DICT_FORCE_RESIZE_RATIO * dict_size(self.ht_size_exp[0]))
+            {
                 self.expand((ht_used + 1) as usize)?;
                 return Ok(true);
             }
@@ -560,16 +626,24 @@ where K: Default + Clone + Eq + Hash,
         }
 
         unsafe {
-            if (DICT_CAN_RESIZE == DictResizeEnable && self.ht_used[0] as u64 * HASHTABLE_MIN_FILL <= dict_size(self.ht_size_exp[0])) || (DICT_CAN_RESIZE != DictResizeForbid && self.ht_used[0] as u64 * HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO <= dict_size(self.ht_size_exp[0])) {
+            if (DICT_CAN_RESIZE == DictResizeEnable
+                && self.ht_used[0] as u64 * HASHTABLE_MIN_FILL <= dict_size(self.ht_size_exp[0]))
+                || (DICT_CAN_RESIZE != DictResizeForbid
+                    && self.ht_used[0] as u64 * HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO
+                        <= dict_size(self.ht_size_exp[0]))
+            {
                 self.shrink(self.ht_used[0] as u64)?;
-                return Ok(true)
+                return Ok(true);
             }
         }
         Ok(false)
     }
 
     pub fn shrink(&mut self, size: u64) -> Result<(), HashError> {
-        if self.dict_is_rehashing() || (self.ht_used[0] as u64 > size) || (dict_size(self.ht_size_exp[0]) <= size) {
+        if self.dict_is_rehashing()
+            || (self.ht_used[0] as u64 > size)
+            || (dict_size(self.ht_size_exp[0]) <= size)
+        {
             return Err(HashError::ShrinkErr(-2));
         }
         self.resize(size as usize)
@@ -627,7 +701,9 @@ where K: Default + Clone + Eq + Hash,
                     call_back.unwrap();
                 }
                 let mut he = self.ht_table[ht_idx][i as usize];
-                if *he.unwrap().as_ptr() == DictEntry::default() { continue; }
+                if *he.unwrap().as_ptr() == DictEntry::default() {
+                    continue;
+                }
 
                 while *he.unwrap().as_ptr() != DictEntry::default() {
                     let box_node = Box::from_raw(he.unwrap().as_ptr());
@@ -648,7 +724,7 @@ where K: Default + Clone + Eq + Hash,
         self.pause_auto_resize = 0;
     }
 
-    pub fn get_random_key(&mut self) -> Option<NonNull<DictEntry<K ,V>>> {
+    pub fn get_random_key(&mut self) -> Option<NonNull<DictEntry<K, V>>> {
         unsafe {
             let mut he;
             if self.dict_size() == 0 {
@@ -661,7 +737,8 @@ where K: Default + Clone + Eq + Hash,
                 let s0 = dict_size(self.ht_size_exp[0]) as i64;
                 // We are sure there are no elements in indexes from 0 to rehashidx-1
                 loop {
-                    let h = self.rehash_idx + random_ulong() as i64 % (self.dict_buckets() as i64 - self.rehash_idx);
+                    let h = self.rehash_idx
+                        + random_ulong() as i64 % (self.dict_buckets() as i64 - self.rehash_idx);
                     he = if h >= s0 {
                         self.ht_table[1][(h - s0) as usize]
                     } else {
@@ -699,19 +776,23 @@ where K: Default + Clone + Eq + Hash,
         }
     }
 
-    pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry<K ,V>>>{
+    pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry<K, V>>> {
         let mut entries = Vec::with_capacity(GETFAIR_NUM_ENTRIES);
         let count = GETFAIR_NUM_ENTRIES;
         let cnt = self.get_some_keys(&mut entries, count as u64);
 
         if cnt == 0 {
-            return self.get_random_key()
+            return self.get_random_key();
         }
-        let idx = gen_random() % count as u32 ;
+        let idx = gen_random() % count as u32;
         entries[idx as usize]
     }
 
-    fn get_some_keys(&mut self, des: &mut Vec<Option<NonNull<DictEntry<K, V>>>>, mut count: u64) -> u64 {
+    fn get_some_keys(
+        &mut self,
+        des: &mut Vec<Option<NonNull<DictEntry<K, V>>>>,
+        mut count: u64,
+    ) -> u64 {
         let mut stored = 0;
         if (self.dict_size() as u64) < count {
             count = self.dict_size() as u64;
@@ -725,7 +806,7 @@ where K: Default + Clone + Eq + Hash,
             }
         }
 
-        let table = if self.dict_is_rehashing() {2} else {1};
+        let table = if self.dict_is_rehashing() { 2 } else { 1 };
         let mut max_size_mask = dict_size_mask(self.ht_size_exp[0]);
         if table > 1 && max_size_mask < dict_size_mask(self.ht_size_exp[1]) {
             max_size_mask = dict_size_mask(self.ht_size_exp[1]);
@@ -744,7 +825,9 @@ where K: Default + Clone + Eq + Hash,
                             continue;
                         }
                     }
-                    if i >= dict_size(self.ht_size_exp[j]) { continue; }
+                    if i >= dict_size(self.ht_size_exp[j]) {
+                        continue;
+                    }
                     let mut he = self.ht_table[j][i as usize];
 
                     if he.is_none() {
@@ -775,7 +858,7 @@ where K: Default + Clone + Eq + Hash,
                 i = (i + 1) & max_size_mask;
             }
         }
-        return if stored > count { stored } else { count }
+        return if stored > count { stored } else { count };
     }
 
     pub fn find_by_hash_and_ptr(&self, key: K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
@@ -785,7 +868,9 @@ where K: Default + Clone + Eq + Hash,
         unsafe {
             for table in 0..2 {
                 let idx = hash & dict_size_mask(self.ht_size_exp[table]);
-                if table == 0 && (idx as i64) < self.rehash_idx { continue; }
+                if table == 0 && (idx as i64) < self.rehash_idx {
+                    continue;
+                }
                 let mut he = self.ht_table[table][idx as usize];
                 while he.is_some() {
                     if key == (*he.unwrap().as_ptr()).key {
@@ -807,7 +892,11 @@ where K: Default + Clone + Eq + Hash,
         *to = dict_size(self.ht_size_exp[1]);
     }
 
-    pub fn dict_two_phase_unlink_find(&mut self, key: &K, table_index: &mut i32) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn dict_two_phase_unlink_find(
+        &mut self,
+        key: &K,
+        table_index: &mut i32,
+    ) -> Option<NonNull<DictEntry<K, V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -818,7 +907,9 @@ where K: Default + Clone + Eq + Hash,
         unsafe {
             for table in 0..2 {
                 let idx = h & dict_size_mask(self.ht_size_exp[table]);
-                if table == 0 && (idx as i64) < self.rehash_idx { continue; }
+                if table == 0 && (idx as i64) < self.rehash_idx {
+                    continue;
+                }
                 let mut he = self.ht_table[table][idx as usize];
                 while he.is_some() {
                     let he_key = (*he.unwrap().as_ptr()).get_key();
@@ -841,7 +932,7 @@ where K: Default + Clone + Eq + Hash,
         &mut self,
         he: Option<NonNull<DictEntry<K, V>>>,
         mut plink: Option<NonNull<DictEntry<K, V>>>,
-        table_index: usize
+        table_index: usize,
     ) {
         if he.is_none() {
             return;
@@ -856,9 +947,10 @@ where K: Default + Clone + Eq + Hash,
     }
 }
 
-impl <K, V> Dict<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone 
+impl<K, V> Dict<K, V>
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     #[inline]
     pub fn reset(&mut self, table: usize) {
@@ -915,4 +1007,3 @@ where K: Default + Clone + Eq + Hash,
         self.pause_rehash > 0
     }
 }
-

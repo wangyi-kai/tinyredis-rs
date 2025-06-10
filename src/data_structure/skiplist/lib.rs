@@ -1,6 +1,6 @@
-use std::cmp::Ordering;
-use rand::Rng;
 use super::{RAND_MAX, SKIP_LIST_MAX_LEVEL, SKIP_LIST_P};
+use rand::Rng;
+use std::cmp::Ordering;
 
 pub fn gen_random() -> u32 {
     let mut rng = rand::rng();

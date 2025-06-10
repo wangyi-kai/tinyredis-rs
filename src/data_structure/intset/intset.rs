@@ -1,5 +1,5 @@
-use crate::data_structure::intset::{*};
 use crate::data_structure::intset::lib::intset_value_encoding;
+use crate::data_structure::intset::*;
 
 use crate::data_structure::skiplist::lib::gen_random;
 
@@ -93,7 +93,7 @@ impl IntSet {
                 *pos.unwrap() = min as usize;
             }
             false
-        }
+        };
     }
 
     fn inset_set(&mut self, pos: usize, value: i64) {
@@ -132,7 +132,10 @@ impl IntSet {
 
         while length > 0 {
             length -= 1;
-            self.inset_set((length + prepend) as usize, self.get_encoded(length as usize, cur_encoding));
+            self.inset_set(
+                (length + prepend) as usize,
+                self.get_encoded(length as usize, cur_encoding),
+            );
         }
 
         if prepend > 0 {
@@ -160,7 +163,7 @@ impl IntSet {
                 bytes *= 2;
                 (from * 2, to * 2)
             }
-            _ => { (0, 0)}
+            _ => (0, 0),
         };
 
         self.contents.copy_within(src..src + bytes, dst);
@@ -172,7 +175,7 @@ impl IntSet {
         *success = true;
 
         if value_encoding > self.encoding as u8 {
-            return self.upgrade_and_add(value)
+            return self.upgrade_and_add(value);
         } else {
             if self.search(value, Some(&mut pos)) {
                 *success = false;

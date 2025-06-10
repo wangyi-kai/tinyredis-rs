@@ -1,6 +1,6 @@
-use std::ptr::NonNull;
-use super::{SKIP_LIST_MAX_LEVEL};
 use super::lib::{random_level, sds_cmp};
+use super::SKIP_LIST_MAX_LEVEL;
+use std::ptr::NonNull;
 
 #[derive(Clone, Debug, Default)]
 pub struct Node {
@@ -84,14 +84,21 @@ impl SkipList {
     #[inline(always)]
     pub fn insert(&mut self, score: f64, elem: String) -> NonNull<Node> {
         unsafe {
-            let mut update = vec![NonNull::new_unchecked(Box::into_raw(Box::new(Node::default()))); SKIP_LIST_MAX_LEVEL];
+            let mut update = vec![
+                NonNull::new_unchecked(Box::into_raw(Box::new(Node::default())));
+                SKIP_LIST_MAX_LEVEL
+            ];
             let mut rank = vec![0u64; SKIP_LIST_MAX_LEVEL];
             let mut x = self.head.unwrap();
             assert!(!score.is_nan());
 
             for i in (0..self.level).rev() {
                 // store rank that is crossed to reach the insert position
-                rank[i] = if i == (self.level - 1) { 0 } else { rank[i + 1] };
+                rank[i] = if i == (self.level - 1) {
+                    0
+                } else {
+                    rank[i + 1]
+                };
                 while let Some(level) = (*x.as_ptr()).level.get(i) {
                     if let Some(forward) = level.forward {
                         let l_score = (*forward.as_ptr()).score;
@@ -177,7 +184,10 @@ impl SkipList {
     #[inline(always)]
     pub fn delete(&mut self, score: f64, elem: &String) -> bool {
         unsafe {
-            let mut update = vec![NonNull::new_unchecked(Box::into_raw(Box::new(Node::default()))); SKIP_LIST_MAX_LEVEL];
+            let mut update = vec![
+                NonNull::new_unchecked(Box::into_raw(Box::new(Node::default())));
+                SKIP_LIST_MAX_LEVEL
+            ];
             let mut x = self.head.unwrap();
 
             for i in (0..self.level).rev() {
@@ -201,7 +211,7 @@ impl SkipList {
                     true
                 } else {
                     false
-                }
+                };
             }
             false
         }
@@ -210,7 +220,10 @@ impl SkipList {
     #[inline(always)]
     pub fn update_score(&mut self, cur_score: f64, elem: &str, new_score: f64) -> NonNull<Node> {
         unsafe {
-            let mut update = vec![NonNull::new_unchecked(Box::into_raw(Box::new(Node::default()))); SKIP_LIST_MAX_LEVEL];
+            let mut update = vec![
+                NonNull::new_unchecked(Box::into_raw(Box::new(Node::default())));
+                SKIP_LIST_MAX_LEVEL
+            ];
             let mut x = self.head.unwrap();
 
             for i in (0..self.level).rev() {
@@ -227,7 +240,11 @@ impl SkipList {
             }
 
             x = (*x.as_ptr()).level[0].forward.unwrap();
-            if ((*x.as_ptr()).backward.is_none() || (*(*x.as_ptr()).backward.unwrap().as_ptr()).score < new_score) && ((*x.as_ptr()).level[0].forward.is_none() || (*(*x.as_ptr()).level[0].forward.unwrap().as_ptr()).score > new_score) {
+            if ((*x.as_ptr()).backward.is_none()
+                || (*(*x.as_ptr()).backward.unwrap().as_ptr()).score < new_score)
+                && ((*x.as_ptr()).level[0].forward.is_none()
+                    || (*(*x.as_ptr()).level[0].forward.unwrap().as_ptr()).score > new_score)
+            {
                 (*x.as_ptr()).score = new_score;
                 return x;
             }
@@ -256,7 +273,10 @@ impl SkipList {
                     }
                 }
 
-                if (*x.as_ptr()).elem != String::default() && (*x.as_ptr()).score == score && sds_cmp(&(*x.as_ptr()).elem, elem) == 0 {
+                if (*x.as_ptr()).elem != String::default()
+                    && (*x.as_ptr()).score == score
+                    && sds_cmp(&(*x.as_ptr()).elem, elem) == 0
+                {
                     return rank as i64;
                 }
             }
@@ -270,7 +290,9 @@ impl SkipList {
             let mut x = self.head.unwrap();
             let mut traversed = 0;
             for i in (0..self.level).rev() {
-                while (*x.as_ptr()).level[i].forward.is_some() && ((*x.as_ptr()).level[i].span + traversed) <= rank as u64 {
+                while (*x.as_ptr()).level[i].forward.is_some()
+                    && ((*x.as_ptr()).level[i].span + traversed) <= rank as u64
+                {
                     traversed += (*x.as_ptr()).level[i].span;
                     x = (*x.as_ptr()).level[i].forward.unwrap();
                 }

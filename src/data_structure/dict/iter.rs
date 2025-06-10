@@ -1,20 +1,22 @@
+use crate::data_structure::dict::dict::{Dict, DictEntry};
+use crate::data_structure::dict::lib::*;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use crate::data_structure::dict::dict::{Dict, DictEntry};
-use crate::data_structure::dict::lib::{*};
 
 #[derive(Debug)]
 pub struct EntryIter<'a, K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     cur: Option<&'a DictEntry<K, V>>,
     _boo: PhantomData<&'a (K, V)>,
 }
 
 impl<K, V> DictEntry<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub fn iter(&self) -> EntryIter<K, V> {
         EntryIter {
@@ -25,8 +27,9 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl<'a, K, V> Iterator for EntryIter<'a, K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     type Item = &'a DictEntry<K, V>;
 
@@ -48,8 +51,9 @@ where K: Default + Clone + Eq + Hash,
 }
 
 pub struct DictIterator<'a, K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub(crate) dict: Option<&'a mut Dict<K, V>>,
     pub(crate) table: usize,
@@ -58,12 +62,13 @@ where K: Default + Clone + Eq + Hash,
     pub(crate) entry: Option<EntryIter<'a, K, V>>,
 }
 
-impl <'a, K, V> DictIterator<'a, K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+impl<'a, K, V> DictIterator<'a, K, V>
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub fn reset(&mut self) {
-        if !(self.index == -1 && self.table == 0)  {
+        if !(self.index == -1 && self.table == 0) {
             if self.safe != 0 {
                 self.dict.as_mut().unwrap().resume_rehash()
             }
@@ -72,8 +77,9 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl<'a, K, V> Dict<K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     pub fn iter(&mut self) -> DictIterator<K, V> {
         DictIterator {
@@ -97,8 +103,9 @@ where K: Default + Clone + Eq + Hash,
 }
 
 impl<'a, K, V> Iterator for DictIterator<'a, K, V>
-where K: Default + Clone + Eq + Hash,
-      V: Default + PartialEq + Clone
+where
+    K: Default + Clone + Eq + Hash,
+    V: Default + PartialEq + Clone,
 {
     type Item = &'a DictEntry<K, V>;
 
@@ -123,7 +130,9 @@ where K: Default + Clone + Eq + Hash,
                     }
                 }
                 self.index += 1;
-                if self.index >= (dict_size(self.dict.as_ref().unwrap().ht_size_exp[self.table]) as i64) {
+                if self.index
+                    >= (dict_size(self.dict.as_ref().unwrap().ht_size_exp[self.table]) as i64)
+                {
                     if self.dict.as_ref().unwrap().dict_is_rehashing() && self.table == 0 {
                         self.table += 1;
                         self.index = 0;
@@ -131,7 +140,11 @@ where K: Default + Clone + Eq + Hash,
                         break;
                     }
                 }
-                let entry_iter = (*self.dict.as_ref().unwrap().ht_table[self.table][self.index as usize].unwrap().as_ptr()).iter();
+                let entry_iter = (*self.dict.as_ref().unwrap().ht_table[self.table]
+                    [self.index as usize]
+                    .unwrap()
+                    .as_ptr())
+                .iter();
                 self.entry = Some(entry_iter);
             }
         }

@@ -1,2 +1,2 @@
-mod lib;
 mod db;
+mod lib;

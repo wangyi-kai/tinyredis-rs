@@ -1,7 +1,7 @@
-pub mod quicklist;
-mod iter;
 mod bookmark;
+mod iter;
 mod lib;
+pub mod quicklist;
 
 const QL_FILL_BITS: i32 = 16;
 const QL_COMP_BITS: u32 = 16;

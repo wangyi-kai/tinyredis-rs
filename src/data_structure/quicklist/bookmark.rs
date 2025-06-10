@@ -4,4 +4,3 @@ pub struct QuickListBookmark {
     node: QuickListNode,
     name: String,
 }
-

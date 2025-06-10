@@ -1,16 +1,18 @@
-
 #[cfg(test)]
 mod dict_test {
     use crate::data_structure::dict::dict::Dict;
     use crate::data_structure::dict::error::HashError;
     use crate::data_structure::dict::hash::sys_hash;
-    use crate::data_structure::dict::lib::{DictResizeFlag::DictResizeAvoid, dict_set_resize_enabled, DICT_FORCE_RESIZE_RATIO, next_exp, dict_size, HASHTABLE_MIN_FILL, random_u32, random_i32, DictType};
     use crate::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
+    use crate::data_structure::dict::lib::{
+        dict_set_resize_enabled, dict_size, next_exp, random_i32, random_u32,
+        DictResizeFlag::DictResizeAvoid, DictType, DICT_FORCE_RESIZE_RATIO, HASHTABLE_MIN_FILL,
+    };
 
-    use std::collections::HashMap;
-    use std::time::{Instant};
-    use rand::{Rng, SeedableRng};
     use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::collections::HashMap;
+    use std::time::Instant;
 
     use std::fmt::Write as _;
     use std::sync::Arc;
@@ -36,8 +38,10 @@ mod dict_test {
             init = 1;
         }
 
-        let sub_string_size = MIN_STRING_SIZE + rand::rng().random::<u32>() as usize % (MAX_STRING_SIZE - MIN_STRING_SIZE + 1);
-        let start_index = rand::rng().random::<u32>() as usize % (LARGE_STRING_SIZE - sub_string_size + 1);
+        let sub_string_size = MIN_STRING_SIZE
+            + rand::rng().random::<u32>() as usize % (MAX_STRING_SIZE - MIN_STRING_SIZE + 1);
+        let start_index =
+            rand::rng().random::<u32>() as usize % (LARGE_STRING_SIZE - sub_string_size + 1);
         large_string[start_index..start_index + sub_string_size].to_string()
     }
 
@@ -85,7 +89,10 @@ mod dict_test {
 
         print!("[TEST] Add one more key, trigger the dict resize: ");
         unsafe {
-            let res = d.add_raw(string_from_long_long(current_dict_used as i64), current_dict_used as i64)?;
+            let res = d.add_raw(
+                string_from_long_long(current_dict_used as i64),
+                current_dict_used as i64,
+            )?;
             //assert_eq!(res, true);
             current_dict_used += 1;
             new_dict_size = 1 << next_exp(current_dict_used as usize);
@@ -158,7 +165,8 @@ mod dict_test {
         print!("[TEST] Use DICT_RESIZE_AVOID to disable the dict resize and reduce to 3: ");
         {
             dict_set_resize_enabled(DictResizeAvoid);
-            let remain_keys = dict_size(d.ht_size_exp[0]) / (HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO) + 1;
+            let remain_keys =
+                dict_size(d.ht_size_exp[0]) / (HASHTABLE_MIN_FILL * DICT_FORCE_RESIZE_RATIO) + 1;
             for j in remain_keys..128 {
                 let key = string_from_long_long(j as i64);
                 let res = d.generic_delete(&key);
@@ -212,7 +220,10 @@ mod dict_test {
             d.add_raw(key, 0)?;
         }
         let end = start.elapsed();
-        println!("Inserting random substrings (100-500B) from large string with symbols: {:?}", end);
+        println!(
+            "Inserting random substrings (100-500B) from large string with symbols: {:?}",
+            end
+        );
         assert!(d.dict_size() <= count);
         d.empty(None);
 
@@ -233,7 +244,10 @@ mod dict_test {
             d.add_non_exists_by_hash(key, hash);
         }
         let end = start.elapsed();
-        println!("Inserting via dictAddNonExistsByHash() non existing: {:?}", end);
+        println!(
+            "Inserting via dictAddNonExistsByHash() non existing: {:?}",
+            end
+        );
         assert_eq!(d.dict_size(), count);
 
         while d.dict_is_rehashing() {
@@ -253,7 +267,10 @@ mod dict_test {
             }
         }
         let end = start.elapsed();
-        println!("Find() and inserting via dictFind()+dictAddRaw() non existing: {:?}", end);
+        println!(
+            "Find() and inserting via dictFind()+dictAddRaw() non existing: {:?}",
+            end
+        );
         d.empty(None);
 
         let start = Instant::now();
@@ -322,9 +339,8 @@ mod dict_test {
         Ok(())
     }
 
-
     #[test]
-    fn dict_insert_and_find()  -> Result<(), HashError>{
+    fn dict_insert_and_find() -> Result<(), HashError> {
         unsafe {
             let benchmark_dict_type = Arc::new(DictType {
                 hash_function: None,
@@ -403,7 +419,6 @@ mod dict_test {
         }
         Ok(())
     }
-
 
     #[test]
     fn dict_delete() -> Result<(), HashError> {

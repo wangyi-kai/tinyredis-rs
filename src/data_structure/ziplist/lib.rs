@@ -1,8 +1,8 @@
+use crate::data_structure::ziplist::error::ZipListError;
+use crate::data_structure::ziplist::ziplist::ZipList;
+use crate::data_structure::ziplist::*;
 use std::cmp;
 use std::str::from_utf8;
-use crate::data_structure::ziplist::{*};
-use crate::data_structure::ziplist::error::ZipListError;
-use crate::data_structure::ziplist::ziplist::{ZipList};
 
 #[derive(Debug)]
 pub enum Content {
@@ -36,7 +36,6 @@ pub fn entry_encoding(ptr: &[u8]) -> u8 {
     encoding
 }
 
-
 /* Decode the entry encoding type and data length (string length for strings,
  * number of bytes used for the integer for integer entries) encoded in 'ptr'.
  * The 'encoding' variable is input, extracted by the caller, the 'lensize'
@@ -46,15 +45,16 @@ pub fn entry_encoding(ptr: &[u8]) -> u8 {
 pub fn decode_length(ptr: &[u8], encoding: u8) -> (u32, u32) {
     if encoding < ZIP_STR_MASK {
         match encoding {
-            ZIP_STR_06B => {
-                (1, (ptr[0] & 0x3f) as u32)
-            }
+            ZIP_STR_06B => (1, (ptr[0] & 0x3f) as u32),
             ZIP_STR_14B => {
                 let len = (((ptr[0] & 0x3f) as u32) << 8) | (ptr[1] as u32);
                 (2, len)
             }
             ZIP_STR_32B => {
-                let len = (ptr[1] as u32) << 24 | (ptr[2] as u32) <<16 | (ptr[3] as u32) << 8 | (ptr[4] as u32);
+                let len = (ptr[1] as u32) << 24
+                    | (ptr[2] as u32) << 16
+                    | (ptr[3] as u32) << 8
+                    | (ptr[4] as u32);
                 (5, len)
             }
             _ => (0, 0), // bad encoding
@@ -122,7 +122,7 @@ fn string_to_number(s: &str) -> Result<i64, ZipListError> {
         }
         v *= 10;
         if v > u64::MAX - digit {
-            return Err(ZipListError::OverFlowAdd)
+            return Err(ZipListError::OverFlowAdd);
         }
         v += digit;
         p_len += 1;
@@ -164,9 +164,7 @@ pub fn try_encoding(entry: &str) -> Option<(i64, u8)> {
             };
             Some((value, encoding))
         }
-        Err(_) => {
-            None
-        }
+        Err(_) => None,
     }
 }
 
@@ -277,16 +275,16 @@ pub fn save_integer(ptr: &mut [u8], value: i64, encoding: u8) {
             let i64 = value.to_le_bytes();
             ptr[..8].copy_from_slice(&i64);
         }
-        imm if imm >= ZIP_INT_IMM_MIN && imm <= ZIP_INT_IMM_MAX => { }
-        _ => { panic!("Invalid zip integer encoding"); }
+        imm if imm >= ZIP_INT_IMM_MIN && imm <= ZIP_INT_IMM_MAX => {}
+        _ => {
+            panic!("Invalid zip integer encoding");
+        }
     }
 }
 
 pub fn load_integer(ptr: &[u8], encoding: u8) -> i64 {
     match encoding {
-        ZIP_INT_8B => {
-            ptr[0] as i8 as i64
-        }
+        ZIP_INT_8B => ptr[0] as i8 as i64,
         ZIP_INT_16B => {
             let bytes = ptr[..2].try_into().unwrap();
             i16::from_le_bytes(bytes) as i64
@@ -314,9 +312,14 @@ pub fn load_integer(ptr: &[u8], encoding: u8) -> i64 {
 }
 
 pub fn incr_length(ptr: &mut [u8], incr: usize) {
-    let len = u16::from_le_bytes(ptr[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].try_into().unwrap());
+    let len = u16::from_le_bytes(
+        ptr[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2]
+            .try_into()
+            .unwrap(),
+    );
     if len < u16::MAX {
-        ptr[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2].copy_from_slice(&(len as usize + incr).to_le_bytes())
+        ptr[ZIPLIST_LENGTH_OFFSET..ZIPLIST_LENGTH_OFFSET + 2]
+            .copy_from_slice(&(len as usize + incr).to_le_bytes())
     }
 }
 
@@ -326,16 +329,21 @@ pub fn ziplist_repr(zl: &mut ZipList) {
     let zl_bytes = zl.ziplist_len();
     let num = zl.entry_num();
     let tail_offset = zl.tail_offset();
-    println!("total bytes: {}, num entries: {}, tail_offset: {}", zl_bytes, num, tail_offset);
+    println!(
+        "total bytes: {}, num entries: {}, tail_offset: {}",
+        zl_bytes, num, tail_offset
+    );
     pos = ZIPLIST_HEADER_SIZE as usize;
 
     while zl.data[pos] != ZIP_END {
         let entry = match zl.entry_safe(zl_bytes, pos, 1) {
-            Ok(entry) => { entry }
-            Err(_) => { return; }
+            Ok(entry) => entry,
+            Err(_) => {
+                return;
+            }
         };
         //println!("addr: {}, index: {}, offset: {}, hdr+entry len: {}, hdr len: {}, prevrawlen: {}, prevrawlensize: {}, payload: {}", pos, index, pos, entry.head_size+entry.len, entry.head_size, entry.prev_raw_len, entry.prev_raw_len_size, entry.len);
-        for i in 0..(entry.head_size+entry.len) {
+        for i in 0..(entry.head_size + entry.len) {
             //print!("{:02x}|", zl.data[pos]);
         }
         //print!("\n");
@@ -356,7 +364,13 @@ pub fn ziplist_repr(zl: &mut ZipList) {
 type ZiplistValidateEntryCb = fn(pos: usize, head_count: u32, user_dara: *mut c_void) -> i32;
 use std::ffi::c_void;
 
-pub fn ziplist_valid_integerity(zl: &mut ZipList, size: usize, deep: i32, entry_cb: Option<ZiplistValidateEntryCb>, user_data: Option<*mut c_void>) -> i32 {
+pub fn ziplist_valid_integerity(
+    zl: &mut ZipList,
+    size: usize,
+    deep: i32,
+    entry_cb: Option<ZiplistValidateEntryCb>,
+    user_data: Option<*mut c_void>,
+) -> i32 {
     if size < (ZIPLIST_HEADER_SIZE + ZIPLIST_END_SIZE) as usize {
         return 0;
     }
@@ -389,8 +403,8 @@ pub fn ziplist_valid_integerity(zl: &mut ZipList, size: usize, deep: i32, entry_
         }
         if let Some(cb) = entry_cb {
             if cb(pos, header_count, user_data.unwrap()) != 0 {
-            return 0;
-        }
+                return 0;
+            }
         }
         prev_raw_size = e.head_size + e.len;
         prev = pos;
@@ -430,26 +444,33 @@ pub fn ziplist_merge(first: &mut Option<ZipList>, second: &mut Option<ZipList>) 
     let target_bytes = target.ziplist_len();
     let source_bytes = source.ziplist_len();
 
-    let zl_bytes = first_bytes as u32 + second_bytes as u32 - ZIPLIST_HEADER_SIZE - ZIPLIST_END_SIZE;
+    let zl_bytes =
+        first_bytes as u32 + second_bytes as u32 - ZIPLIST_HEADER_SIZE - ZIPLIST_END_SIZE;
     let zl_len = cmp::min(first_len + second_len, u16::MAX as u32) as u16;
     assert!(zl_bytes < u32::MAX);
 
     target.resize(zl_bytes);
     if append {
-        target.data[target_bytes - ZIPLIST_END_SIZE as usize..].copy_from_slice(&source.data[ZIPLIST_HEADER_SIZE as usize..source_bytes]);
+        target.data[target_bytes - ZIPLIST_END_SIZE as usize..]
+            .copy_from_slice(&source.data[ZIPLIST_HEADER_SIZE as usize..source_bytes]);
     } else {
-        target.data.copy_within(ZIPLIST_HEADER_SIZE as usize..source_bytes, source_bytes - ZIPLIST_END_SIZE as usize);
-        target.data[..source_bytes - ZIPLIST_END_SIZE as usize].copy_from_slice(&source.data[..source_bytes - ZIPLIST_END_SIZE as usize]);
+        target.data.copy_within(
+            ZIPLIST_HEADER_SIZE as usize..source_bytes,
+            source_bytes - ZIPLIST_END_SIZE as usize,
+        );
+        target.data[..source_bytes - ZIPLIST_END_SIZE as usize]
+            .copy_from_slice(&source.data[..source_bytes - ZIPLIST_END_SIZE as usize]);
     }
 
     target.data[..4].copy_from_slice(&zl_bytes.to_le_bytes());
     target.data[8..10].copy_from_slice(&zl_len.to_le_bytes());
-    target.data[4..8].copy_from_slice(&(first_bytes as u32 - ZIPLIST_END_SIZE + second_offset as u32 - ZIPLIST_HEADER_SIZE).to_le_bytes());
+    target.data[4..8].copy_from_slice(
+        &(first_bytes as u32 - ZIPLIST_END_SIZE + second_offset as u32 - ZIPLIST_HEADER_SIZE)
+            .to_le_bytes(),
+    );
     target.cascade_update(first_offset);
 
-    if append {
-
-    }
+    if append {}
     Some(target)
 }
 

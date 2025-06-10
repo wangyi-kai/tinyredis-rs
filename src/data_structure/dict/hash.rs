@@ -1,5 +1,5 @@
-use std::hash::{Hash, Hasher};
 use cityhasher::CityHasher;
+use std::hash::{Hash, Hasher};
 
 pub const HASH_SEED: u64 = 0x87c37b91114253d5;
 
