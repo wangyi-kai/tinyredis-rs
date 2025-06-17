@@ -5,6 +5,7 @@ use crate::data_structure::quicklist::quicklist::QuickList;
 use std::any::Any;
 use std::hash::Hash;
 use std::sync::Arc;
+use crate::data_structure::ziplist::ziplist::ZipList;
 
 /// A redis object, that is a type able to hold a string / list / set
 
@@ -21,19 +22,28 @@ const OBJ_ZSET: u32 = 3;
 const OBJ_HASH: u32 = 4;
 /// Max number of basic object types
 const OBJ_TYPE_BASIC_MAX: u32 = 5;
+
 /// Raw representation
 pub const OBJ_ENCODING_RAW: u32 = 0;
 /// Encoded as integer
 pub const OBJ_ENCODING_INT: u32 = 1;
 /// Encoded as hash table
 pub const OBJ_ENCODING_HT: u32 = 2;
+/// old hash encoding
+pub const OBJ_ENCODING_ZIPMAP: u32 = 3;
+///OBJ_ENCODING_LINKEDLIST
+pub const OBJ_ENCODING_LINKEDLIST: u32 = 4;
+/// list/hash/zset encoding
+pub const OBJ_ENCODING_ZIPLIST: u32 = 5;
 /// Encoded as intset
 pub const OBJ_ENCODING_INTSET: u32 = 6;
 /// Encoded as skiplist
 pub const OBJ_ENCODING_SKIPLIST: u32 = 7;
 /// Embedded sds string encoding
 pub const OBJ_ENCODING_EMBSTR: u32 = 8;
+/// Encoded as linked list of listpacks
 const OBJ_ENCODING_QUICKLIST: u32 = 9;
+
 const LRU_BITS: u32 = 24;
 /// Max value of obj->lru
 const LRU_CLOCK_MAX: u32 = (1 << LRU_BITS) - 1;
@@ -42,6 +52,7 @@ const OBJ_SHARED_REFCOUNT: i32 = i32::MAX;
 const OBJ_STATIC_REFCOUNT: i32 = i32::MAX - 1;
 const OBJ_FIRST_SPECIAL_REFCOUNT: i32 = OBJ_STATIC_REFCOUNT;
 
+#[derive(Default)]
 pub struct RedisObject {
     /// object type
     object_type: u32,
@@ -99,6 +110,13 @@ impl RedisObject {
         let is = IntSet::new();
         let mut o = RedisObject::create(OBJ_SET, Box::new(is));
         o.encoding = OBJ_ENCODING_INTSET;
+        o
+    }
+
+    pub fn create_list_object() -> Self {
+        let l = ZipList::new();
+        let mut o = RedisObject::create(OBJ_LIST, Box::new(l));
+        o.encoding = OBJ_ENCODING_HT;
         o
     }
 
