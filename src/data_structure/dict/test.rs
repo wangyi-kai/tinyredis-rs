@@ -53,7 +53,7 @@ mod dict_test {
             rehashing_completed: None,
             dict_meta_data_bytes: None,
         });
-        let mut d = Dict::create(benchmark_dict_type);
+        let mut d = Dict::create();
         let mut current_dict_used = 0;
         let mut new_dict_size = 0;
 
@@ -206,7 +206,7 @@ mod dict_test {
             rehashing_completed: None,
             dict_meta_data_bytes: None,
         });
-        let mut d = Dict::create(benchmark_dict_type);
+        let mut d = Dict::create();
         println!("[TEST] Restore to original state: ");
         {
             d.empty(None);
@@ -348,7 +348,7 @@ mod dict_test {
                 rehashing_completed: None,
                 dict_meta_data_bytes: None,
             });
-            let mut dict = Dict::create(benchmark_dict_type);
+            let mut dict = Dict::create();
             let num = 10;
             let start = Instant::now();
 
@@ -398,7 +398,7 @@ mod dict_test {
                 rehashing_completed: None,
                 dict_meta_data_bytes: None,
             });
-            let mut dict = Dict::create(benchmark_dict_type);
+            let mut dict = Dict::create();
             let num = 10;
             let start = Instant::now();
 
@@ -429,7 +429,7 @@ mod dict_test {
                 rehashing_completed: None,
                 dict_meta_data_bytes: None,
             });
-            let mut dict = Dict::create(benchmark_dict_type);
+            let mut dict = Dict::create();
             let num = 10;
 
             for i in 1..num + 1 {

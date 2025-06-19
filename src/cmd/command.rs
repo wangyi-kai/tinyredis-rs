@@ -8,6 +8,7 @@ pub enum RedisCommand {
     SortSet(SortedCmd),
     Hash(HashCmd),
 }
+
 pub enum ConnCmd {
     /// Authenticates the connection
     Auth,

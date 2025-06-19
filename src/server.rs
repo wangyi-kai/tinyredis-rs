@@ -4,7 +4,8 @@ use crate::data_structure::intset::intset::IntSet;
 use crate::data_structure::quicklist::quicklist::QuickList;
 use std::any::Any;
 use std::hash::Hash;
-use std::sync::Arc;
+
+use crate::data_structure::skiplist::skiplist::SkipList;
 use crate::data_structure::ziplist::ziplist::ZipList;
 
 /// A redis object, that is a type able to hold a string / list / set
@@ -51,6 +52,14 @@ const LRU_CLOCK_MAX: u32 = (1 << LRU_BITS) - 1;
 const OBJ_SHARED_REFCOUNT: i32 = i32::MAX;
 const OBJ_STATIC_REFCOUNT: i32 = i32::MAX - 1;
 const OBJ_FIRST_SPECIAL_REFCOUNT: i32 = OBJ_STATIC_REFCOUNT;
+
+pub enum RedisValue {
+    String(String),
+    List,
+    Hash,
+    SortedSet,
+    Set,
+}
 
 #[derive(Default)]
 pub struct RedisObject {
@@ -100,7 +109,7 @@ impl RedisObject {
             rehashing_completed: None,
             dict_meta_data_bytes: None,
         };
-        let d = Dict::create(Arc::new(dict_type));
+        let d = Dict::create();
         let mut o = RedisObject::create(OBJ_SET, Box::new(d));
         o.encoding = OBJ_ENCODING_HT;
         o
@@ -117,6 +126,13 @@ impl RedisObject {
         let l = ZipList::new();
         let mut o = RedisObject::create(OBJ_LIST, Box::new(l));
         o.encoding = OBJ_ENCODING_HT;
+        o
+    }
+
+    pub fn create_skiplist_object() -> Self {
+        let s = SkipList::new();
+        let mut o = RedisObject::create(OBJ_ZSET, Box::new(s));
+        o.encoding = OBJ_ENCODING_SKIPLIST;
         o
     }
 
@@ -146,4 +162,3 @@ impl RedisObject {
     }
 }
 
-pub struct Command {}

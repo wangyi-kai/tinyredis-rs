@@ -10,9 +10,9 @@ pub struct ZSet<K, V> {
 }
 
 impl<K, V> ZSet<K, V> {
-    pub fn new(dict_type: Arc<DictType<K, V>>) -> Self<K, V> {
+    pub fn new() -> Self<K, V> {
         Self {
-            dict: Dict::create(dict_type.clone()),
+            dict: Dict::create(),
             zsl: SkipList::new(),
         }
     }
