@@ -44,19 +44,17 @@ where
     V: Default + PartialEq + Clone,
 {
     pub fn create(
-        dict_type: DictType<K, V>,
         slot_count_bits: u64,
         flag: i32,
         id: i32,
     ) -> Self<K, V> {
-        let dict_type = Arc::new(dict_type);
         Self {
-            keys: KvStore::create(dict_type.clone(), slot_count_bits, flag),
-            expires: KvStore::create(dict_type.clone(), slot_count_bits, flag),
-            blocking_keys: Dict::create(dict_type.clone()),
-            blocking_keys_unblock_on_nokey: Dict::create(dict_type.clone()),
-            read_keys: Dict::create(dict_type.clone()),
-            watched_keys: Dict::create(dict_type.clone()),
+            keys: KvStore::create(slot_count_bits, flag),
+            expires: KvStore::create(slot_count_bits, flag),
+            blocking_keys: Dict::create(),
+            blocking_keys_unblock_on_nokey: Dict::create(),
+            read_keys: Dict::create(),
+            watched_keys: Dict::create(),
             id,
             avg_ttl: 0,
             expires_cursor: 0,

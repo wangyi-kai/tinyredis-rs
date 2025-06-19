@@ -1,2 +1,2 @@
-mod db;
+pub mod db;
 mod lib;

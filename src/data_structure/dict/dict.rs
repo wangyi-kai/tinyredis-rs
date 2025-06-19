@@ -15,11 +15,12 @@ use std::mem;
 use std::ptr::NonNull;
 use std::sync::Arc;
 use std::time::Instant;
+use crate::server::RedisObject;
 
 #[derive(Default, Clone)]
 pub enum Value {
     #[default]
-    Val(Box<dyn Any>),
+    Val(RedisObject),
     U64(u64),
     S64(i64),
     F(f64),
@@ -102,7 +103,7 @@ where
     K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    pub dict_type: Arc<DictType<K, V>>,
+    //pub dict_type: Arc<DictType<K, V>>,
     /// dict table
     pub ht_table: Vec<Vec<Option<NonNull<DictEntry<K, V>>>>>,
     /// dict table used
@@ -123,10 +124,9 @@ where
     K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    pub fn create(dict_type: Arc<DictType<K, V>>) -> Self {
+    pub fn create() -> Self {
         unsafe {
             Self {
-                dict_type,
                 ht_table: vec![
                     vec![
                         Some(NonNull::new_unchecked(Box::into_raw(Box::new(

@@ -30,7 +30,7 @@ where
     V: Default + PartialEq + Clone,
 {
     flag: i32,
-    pub(crate) dtype: Arc<DictType<K, V>>,
+    //pub(crate) dtype: Arc<DictType<K, V>>,
     pub(crate) dicts: Vec<Option<NonNull<Dict<K, V>>>>,
     pub(crate) num_dicts: u64,
     num_dicts_bits: u64,
@@ -63,7 +63,7 @@ where
 {
     // num_dicts_bits is the log2 of the amount of dictionaries needed
     // (e.g. 0 for 1 dict, 3 for 8 dicts)
-    pub fn create(dict_type: Arc<DictType<K, V>>, num_dicts_bits: u64, flag: i32) -> Self {
+    pub fn create(num_dicts_bits: u64, flag: i32) -> Self {
         unsafe {
             assert!(num_dicts_bits <= 16);
             let mut kv_size = size_of::<Self>();
@@ -75,7 +75,7 @@ where
             let mut allocated_dicts = 0;
             if flag & KVSTORE_ALLOCATE_DICTS_ON_DEMAND != 0 {
                 for _ in 0..num_dicts {
-                    let d = Dict::create(dict_type.clone());
+                    let d = Dict::create();
                     dicts.push(Some(NonNull::new_unchecked(Box::into_raw(Box::new(d)))));
                     allocated_dicts += 1;
                 }
@@ -89,7 +89,6 @@ where
 
             Self {
                 flag,
-                dtype: dict_type.clone(),
                 dicts,
                 num_dicts: num_dicts as u64,
                 num_dicts_bits,
@@ -113,7 +112,7 @@ where
             return d;
         }
         unsafe {
-            let dict = Dict::create(self.dtype.clone());
+            let dict = Dict::create();
             self.dicts[didx as usize] = Some(NonNull::new_unchecked(Box::into_raw(Box::new(dict))));
             self.allocated_dicts += 1;
             self.dicts[didx as usize]
