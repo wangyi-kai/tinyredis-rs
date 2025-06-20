@@ -4,21 +4,19 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 #[derive(Debug)]
-pub struct EntryIter<'a, K, V>
+pub struct EntryIter<'a, V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    cur: Option<&'a DictEntry<K, V>>,
-    _boo: PhantomData<&'a (K, V)>,
+    cur: Option<&'a DictEntry<V>>,
+    _boo: PhantomData<&'a (V)>,
 }
 
-impl<K, V> DictEntry<K, V>
+impl<V> DictEntry<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    pub fn iter(&self) -> EntryIter<K, V> {
+    pub fn iter(&self) -> EntryIter<V> {
         EntryIter {
             cur: Some(self),
             _boo: PhantomData,
@@ -26,12 +24,11 @@ where
     }
 }
 
-impl<'a, K, V> Iterator for EntryIter<'a, K, V>
+impl<'a, V> Iterator for EntryIter<'a, V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    type Item = &'a DictEntry<K, V>;
+    type Item = &'a DictEntry<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(cur) = self.cur {
@@ -50,21 +47,19 @@ where
     }
 }
 
-pub struct DictIterator<'a, K, V>
+pub struct DictIterator<'a, V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    pub(crate) dict: Option<&'a mut Dict<K, V>>,
+    pub(crate) dict: Option<&'a mut Dict<V>>,
     pub(crate) table: usize,
     pub(crate) index: i64,
     pub(crate) safe: i64,
-    pub(crate) entry: Option<EntryIter<'a, K, V>>,
+    pub(crate) entry: Option<EntryIter<'a, V>>,
 }
 
-impl<'a, K, V> DictIterator<'a, K, V>
+impl<'a, V> DictIterator<'a, V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     pub fn reset(&mut self) {
@@ -76,12 +71,11 @@ where
     }
 }
 
-impl<'a, K, V> Dict<K, V>
+impl<'a, V> Dict<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    pub fn iter(&mut self) -> DictIterator<K, V> {
+    pub fn iter(&mut self) -> DictIterator<V> {
         DictIterator {
             dict: Some(self),
             table: 0,
@@ -91,7 +85,7 @@ where
         }
     }
 
-    pub fn safe_iter(&mut self) -> DictIterator<K, V> {
+    pub fn safe_iter(&mut self) -> DictIterator<V> {
         DictIterator {
             dict: Some(self),
             table: 0,
@@ -102,12 +96,11 @@ where
     }
 }
 
-impl<'a, K, V> Iterator for DictIterator<'a, K, V>
+impl<'a, V> Iterator for DictIterator<'a, V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
-    type Item = &'a DictEntry<K, V>;
+    type Item = &'a DictEntry<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {

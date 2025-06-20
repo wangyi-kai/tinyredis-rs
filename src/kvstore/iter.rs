@@ -4,23 +4,19 @@ use crate::kvstore::kvstore::KvStore;
 use std::hash::Hash;
 use std::ptr::NonNull;
 
-pub struct KvStoreIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+pub struct KvStoreIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
-    pub(crate) kvs: *mut KvStore<K, V>,
+    pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
     pub(crate) next_didx: i32,
-    pub(crate) di: Option<DictIterator<'a, K, V>>,
+    pub(crate) di: Option<DictIterator<'a, V>>,
 }
 
-impl<'a, K, V> KvStoreIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+impl<'a, V> KvStoreIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
-    pub fn next_dict(&mut self) -> Option<NonNull<Dict<K, V>>> {
+    pub fn next_dict(&mut self) -> Option<NonNull<Dict<V>>> {
         if self.next_didx == -1 {
             return None;
         }
@@ -52,12 +48,10 @@ where
     }
 }
 
-impl<'a, K, V> Iterator for KvStoreIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+impl<'a, V> Iterator for KvStoreIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
-    type Item = &'a DictEntry<K, V>;
+    type Item = &'a DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let mut de = if self.di.as_ref().unwrap().dict.is_some() {
@@ -85,28 +79,22 @@ where
     }
 }
 
-impl<'a, K, V> Drop for KvStoreIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+impl<'a, V> Drop for KvStoreIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
     fn drop(&mut self) {}
 }
 
-pub struct KvStoreDictIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+pub struct KvStoreDictIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
-    pub(crate) kvs: *mut KvStore<K, V>,
+    pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
-    pub(crate) di: Option<DictIterator<'a, K, V>>,
+    pub(crate) di: Option<DictIterator<'a, V>>,
 }
 
-impl<'a, K, V> KvStoreDictIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+impl<'a, V> KvStoreDictIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
     pub fn release_dict_iterator(&mut self) {
         unsafe {
@@ -118,12 +106,10 @@ where
     }
 }
 
-impl<'a, K, V> Iterator for KvStoreDictIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+impl<'a, V> Iterator for KvStoreDictIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
-    type Item = &'a DictEntry<K, V>;
+    type Item = &'a DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let d = (*self.kvs).get_dict(self.didx as usize);
@@ -135,10 +121,8 @@ where
     }
 }
 
-impl<'a, K, V> Drop for KvStoreDictIterator<'a, K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+impl<'a, V> Drop for KvStoreDictIterator<'a, V>
+where V: Default + PartialEq + Clone,
 {
     fn drop(&mut self) {}
 }

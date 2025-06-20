@@ -61,7 +61,7 @@ pub enum RedisValue {
     Set,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RedisObject {
     /// object type
     object_type: u32,

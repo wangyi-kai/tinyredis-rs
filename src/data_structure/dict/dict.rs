@@ -13,7 +13,6 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::mem;
 use std::ptr::NonNull;
-use std::sync::Arc;
 use std::time::Instant;
 use crate::server::RedisObject;
 
@@ -26,41 +25,30 @@ pub enum Value {
     F(f64),
 }
 
-impl Default for Value {
-    fn default() -> Self {
-        // 默认使用 Val 包装一个具体类型，比如 0u64
-        Value::Val(Box::new(0u64))
-    }
-}
-
-#[derive(Debug, Copy)]
-pub struct DictEntry<K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+#[derive(Debug, Clone)]
+pub struct DictEntry<V>
+where V: Default + PartialEq + Clone,
 {
-    pub(crate) key: K,
+    pub(crate) key: String,
     pub(crate) val: V,
-    pub(crate) next: Option<NonNull<DictEntry<K, V>>>,
+    pub(crate) next: Option<NonNull<DictEntry<V>>>,
 }
 
-impl<K, V> Default for DictEntry<K, V>
+impl<V> Default for DictEntry<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     fn default() -> Self {
         Self {
-            key: K::default(),
+            key: "".to_string(),
             val: V::default(),
             next: None,
         }
     }
 }
 
-impl<K, V> Clone for DictEntry<K, V>
+impl<V> Clone for DictEntry<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     fn clone(&self) -> Self {
@@ -72,9 +60,8 @@ where
     }
 }
 
-impl<K, V> PartialEq for DictEntry<K, V>
+impl<V> PartialEq for DictEntry<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -82,13 +69,12 @@ where
     }
 }
 
-impl<K, V> DictEntry<K, V>
+impl<V> DictEntry<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     #[inline]
-    pub fn get_key(&self) -> &K {
+    pub fn get_key(&self) -> &str {
         &self.key
     }
 
@@ -98,14 +84,13 @@ where
     }
 }
 
-pub struct Dict<K, V>
+pub struct Dict<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     //pub dict_type: Arc<DictType<K, V>>,
     /// dict table
-    pub ht_table: Vec<Vec<Option<NonNull<DictEntry<K, V>>>>>,
+    pub ht_table: Vec<Vec<Option<NonNull<DictEntry<V>>>>>,
     /// dict table used
     pub ht_used: Vec<u32>,
     /// rehashing not in progress if rehash_idx == -1
@@ -119,9 +104,8 @@ where
     pub metadata: Vec<Box<dyn Any>>,
 }
 
-impl<K, V> Dict<K, V>
+impl<V> Dict<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     pub fn create() -> Self {
@@ -146,7 +130,7 @@ where
         }
     }
 
-    pub fn scan(&mut self, mut v: u64, scan_fn: DictScanFunction<K, V>) -> u64 {
+    pub fn scan(&mut self, mut v: u64, scan_fn: DictScanFunction<V>) -> u64 {
         let mut ht_idx0 = 0;
         let mut ht_idx1 = 0;
         let mut m0 = 0;
@@ -208,7 +192,7 @@ where
         v
     }
 
-    pub unsafe fn find_position_for_insert(&mut self, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
+    pub unsafe fn find_position_for_insert(&mut self, key: &String) -> Option<NonNull<DictEntry<V>>> {
         let hash = sys_hash(&key);
         let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
         //Rehash the dict table if needed
@@ -239,7 +223,7 @@ where
     }
 
     #[inline]
-    pub fn add_raw(&mut self, key: K, val: V) -> Result<NonNull<DictEntry<K, V>>, HashError> {
+    pub fn add_raw(&mut self, key: String, val: V) -> Result<NonNull<DictEntry<V>>, HashError> {
         unsafe {
             let hash = sys_hash(&key);
             let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
@@ -280,7 +264,7 @@ where
         }
     }
 
-    pub fn add_non_exists_by_hash(&mut self, key: K, hash: u64) {
+    pub fn add_non_exists_by_hash(&mut self, key: String, hash: u64) {
         unsafe {
             let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
 
@@ -301,7 +285,7 @@ where
         }
     }
 
-    pub fn find_by_hash(&mut self, key: &K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn find_by_hash(&mut self, key: &String, hash: u64) -> Option<NonNull<DictEntry<V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -330,7 +314,7 @@ where
         None
     }
 
-    pub fn find(&mut self, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn find(&mut self, key: &String) -> Option<NonNull<DictEntry<V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -339,7 +323,7 @@ where
         self.find_by_hash(key, hash)
     }
 
-    pub fn fetch_value(&mut self, key: &K) -> Option<&V> {
+    pub fn fetch_value(&mut self, key: &String) -> Option<&V> {
         let he = self.find(key);
         unsafe {
             if he.is_some() {
@@ -351,8 +335,8 @@ where
 
     pub fn generic_delete(
         &mut self,
-        key: &K,
-    ) -> Result<Option<NonNull<DictEntry<K, V>>>, HashError> {
+        key: &String,
+    ) -> Result<Option<NonNull<DictEntry<V>>>, HashError> {
         unsafe {
             if self.dict_size() == 0 {
                 return Ok(None);
@@ -691,7 +675,7 @@ where
         self._clear(1, None);
     }
 
-    fn _clear(&mut self, ht_idx: usize, call_back: Option<fn(&mut Dict<K, V>)>) {
+    fn _clear(&mut self, ht_idx: usize, call_back: Option<fn(&mut Dict<V>)>) {
         unsafe {
             for i in 0..dict_size(self.ht_size_exp[ht_idx]) {
                 if self.ht_used[ht_idx] <= 0 {
@@ -715,7 +699,7 @@ where
         }
     }
 
-    pub fn empty(&mut self, call_back: Option<fn(&mut Dict<K, V>)>) {
+    pub fn empty(&mut self, call_back: Option<fn(&mut Dict<V>)>) {
         self._clear(0, call_back);
         self._clear(1, call_back);
 
@@ -724,7 +708,7 @@ where
         self.pause_auto_resize = 0;
     }
 
-    pub fn get_random_key(&mut self) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn get_random_key(&mut self) -> Option<NonNull<DictEntry<V>>> {
         unsafe {
             let mut he;
             if self.dict_size() == 0 {
@@ -776,7 +760,7 @@ where
         }
     }
 
-    pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry<V>>> {
         let mut entries = Vec::with_capacity(GETFAIR_NUM_ENTRIES);
         let count = GETFAIR_NUM_ENTRIES;
         let cnt = self.get_some_keys(&mut entries, count as u64);
@@ -790,7 +774,7 @@ where
 
     fn get_some_keys(
         &mut self,
-        des: &mut Vec<Option<NonNull<DictEntry<K, V>>>>,
+        des: &mut Vec<Option<NonNull<DictEntry<V>>>>,
         mut count: u64,
     ) -> u64 {
         let mut stored = 0;
@@ -861,7 +845,7 @@ where
         return if stored > count { stored } else { count };
     }
 
-    pub fn find_by_hash_and_ptr(&self, key: K, hash: u64) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn find_by_hash_and_ptr(&self, key: String, hash: u64) -> Option<NonNull<DictEntry<V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -894,9 +878,9 @@ where
 
     pub fn dict_two_phase_unlink_find(
         &mut self,
-        key: &K,
+        key: &String,
         table_index: &mut i32,
-    ) -> Option<NonNull<DictEntry<K, V>>> {
+    ) -> Option<NonNull<DictEntry<V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -930,8 +914,8 @@ where
 
     pub fn dict_two_phase_unlink_free(
         &mut self,
-        he: Option<NonNull<DictEntry<K, V>>>,
-        mut plink: Option<NonNull<DictEntry<K, V>>>,
+        he: Option<NonNull<DictEntry<V>>>,
+        mut plink: Option<NonNull<DictEntry<V>>>,
         table_index: usize,
     ) {
         if he.is_none() {
@@ -947,9 +931,8 @@ where
     }
 }
 
-impl<K, V> Dict<K, V>
+impl<V> Dict<V>
 where
-    K: Default + Clone + Eq + Hash,
     V: Default + PartialEq + Clone,
 {
     #[inline]
