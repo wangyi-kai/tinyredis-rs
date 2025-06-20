@@ -30,14 +30,14 @@ impl<T> Node<T> {
     }
 }
 
-pub struct List<T> {
+pub struct LinkList<T> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
     len: usize,
 }
 
-impl<T: PartialEq> List<T> {
-    pub fn create() -> List<T> {
+impl<T: PartialEq> LinkList<T> {
+    pub fn create() -> LinkList<T> {
         Self {
             head: None,
             tail: None,
@@ -179,7 +179,7 @@ pub struct Iter<'a, T> {
     _bool: PhantomData<&'a T>,
 }
 
-impl<T> List<T> {
+impl<T> LinkList<T> {
     pub fn iter(&self) -> Iter<T> {
         Iter {
             head: self.head,

@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod test {
-    use crate::data_structure::adlist::adlist::List;
+    use crate::data_structure::adlist::adlist::LinkList;
 
     #[test]
     fn list_insert() {
-        let mut list = List::create();
+        let mut list = LinkList::create();
         let num = 10;
 
         for i in 0..num {
@@ -24,7 +24,7 @@ mod test {
 
     #[test]
     fn list_delete() {
-        let mut list = List::create();
+        let mut list = LinkList::create();
         let num = 10;
 
         for i in 0..num {

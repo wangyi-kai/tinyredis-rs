@@ -4,9 +4,10 @@ use crate::data_structure::intset::intset::IntSet;
 use crate::data_structure::quicklist::quicklist::QuickList;
 use std::any::Any;
 use std::hash::Hash;
-
+use std::iter::Skip;
 use crate::data_structure::skiplist::skiplist::SkipList;
 use crate::data_structure::ziplist::ziplist::ZipList;
+use crate::data_structure::adlist::adlist::LinkList;
 
 /// A redis object, that is a type able to hold a string / list / set
 
@@ -53,16 +54,21 @@ const OBJ_SHARED_REFCOUNT: i32 = i32::MAX;
 const OBJ_STATIC_REFCOUNT: i32 = i32::MAX - 1;
 const OBJ_FIRST_SPECIAL_REFCOUNT: i32 = OBJ_STATIC_REFCOUNT;
 
-pub enum RedisValue {
+pub enum RedisValue<T> {
     String(String),
-    List,
-    Hash,
-    SortedSet,
-    Set,
+    List(ListObject<T>),
+    Hash(Dict<T>),
+    SortedSet(SkipList),
+    Set(IntSet),
+}
+
+pub enum ListObject<T> {
+    LinkList(LinkList<T>),
+    ZipList(ZipList),
 }
 
 #[derive(Default, Clone)]
-pub struct RedisObject {
+pub struct RedisObject<T> {
     /// object type
     object_type: u32,
     /// object encoding
@@ -72,11 +78,11 @@ pub struct RedisObject {
     /// object reference count
     ref_count: i32,
     /// actual object
-    pub ptr: Box<dyn Any>,
+    pub ptr: RedisValue<T>,
 }
 
-impl RedisObject {
-    fn create(object_type: u32, ptr: Box<dyn Any>) -> Self {
+impl<T> RedisObject<T> {
+    fn create(object_type: u32, ptr: RedisValue<T>) -> Self {
         Self {
             object_type,
             encoding: OBJ_ENCODING_RAW,
@@ -87,7 +93,8 @@ impl RedisObject {
     }
 
     fn create_raw_string_object(s: String) -> Self {
-        let s_object = Box::new(s);
+        //let s_object = Box::new(s);
+        let s_object = RedisValue::String(s);
         RedisObject::create(OBJ_STRING, s_object)
     }
 

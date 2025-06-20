@@ -1,4 +1,4 @@
-use crate::data_structure::adlist::adlist::{List, Node};
+use crate::data_structure::adlist::adlist::{LinkList, Node};
 use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::data_structure::dict::iter::DictIterator;
 use crate::data_structure::dict::lib::{entry_mem_usage, DictScanFunction, DictType};
@@ -34,7 +34,7 @@ where
     pub(crate) num_dicts: u64,
     num_dicts_bits: u64,
     /// List of dictionaries in this kvstore that are currently rehashing
-    pub rehashing: List<NonNull<Dict<V>>>,
+    pub rehashing: LinkList<NonNull<Dict<V>>>,
     /// Cron job uses this cursor to gradually resize dictionaries (only used if num_dicts > 1)
     resize_cursor: i32,
     /// The number of allocated dicts.
@@ -78,7 +78,7 @@ where
                     allocated_dicts += 1;
                 }
             }
-            let rehashing = List::create();
+            let rehashing = LinkList::create();
             let dict_size_index = if num_dicts > 1 {
                 vec![0; 8 * (1 + num_dicts)].to_vec()
             } else {
