@@ -580,13 +580,7 @@ where
         }
     }
 
-    pub fn dict_two_phase_unlink_free(
-        &mut self,
-        didx: i32,
-        he: Option<NonNull<DictEntry<V>>>,
-        plink: Option<NonNull<DictEntry<V>>>,
-        table_index: usize,
-    ) {
+    pub fn dict_two_phase_unlink_free(&mut self, didx: i32, he: Option<NonNull<DictEntry<V>>>, plink: Option<NonNull<DictEntry<V>>>, table_index: usize, ) {
         unsafe {
             let d = self.get_dict(didx as usize);
             (*d.unwrap().as_ptr()).dict_two_phase_unlink_free(he, plink, table_index);
@@ -595,7 +589,7 @@ where
         }
     }
 
-    pub fn dict_delete(&mut self, didx: i32, key: &String) -> Option<NonNull<DictEntry<V>>> {
+    pub fn dict_delete(&mut self, didx: i32, key: &str) -> Option<NonNull<DictEntry<V>>> {
         unsafe {
             let d = self.get_dict(didx as usize);
             if d.is_none() {

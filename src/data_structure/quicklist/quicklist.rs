@@ -177,7 +177,7 @@ pub struct QuickList {
     tail: Option<NonNull<QuickListNode>>,
     /// total count of all entries in all listpacks
     count: u64,
-    /// number of quicklistNodes
+    /// number of quicklist Nodes
     len: u64,
     /// fill factor for individual nodes
     fill: i32,

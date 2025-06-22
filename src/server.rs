@@ -58,7 +58,7 @@ pub enum RedisValue<T> {
     String(String),
     List(ListObject<T>),
     Hash(Dict<T>),
-    SortedSet(SkipList),
+    SortSet(SkipList),
     Set(IntSet),
 }
 
@@ -102,43 +102,44 @@ impl<T> RedisObject<T> {
         RedisObject::create_raw_string_object(s)
     }
 
-    pub fn create_quicklist_object(fill: i32, compress: i32) -> Self {
-        let l = QuickList::new(fill, compress);
-        let mut o = RedisObject::create(OBJ_LIST, Box::new(l));
-        o.encoding = OBJ_ENCODING_QUICKLIST;
-        o
-    }
+    // pub fn create_quicklist_object(fill: i32, compress: i32) -> Self {
+    //     let l = QuickList::new(fill, compress);
+    //     let mut o = RedisObject::create(OBJ_LIST, Box::new(l));
+    //     o.encoding = OBJ_ENCODING_QUICKLIST;
+    //     o
+    // }
 
-    pub fn create_set_object() -> Self {
-        let dict_type = DictType {
-            hash_function: None,
-            rehashing_started: None,
-            rehashing_completed: None,
-            dict_meta_data_bytes: None,
-        };
-        let d = Dict::create();
-        let mut o = RedisObject::create(OBJ_SET, Box::new(d));
+    // pub fn create_set_object() -> Self {
+    //     let d = Dict::create();
+    //     let mut o = RedisObject::create(OBJ_SET, RedisValue::S);
+    //     o.encoding = OBJ_ENCODING_HT;
+    //     o
+    // }
+
+    pub fn create_hash_object() -> Self<T> {
+        let ht = Dict::create();
+        let mut o = RedisObject::create(OBJ_HASH, RedisValue::Hash(ht));
         o.encoding = OBJ_ENCODING_HT;
         o
     }
 
-    pub fn create_inset_object() -> Self {
+    pub fn create_intset_object() -> Self<T> {
         let is = IntSet::new();
-        let mut o = RedisObject::create(OBJ_SET, Box::new(is));
+        let mut o = RedisObject::create(OBJ_SET, RedisValue::Set(is));
         o.encoding = OBJ_ENCODING_INTSET;
         o
     }
 
-    pub fn create_list_object() -> Self {
-        let l = ZipList::new();
-        let mut o = RedisObject::create(OBJ_LIST, Box::new(l));
+    pub fn create_list_object() -> Self<T> {
+        let z = ZipList::new();
+        let mut o = RedisObject::create(OBJ_LIST, RedisValue::List(ListObject::ZipList(z)));
         o.encoding = OBJ_ENCODING_HT;
         o
     }
 
-    pub fn create_skiplist_object() -> Self {
+    pub fn create_skiplist_object() -> Self<T> {
         let s = SkipList::new();
-        let mut o = RedisObject::create(OBJ_ZSET, Box::new(s));
+        let mut o = RedisObject::create(OBJ_ZSET, RedisValue::SortSet(s));
         o.encoding = OBJ_ENCODING_SKIPLIST;
         o
     }

@@ -1,10 +1,8 @@
 use crate::data_structure::dict::dict::{Dict, DictEntry, Value};
-use crate::data_structure::dict::lib::DictType;
 use crate::kvstore::kvstore::KvStore;
-use crate::server::RedisObject;
+use crate::server::{RedisObject, RedisValue};
 use std::hash::Hash;
 use std::ptr::NonNull;
-use std::sync::Arc;
 
 pub enum KeyStatus {
     KeyValid = 0,
@@ -12,24 +10,22 @@ pub enum KeyStatus {
     KeyDeleted,
 }
 
-pub struct RedisDb<K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+pub struct RedisDb<V>
+where V: Default + PartialEq + Clone,
 {
     /// The keyspace for this DB. As metadata, holds key sizes histogram
-    keys: KvStore<K, V>,
+    keys: KvStore<V>,
     /// Timeout of keys with a timeout set
-    expires: KvStore<K, V>,
+    expires: KvStore<V>,
     /// Keys with clients waiting for data (BLPOP)
-    blocking_keys: Dict<K, V>,
+    blocking_keys: Dict<V>,
     /// Keys with clients waiting for data,
     /// and should be unblocked if key is deleted (XREADEDGROUP)
-    blocking_keys_unblock_on_nokey: Dict<K, V>,
+    blocking_keys_unblock_on_nokey: Dict<V>,
     /// Blocked keys that received a PUSH
-    read_keys: Dict<K, V>,
+    read_keys: Dict<V>,
     /// WATCHED keys for MULTI/EXEC CAS
-    watched_keys: Dict<K, V>,
+    watched_keys: Dict<V>,
     /// Database ID
     id: i32,
     /// Average TTL, just for stats
@@ -38,16 +34,14 @@ where
     expires_cursor: u64,
 }
 
-impl<K, V> RedisDb<K, V>
-where
-    K: Default + Clone + Eq + Hash,
-    V: Default + PartialEq + Clone,
+impl<V> RedisDb<V>
+where V: Default + PartialEq + Clone,
 {
     pub fn create(
         slot_count_bits: u64,
         flag: i32,
         id: i32,
-    ) -> Self<K, V> {
+    ) -> Self<V> {
         Self {
             keys: KvStore::create(slot_count_bits, flag),
             expires: KvStore::create(slot_count_bits, flag),
@@ -60,44 +54,55 @@ where
             expires_cursor: 0,
         }
     }
-    pub fn find(&self, key: &K) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn find(&self, key: &String) -> Option<NonNull<DictEntry<V>>> {
         self.keys.dict_find(0, key)
     }
 
-    pub fn add(&mut self, key: RedisObject, val: RedisObject) -> Option<NonNull<DictEntry<K, V>>> {
+    pub fn add(&mut self, key: RedisObject<String>, val: RedisObject<V>) -> Option<NonNull<DictEntry<V>>> {
         self.add_internal(key, val, 0)
     }
 
     fn add_internal(
         &mut self,
-        key: RedisObject,
-        val: RedisObject,
+        key: RedisObject<String>,
+        val: RedisObject<V>,
         update_if_exist: i32,
-    ) -> Option<NonNull<DictEntry<K, V>>> {
+    ) -> Option<NonNull<DictEntry<V>>> {
         let slot = 0;
-        let de = self.keys.dict_add_raw(slot, key.ptr);
+        let key = match key.ptr {
+            RedisValue::String(s) => s,
+            _ => { "".to_string() }
+        };
+        let de = self.keys.add(slot, key, val);
         de
     }
 
-    fn generic_delete(&mut self, key: &RedisObject) {
-        let mut table = 0;
+    fn generic_delete(&mut self, key: &RedisObject<String>) {
         let slot = 0;
-        let de = self.keys.dict_delete(slot, &key.ptr as K);
+        let key = match &key.ptr {
+            RedisValue::String(s) => s,
+            _ => { "" }
+        };
+        let de = self.keys.dict_delete(slot, key);
         if de.is_some() {
-            self.expires.dict_delete(slot, &key.ptr as K);
+            self.expires.dict_delete(slot, key);
         }
     }
 
     fn set_val(
         &mut self,
-        key: RedisObject,
-        val: RedisObject,
+        key: RedisObject<String>,
+        val: RedisObject<V>,
         overwrite: i32,
-        mut de: Option<NonNull<DictEntry<K, Value>>>,
+        mut de: Option<NonNull<DictEntry<V>>>,
     ) {
         let slot = 0;
+        let key = match key.ptr {
+            RedisValue::String(s) => s,
+            _ => { "".to_string() }
+        };
         if de.is_some() {
-            de = self.keys.dict_find(slot, key.ptr as K);
+            de = self.keys.dict_find(slot, &key);
         }
         unsafe {
             let old = (*de.unwrap().as_ptr()).get_val();

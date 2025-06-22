@@ -17,9 +17,9 @@ use std::time::Instant;
 use crate::server::RedisObject;
 
 #[derive(Default, Clone)]
-pub enum Value {
+pub enum Value<T> {
     #[default]
-    Val(RedisObject),
+    Val(RedisObject<T>),
     U64(u64),
     S64(i64),
     F(f64),
@@ -335,7 +335,7 @@ where
 
     pub fn generic_delete(
         &mut self,
-        key: &String,
+        key: &str,
     ) -> Result<Option<NonNull<DictEntry<V>>>, HashError> {
         unsafe {
             if self.dict_size() == 0 {
