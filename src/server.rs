@@ -55,7 +55,7 @@ const OBJ_STATIC_REFCOUNT: i32 = i32::MAX - 1;
 const OBJ_FIRST_SPECIAL_REFCOUNT: i32 = OBJ_STATIC_REFCOUNT;
 
 pub enum RedisValue<T> {
-    String(String),
+    String(T),
     List(ListObject<T>),
     Hash(Dict<T>),
     SortSet(SkipList),
@@ -72,7 +72,7 @@ pub struct RedisObject<T> {
     /// object type
     object_type: u32,
     /// object encoding
-    encoding: u32,
+    pub encoding: u32,
     /// object last visit time
     lru: u32,
     /// object reference count
@@ -116,7 +116,7 @@ impl<T> RedisObject<T> {
     //     o
     // }
 
-    pub fn create_hash_object() -> Self<T> {
+    pub fn create_hash_object() -> Self {
         let ht = Dict::create();
         let mut o = RedisObject::create(OBJ_HASH, RedisValue::Hash(ht));
         o.encoding = OBJ_ENCODING_HT;

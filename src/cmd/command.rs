@@ -1,4 +1,4 @@
-
+use crate::cmd::hash::HashCmd;
 
 pub enum RedisCommand {
     Connection(ConnCmd),
@@ -26,17 +26,6 @@ pub enum ConnCmd {
     Reset,
     /// Changes the selected database
     Select,
-}
-
-pub enum HashCmd {
-    /// Deletes one or more fields and their values from a hash.
-    HDel,
-    /// Returns the value of a field in a hash
-    HGet,
-    /// Creates or modifies the value of a field in a hash
-    HSet,
-    /// Iterates over fields and values of a hash
-    HScan,
 }
 
 pub enum ListCmd {

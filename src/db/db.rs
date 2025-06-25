@@ -54,11 +54,27 @@ where V: Default + PartialEq + Clone,
             expires_cursor: 0,
         }
     }
-    pub fn find(&self, key: &String) -> Option<NonNull<DictEntry<V>>> {
+    pub fn lookup_key<K>(&self, key: &RedisObject<K>) -> Option<&mut V> {
+        let k = match &key.ptr {
+            RedisValue::String(s) => s,
+            _ => return None,
+        };
+
+        let mut de = self.keys.dict_find(0, k);
+        unsafe {
+            if de.is_none() {
+                return None;
+            }
+            let val = (*de.unwrap().as_ptr()).get_val();
+            Some(val)
+        }
+    }
+
+    pub fn find(&self, key: &str) -> Option<NonNull<DictEntry<V>>> {
         self.keys.dict_find(0, key)
     }
 
-    pub fn add(&mut self, key: RedisObject<String>, val: RedisObject<V>) -> Option<NonNull<DictEntry<V>>> {
+    pub fn add(&mut self, key: RedisObject<String>, val: V) -> Option<NonNull<DictEntry<V>>> {
         self.add_internal(key, val, 0)
     }
 

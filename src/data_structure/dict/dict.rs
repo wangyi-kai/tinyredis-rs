@@ -20,6 +20,7 @@ use crate::server::RedisObject;
 pub enum Value<T> {
     #[default]
     Val(RedisObject<T>),
+    Sds(String),
     U64(u64),
     S64(i64),
     F(f64),
@@ -35,21 +36,19 @@ where V: Default + PartialEq + Clone,
 }
 
 impl<V> Default for DictEntry<V>
-where
-    V: Default + PartialEq + Clone,
+where V: Default + PartialEq + Clone,
 {
     fn default() -> Self {
         Self {
             key: "".to_string(),
-            val: V::default(),
+            val: "".to_string(),
             next: None,
         }
     }
 }
 
 impl<V> Clone for DictEntry<V>
-where
-    V: Default + PartialEq + Clone,
+where V: Default + PartialEq + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -61,8 +60,7 @@ where
 }
 
 impl<V> PartialEq for DictEntry<V>
-where
-    V: Default + PartialEq + Clone,
+where V: Default + PartialEq + Clone,
 {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.val == other.val
@@ -70,8 +68,7 @@ where
 }
 
 impl<V> DictEntry<V>
-where
-    V: Default + PartialEq + Clone,
+where V: Default + PartialEq + Clone,
 {
     #[inline]
     pub fn get_key(&self) -> &str {
@@ -79,8 +76,8 @@ where
     }
 
     #[inline]
-    pub fn get_val(&self) -> V {
-        &self.val
+    pub fn get_val(&mut self) -> &mut V {
+        &mut self.val
     }
 }
 
@@ -285,7 +282,7 @@ where
         }
     }
 
-    pub fn find_by_hash(&mut self, key: &String, hash: u64) -> Option<NonNull<DictEntry<V>>> {
+    pub fn find_by_hash(&mut self, key: &str, hash: u64) -> Option<NonNull<DictEntry<V>>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -314,7 +311,7 @@ where
         None
     }
 
-    pub fn find(&mut self, key: &String) -> Option<NonNull<DictEntry<V>>> {
+    pub fn find(&mut self, key: &str) -> Option<NonNull<DictEntry<V>>> {
         if self.dict_size() == 0 {
             return None;
         }

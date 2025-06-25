@@ -536,7 +536,7 @@ where
         }
     }
 
-    pub fn dict_find(&self, didx: i32, key: &String) -> Option<NonNull<DictEntry<V>>> {
+    pub fn dict_find(&self, didx: i32, key: &str) -> Option<NonNull<DictEntry<V>>> {
         let d = self.get_dict(didx as usize);
         if d.is_none() {
             return None;
