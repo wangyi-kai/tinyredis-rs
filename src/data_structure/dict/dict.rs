@@ -14,7 +14,7 @@ use std::hash::Hash;
 use std::mem;
 use std::ptr::NonNull;
 use std::time::Instant;
-use crate::server::RedisObject;
+use crate::object::RedisObject;
 
 #[derive(Default, Clone)]
 pub enum Value<T> {
@@ -82,8 +82,7 @@ where V: Default + PartialEq + Clone,
 }
 
 pub struct Dict<V>
-where
-    V: Default + PartialEq + Clone,
+where V: Default + PartialEq + Clone,
 {
     //pub dict_type: Arc<DictType<K, V>>,
     /// dict table
@@ -102,8 +101,7 @@ where
 }
 
 impl<V> Dict<V>
-where
-    V: Default + PartialEq + Clone,
+where V: Default + PartialEq + Clone,
 {
     pub fn create() -> Self {
         unsafe {

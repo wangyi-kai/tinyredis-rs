@@ -1,38 +1,55 @@
 use crate::data_structure::dict::dict::Value;
 use crate::db::db::RedisDb;
-use crate::server::{OBJ_ENCODING_HT, RedisObject, RedisValue};
+use crate::object::{OBJ_ENCODING_HT, RedisObject, RedisValue};
+use crate::parser::frame::Frame;
 
 pub enum HashCmd {
     /// Creates or modifies the value of a field in a hash
-    HSet { key: String, value: String},
+    HSet { key: String, field: String, value: String},
     /// Returns the value of a field in a hash
-    HGet { key: String },
+    HGet { key: String, field: String },
     /// Deletes one or more fields and their values from a hash.
-    HDel { key: String },
+    HDel { key: String, field: String },
     /// Iterates over fields and values of a hash
     HScan,
 }
 
 impl HashCmd {
-    pub fn set(&self, db: &mut RedisDb<RedisObject<String>>, key: RedisObject<String>) {
-        let mut o = db.lookup_key(&key);
-        if o.is_none() {
-            let mut ht = RedisObject::create_hash_object();
-            match self {
-                HashCmd::HSet {key, value} => Self::hash_set(&mut ht, key.clone(), value.clone()),
-                _ => return
-            }
-            db.add(key, ht);
-        }
-
+    pub fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
         match self {
-            HashCmd::HSet {key, value} => {
-                Self::hash_set(o.unwrap(), key.clone(), value.clone());
+            HashCmd::HGet {key, field} => {
+                let key = RedisObject::create_string_object(key);
+                let mut o = db.lookup_key(&key);
+                if o.is_some() {
+                    let val = Self::hash_get(o.unwrap(), &field);
+                    Ok(Frame::Bulk(val.clone().into()))
+                } else {
+                    Ok(Frame::Null)
+                }
             }
-            _ => return
+            HashCmd::HDel {key, field} => {
+                let key = RedisObject::create_string_object(key);
+                let mut o = db.lookup_key(&key);
+                if o.is_some() {
+                    Self::hash_delete(o.unwrap(), &field);
+                }
+                Ok(Frame::Simple("ok".to_string()))
+            }
+            HashCmd::HSet {key, field, value} => {
+                let key = RedisObject::create_string_object(key);
+                let mut o = db.lookup_key(&key);
+                if o.is_none() {
+                    let mut ht = RedisObject::create_hash_object();
+                    Self::hash_set(&mut ht, field, value);
+                    db.add(key, ht);
+                } else {
+                    Self::hash_set(o.unwrap(), field, value);
+                }
+                Ok(Frame::Simple("ok".to_string()))
+            }
+            HashCmd::HScan => todo!()
         }
     }
-
 
     fn hash_set(o: &mut RedisObject<String>, field: String, value: String) {
         if o.encoding == OBJ_ENCODING_HT {
@@ -48,19 +65,12 @@ impl HashCmd {
                     ht.add_raw(field, value).ok();
                 }
             }
+        } else {
+            todo!()
         }
     }
 
-    pub fn get(&self, db: &mut RedisDb<RedisObject<String>>, key: &RedisObject<String>, field: &str) -> Option<&str> {
-        let mut o = db.lookup_key(&key);
-        if o.is_none() {
-            return None;
-        }
-        let val = Self::get_value(o.unwrap(), field);
-        Some(val)
-    }
-
-    fn get_value(o: &mut RedisObject<String>, field: &str) -> &'static str {
+    fn hash_get(o: &mut RedisObject<String>, field: &str) -> &'static str {
         if o.encoding == OBJ_ENCODING_HT {
             let de = match &mut o.ptr {
                 RedisValue::Hash(ht) => ht.find(&field),
@@ -71,20 +81,7 @@ impl HashCmd {
                 value
             }
         } else {
-            &"".to_string()
-        }
-    }
-
-    pub fn delete(&self, db: &mut RedisDb<RedisObject<String>>, key: &RedisObject<String>) {
-        let mut o = db.lookup_key(&key);
-        if o.is_none() {
-            return;
-        }
-        match self {
-            HashCmd::HDel { key} => {
-                Self::hash_delete(o.unwrap(), &key);
-            }
-            _ => {}
+            todo!()
         }
     }
 

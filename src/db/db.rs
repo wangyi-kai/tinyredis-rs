@@ -1,8 +1,11 @@
 use crate::data_structure::dict::dict::{Dict, DictEntry, Value};
 use crate::kvstore::kvstore::KvStore;
-use crate::server::{RedisObject, RedisValue};
+use crate::object::{RedisObject, RedisValue};
 use std::hash::Hash;
 use std::ptr::NonNull;
+
+use tokio::sync::mpsc;
+use crate::cmd::command::RedisCommand;
 
 pub enum KeyStatus {
     KeyValid = 0,
@@ -32,6 +35,8 @@ where V: Default + PartialEq + Clone,
     avg_ttl: i64,
     /// Cursor of the active expire cycle
     expires_cursor: u64,
+    pub(crate) sender: crate::MpscSender,
+    receiver: crate::MpscReceiver,
 }
 
 impl<V> RedisDb<V>
@@ -42,6 +47,7 @@ where V: Default + PartialEq + Clone,
         flag: i32,
         id: i32,
     ) -> Self<V> {
+        let (sender, receiver) = mpsc::channel(1024);
         Self {
             keys: KvStore::create(slot_count_bits, flag),
             expires: KvStore::create(slot_count_bits, flag),
@@ -52,8 +58,23 @@ where V: Default + PartialEq + Clone,
             id,
             avg_ttl: 0,
             expires_cursor: 0,
+            sender,
+            receiver,
         }
     }
+
+    pub async fn run(&mut self) {
+        while let Some((sender, command)) = self.receiver.recv().await {
+            let frame = match command {
+                RedisCommand::Hash(cmd) => {
+                    cmd.apply(self)
+                }
+                _ => Err("Error".into())
+            };
+            let _ = sender.send(frame);
+        }
+    }
+
     pub fn lookup_key<K>(&self, key: &RedisObject<K>) -> Option<&mut V> {
         let k = match &key.ptr {
             RedisValue::String(s) => s,

@@ -1,29 +1,42 @@
-use std::future::Future;
-use std::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::cmd::command::RedisCommand;
 use crate::db::db::RedisDb;
+use crate::kvstore::KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
+use crate::parser::frame::Frame;
 
-pub struct DbEngine {
-    sender: Sender<RedisCommand>,
+#[derive(Debug)]
+pub struct DbHandle {
+    sender: Vec<crate::MpscSender>,
 }
 
-impl DbEngine {
-    pub fn new(slot_count_bits: u64, flag: i32, id: i32) -> Self {
-        let db = RedisDb::create(slot_count_bits, flag, id);
-        let (sender, mut receiver) = std::sync::mpsc::channel::<RedisCommand>();
-
-        loop {
-            match receiver.recv() {
-                _ => {}
-            }
+impl DbHandle {
+    pub async fn new(db_num: u32) -> Self {
+        let slot_count_bits = 0;
+        let flag = KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
+        let mut db_list = vec![];
+        let mut sender_list = vec![];
+        for i in db_num {
+            let db = RedisDb::create(slot_count_bits, flag, i);
+            db_list.push(db);
+            sender_list.push(db.sender.clone());
+        }
+        for mut db in db_list {
+            tokio::spawn(async move {
+                db.run().await
+            });
         }
 
         Self {
-            sender,
+            sender: sender_list
         }
     }
 
-    pub fn
+    pub fn get_sender(&self, idx: usize) -> Option<crate::MpscSender> {
+        self.sender.get(idx).map(|item| item.clone())
+    }
+
+    pub fn get_size(&self) -> usize {
+        self.sender.len()
+    }
 }
