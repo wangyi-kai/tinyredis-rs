@@ -9,8 +9,6 @@ mod db;
 mod kvstore;
 mod object;
 mod parser;
-mod connection;
-mod listen;
 mod db_engine;
 mod cmd;
 mod client;

@@ -1,11 +1,12 @@
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::Semaphore;
+use tokio::sync::{mpsc, Semaphore};
 use tokio::time;
 use tracing::{debug, error, info};
-use crate::connection::Connection;
-use crate::db_engine::DbHandle;
+
+use crate::server::connection::Connection;
+use crate::db_engine::DbHandler;
 
 const MAX_CONNECTIONS: usize = 250;
 
@@ -13,7 +14,7 @@ const MAX_CONNECTIONS: usize = 250;
 struct Listener {
     listener: TcpListener,
     limit_connections: Arc<Semaphore>,
-    db_handle: Arc<DbHandle>,
+    db_handle: Arc<DbHandler>,
 }
 
 impl Listener {
@@ -42,6 +43,26 @@ impl Listener {
             }
             time::sleep(Duration::from_secs(backoff)).await;
             backoff *= 2;
+        }
+    }
+}
+
+struct Handler {
+    connection: Connection,
+    limit_connections: Arc<Semaphore>,
+    _shutdown_complete: mpsc::Sender<()>,
+    db_sender: crate::MpscSender,
+    db_handler: Arc<DbHandler>,
+}
+
+impl Handler {
+    async fn run(&mut self) -> crate::Result<()> {
+        loop {
+            let frame = tokio::select! {
+                res = self.connection.read_frame() => res?,
+                _ =
+            };
+
         }
     }
 }

@@ -6,11 +6,11 @@ use crate::kvstore::KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
 use crate::parser::frame::Frame;
 
 #[derive(Debug)]
-pub struct DbHandle {
+pub struct DbHandler {
     sender: Vec<crate::MpscSender>,
 }
 
-impl DbHandle {
+impl DbHandler {
     pub async fn new(db_num: u32) -> Self {
         let slot_count_bits = 0;
         let flag = KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
