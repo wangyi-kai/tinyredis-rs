@@ -1,3 +1,5 @@
+use crate::cmd::command::{get_command_name, RedisCommand};
+use crate::cmd::error::CommandError;
 use crate::data_structure::dict::dict::Value;
 use crate::db::db::RedisDb;
 use crate::object::{OBJ_ENCODING_HT, RedisObject, RedisValue};
@@ -15,6 +17,28 @@ pub enum HashCmd {
 }
 
 impl HashCmd {
+    pub fn from_frame(command_name: &str, frame: Frame) -> Result<HashCmd, CommandError> {
+        let len = frame.get_len();
+        match command_name {
+            "hset" => {
+                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
+                let field = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
+                let value = frame.get_frame_by_index(3).ok_or("command error 'set'")?.to_string();
+                Ok(HashCmd::HSet {key, field, value})
+            },
+            "hget" => {
+                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
+                let field = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
+                Ok(HashCmd::HGet {key, field})
+            },
+            "hdel" => {
+                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
+                let field = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
+                Ok(HashCmd::HDel {key, field})
+            },
+            _ => Err(CommandError::ParseError(-1))
+    }
+}
     pub fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
         match self {
             HashCmd::HGet {key, field} => {

@@ -1,4 +1,6 @@
+use crate::cmd::error::CommandError;
 use crate::cmd::hash::HashCmd;
+use crate::parser::frame::Frame;
 
 pub enum RedisCommand {
     Connection(ConnCmd),
@@ -7,6 +9,17 @@ pub enum RedisCommand {
     Set(SetCmd),
     SortSet(SortedCmd),
     Hash(HashCmd),
+}
+
+impl RedisCommand {
+    pub fn from_frame(frame: Frame) -> crate::Result<RedisCommand> {
+        let cmd_name = get_command_name(&frame).ok().unwrap().to_lowercase();
+        let command = match &cmd_name[..] {
+            "hset" | "hget" | "hdel" => RedisCommand::Hash(HashCmd::from_frame(&cmd_name, frame)?),
+            _ => return Err(CommandError::ParseError(-101).into()),
+        };
+        Ok(command)
+    }
 }
 
 pub enum ConnCmd {
@@ -94,4 +107,15 @@ pub enum StringCmd {
     Decr,
     /// Decrements a number from the integer value of a key
     DecrBy,
+}
+
+pub fn get_command_name(frame: &Frame) -> crate::Result<String> {
+    match frame.get_frame_by_index(0).ok_or("frame is empty") {
+        Frame::Simple(s) => Ok(s.clone()),
+        Frame::Bulk(bytes) => {
+            let str = std::str::from_utf8(&bytes[..])?;
+            Ok(String::from(str))
+        }
+        _ => Err("frame is error type".into()),
+    }
 }
