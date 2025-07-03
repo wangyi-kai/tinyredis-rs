@@ -1,3 +1,3 @@
 pub mod connection;
-mod server;
+pub mod server;
 mod shutdown;

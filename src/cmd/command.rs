@@ -2,6 +2,7 @@ use crate::cmd::error::CommandError;
 use crate::cmd::hash::HashCmd;
 use crate::parser::frame::Frame;
 
+#[allow(dead_code)]
 pub enum RedisCommand {
     Connection(ConnCmd),
     String(StringCmd),
@@ -22,6 +23,7 @@ impl RedisCommand {
     }
 }
 
+#[allow(dead_code)]
 pub enum ConnCmd {
     /// Authenticates the connection
     Auth,
@@ -41,6 +43,7 @@ pub enum ConnCmd {
     Select,
 }
 
+#[allow(dead_code)]
 pub enum ListCmd {
     /// Prepends one or more elements to a list. Creates the key if it doesn't exist
     LPush,
@@ -58,6 +61,7 @@ pub enum ListCmd {
     LLen,
 }
 
+#[allow(dead_code)]
 pub enum SetCmd {
     /// Returns the number of members in a set
     SCard,
@@ -73,6 +77,7 @@ pub enum SetCmd {
     SInterCard,
 }
 
+#[allow(dead_code)]
 pub enum SortedCmd {
     /// Adds one or more members to a sorted set, or updates their scores.
     ZAdd,
@@ -89,7 +94,7 @@ pub enum SortedCmd {
     /// Stores the intersect of multiple sorted sets in a key
     ZInterStore,
 }
-
+#[allow(dead_code)]
 pub enum StringCmd {
     /// Appends a string to the value of a key. Creates the key if it doesn't exist
     Append,

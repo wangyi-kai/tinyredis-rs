@@ -77,6 +77,7 @@ pub struct RedisObject<T> {
     pub ptr: RedisValue<T>,
 }
 
+#[allow(dead_code)]
 impl<T> RedisObject<T> {
     fn create(object_type: u32, ptr: RedisValue<T>) -> Self {
         Self {

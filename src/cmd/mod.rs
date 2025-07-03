@@ -1,3 +1,3 @@
 pub mod command;
-mod hash;
+pub(crate) mod hash;
 mod error;

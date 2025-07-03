@@ -30,8 +30,8 @@ mod kvstore_test {
         };
         let dict_type = Arc::new(dict_type);
 
-        let mut kvs1 = KvStore::create(0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND);
-        let mut kvs2 = KvStore::create(
+        let mut kvs1: KvStore<String> = KvStore::create(0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND);
+        let mut kvs2: KvStore<String> = KvStore::create(
             0,
             KVSTORE_ALLOCATE_DICTS_ON_DEMAND | KVSTORE_FREE_EMPTY_DICTS,
         );
@@ -142,7 +142,7 @@ mod kvstore_test {
         print!("[TEST] Verify that a rehashing dict's node in the rehashing list is correctly updated after defragmentation: ");
         {
             let cursor = 0;
-            let mut kvs = KvStore::create(0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND);
+            let mut kvs: KvStore<String> = KvStore::create(0, KVSTORE_ALLOCATE_DICTS_ON_DEMAND);
             for i in 0..256 {
                 let de = kvs.dict_add_raw(0, string_from_int(i));
                 if kvs.rehashing.length() != 0 {
@@ -155,7 +155,7 @@ mod kvstore_test {
 
         print!("[TEST] Verify non-empty dict count is correctly updated: ");
         {
-            let mut kvs = KvStore::create(2,
+            let mut kvs:KvStore<String> = KvStore::create(2,
                 KVSTORE_ALLOCATE_DICTS_ON_DEMAND | KVSTORE_ALLOC_META_KEYS_HIST,
             );
             for idx in 0..4 {

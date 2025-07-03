@@ -72,6 +72,11 @@ impl<V> DictEntry<V>
     pub fn get_val(&mut self) -> &mut V {
         self.val.as_mut().unwrap()
     }
+
+    #[inline]
+    pub fn value(&self) -> &V {
+        self.val.as_ref().unwrap()
+    }
 }
 
 unsafe impl<V: Send> Send for Dict<V> {}

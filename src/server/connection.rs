@@ -1,6 +1,6 @@
 use crate::parser::frame::Frame;
 
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::{Buf, BytesMut};
 use std::io::{self, Cursor};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};

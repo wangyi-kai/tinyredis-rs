@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use crate::cmd::command::{get_command_name, RedisCommand};
 use crate::cmd::error::CommandError;
 use crate::data_structure::dict::dict::Value;
@@ -5,6 +6,7 @@ use crate::db::db::RedisDb;
 use crate::object::{OBJ_ENCODING_HT, RedisObject, RedisValue};
 use crate::parser::frame::Frame;
 
+#[derive(Debug)]
 pub enum HashCmd {
     /// Creates or modifies the value of a field in a hash
     HSet { key: String, field: String, value: String},
@@ -17,6 +19,31 @@ pub enum HashCmd {
 }
 
 impl HashCmd {
+    pub fn into_frame(self) -> Frame {
+        let mut frame = Frame::Array(vec![]);
+        match self {
+            HashCmd::HSet { key, field, value } => {
+                frame.push_bulk(Bytes::from("hset".as_bytes()));
+                frame.push_bulk(Bytes::from(key.into_bytes()));
+                frame.push_bulk(Bytes::from(field.into_bytes()));
+                frame.push_bulk(Bytes::from(value.into_bytes()));
+                frame
+            }
+            HashCmd::HGet { key, field } => {
+                frame.push_bulk(Bytes::from("hget".as_bytes()));
+                frame.push_bulk(Bytes::from(key.into_bytes()));
+                frame.push_bulk(Bytes::from(field.into_bytes()));
+                frame
+            }
+            HashCmd::HDel { key, field } => {
+                frame.push_bulk(Bytes::from("hdel".as_bytes()));
+                frame.push_bulk(Bytes::from(key.into_bytes()));
+                frame.push_bulk(Bytes::from(field.into_bytes()));
+                frame
+            }
+            HashCmd::HScan => Frame::Null
+        }
+    }
     pub fn from_frame(command_name: &str, frame: Frame) -> crate::Result<HashCmd> {
         let len = frame.get_len();
         match command_name {
@@ -46,7 +73,7 @@ impl HashCmd {
                 let mut o = db.lookup_key(&key);
                 if o.is_some() {
                     let val = Self::hash_get(o.unwrap(), &field);
-                    Ok(Frame::Bulk(val.clone().into()))
+                    Ok(Frame::Bulk(val.into()))
                 } else {
                     Ok(Frame::Null)
                 }
@@ -122,5 +149,29 @@ impl HashCmd {
         } else {
             deleted
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::cmd::command::get_command_name;
+    use crate::cmd::hash::HashCmd;
+    use crate::parser::frame::Frame;
+
+    #[test]
+    fn cmd_to_frame() -> crate::Result<()> {
+        let mut cmd = HashCmd::HSet {
+            key: "hello".to_string(),
+            field: "world1".to_string(),
+            value: "world2".to_string(),
+        };
+        let frame = cmd.into_frame();
+        //println!("frame {}", frame);
+
+        let cmd_type = get_command_name(&frame)?;
+        let cmd = HashCmd::from_frame(&cmd_type, frame)?;
+
+        println!("cmd_type:{} cmd:{:?}", cmd_type, cmd);
+        Ok(())
     }
 }
