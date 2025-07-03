@@ -622,7 +622,7 @@ mod test {
 
             for i in 0..iteration {
                 let mut zl = ZipList::new();
-                let mut list = List::create();
+                let mut list = LinkList::create();
                 let len = rand::rng().random::<u32>() % 256;
 
                 for j in 0..len {

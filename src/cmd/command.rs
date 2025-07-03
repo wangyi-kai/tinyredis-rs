@@ -110,7 +110,7 @@ pub enum StringCmd {
 }
 
 pub fn get_command_name(frame: &Frame) -> crate::Result<String> {
-    match frame.get_frame_by_index(0).ok_or("frame is empty") {
+    match frame.get_frame_by_index(0).ok_or("frame is empty")? {
         Frame::Simple(s) => Ok(s.clone()),
         Frame::Bulk(bytes) => {
             let str = std::str::from_utf8(&bytes[..])?;

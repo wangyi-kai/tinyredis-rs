@@ -17,7 +17,7 @@ pub enum HashCmd {
 }
 
 impl HashCmd {
-    pub fn from_frame(command_name: &str, frame: Frame) -> Result<HashCmd, CommandError> {
+    pub fn from_frame(command_name: &str, frame: Frame) -> crate::Result<HashCmd> {
         let len = frame.get_len();
         match command_name {
             "hset" => {
@@ -36,13 +36,13 @@ impl HashCmd {
                 let field = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
                 Ok(HashCmd::HDel {key, field})
             },
-            _ => Err(CommandError::ParseError(-1))
+            _ => Err(CommandError::ParseError(-1).into())
     }
 }
     pub fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
         match self {
             HashCmd::HGet {key, field} => {
-                let key = RedisObject::create_string_object(key);
+                let key = RedisObject::<String>::create_string_object(key);
                 let mut o = db.lookup_key(&key);
                 if o.is_some() {
                     let val = Self::hash_get(o.unwrap(), &field);
@@ -52,7 +52,7 @@ impl HashCmd {
                 }
             }
             HashCmd::HDel {key, field} => {
-                let key = RedisObject::create_string_object(key);
+                let key = RedisObject::<String>::create_string_object(key);
                 let mut o = db.lookup_key(&key);
                 if o.is_some() {
                     Self::hash_delete(o.unwrap(), &field);
@@ -60,10 +60,10 @@ impl HashCmd {
                 Ok(Frame::Simple("ok".to_string()))
             }
             HashCmd::HSet {key, field, value} => {
-                let key = RedisObject::create_string_object(key);
+                let key = RedisObject::<String>::create_string_object(key);
                 let mut o = db.lookup_key(&key);
                 if o.is_none() {
-                    let mut ht = RedisObject::create_hash_object();
+                    let mut ht = RedisObject::<String>::create_hash_object();
                     Self::hash_set(&mut ht, field, value);
                     db.add(key, ht);
                 } else {
@@ -84,7 +84,7 @@ impl HashCmd {
             let entry = ht.find(&field);
             unsafe {
                 if entry.is_some() {
-                    (*entry.unwrap().as_ptr()).val = value;
+                    (*entry.unwrap().as_ptr()).val = Some(value);
                 } else {
                     ht.add_raw(field, value).ok();
                 }
@@ -98,11 +98,11 @@ impl HashCmd {
         if o.encoding == OBJ_ENCODING_HT {
             let de = match &mut o.ptr {
                 RedisValue::Hash(ht) => ht.find(&field),
-                _ => return &"".to_string()
+                _ => return ""
             };
             unsafe {
                 let value = &(*de.unwrap().as_ptr()).val;
-                value
+                value.as_ref().unwrap()
             }
         } else {
             todo!()

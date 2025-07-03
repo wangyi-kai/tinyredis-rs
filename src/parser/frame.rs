@@ -16,7 +16,7 @@ pub enum Frame {
     Array(Vec<Frame>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Error {
     Incomplete,
     Other(crate::Error),

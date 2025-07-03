@@ -4,18 +4,14 @@ use crate::kvstore::kvstore::KvStore;
 use std::hash::Hash;
 use std::ptr::NonNull;
 
-pub struct KvStoreIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+pub struct KvStoreIterator<'a, V> {
     pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
     pub(crate) next_didx: i32,
     pub(crate) di: Option<DictIterator<'a, V>>,
 }
 
-impl<'a, V> KvStoreIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+impl<'a, V> KvStoreIterator<'a, V> {
     pub fn next_dict(&mut self) -> Option<NonNull<Dict<V>>> {
         if self.next_didx == -1 {
             return None;
@@ -48,9 +44,7 @@ where V: Default + PartialEq + Clone,
     }
 }
 
-impl<'a, V> Iterator for KvStoreIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+impl<'a, V> Iterator for KvStoreIterator<'a, V> {
     type Item = &'a DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
@@ -79,23 +73,17 @@ where V: Default + PartialEq + Clone,
     }
 }
 
-impl<'a, V> Drop for KvStoreIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+impl<'a, V> Drop for KvStoreIterator<'a, V> {
     fn drop(&mut self) {}
 }
 
-pub struct KvStoreDictIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+pub struct KvStoreDictIterator<'a, V> {
     pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
     pub(crate) di: Option<DictIterator<'a, V>>,
 }
 
-impl<'a, V> KvStoreDictIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+impl<'a, V> KvStoreDictIterator<'a, V> {
     pub fn release_dict_iterator(&mut self) {
         unsafe {
             if (*self.kvs).get_dict(self.didx as usize).is_some() {
@@ -106,9 +94,7 @@ where V: Default + PartialEq + Clone,
     }
 }
 
-impl<'a, V> Iterator for KvStoreDictIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+impl<'a, V> Iterator for KvStoreDictIterator<'a, V> {
     type Item = &'a DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
@@ -121,8 +107,6 @@ where V: Default + PartialEq + Clone,
     }
 }
 
-impl<'a, V> Drop for KvStoreDictIterator<'a, V>
-where V: Default + PartialEq + Clone,
-{
+impl<'a, V> Drop for KvStoreDictIterator<'a, V> {
     fn drop(&mut self) {}
 }

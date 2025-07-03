@@ -82,10 +82,8 @@ pub fn dict_get_stats_msg(
     buf.len()
 }
 
-impl<K, V> Dict<K, V>
-where
-    K: Default + Clone + Eq + Hash + Display,
-    V: Default + PartialEq + Clone,
+impl<V> Dict<V>
+where V: Default + PartialEq + Clone,
 {
     pub fn get_stats_ht(&self, ht_idx: usize, full: bool) -> DictStats {
         let cl_vector = Vec::with_capacity(DICT_STATS_VECTLEN);

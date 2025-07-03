@@ -24,10 +24,10 @@ pub struct KvStoreDictMetadata {
     key_size_hits: Vec<Vec<u64>>,
 }
 
-pub struct KvStore<V>
-where
-    V: Default + PartialEq + Clone,
-{
+unsafe impl<V: Send> Send for KvStore<V> {}
+unsafe impl<V: Sync> Sync for KvStore<V> {}
+
+pub struct KvStore<V> {
     flag: i32,
     //pub(crate) dtype: Arc<DictType<K, V>>,
     pub(crate) dicts: Vec<Option<NonNull<Dict<V>>>>,
@@ -51,14 +51,11 @@ where
     overhead_hashtable_lut: usize,
     /// The overhead of dictionaries rehashing
     overhead_hashtable_rehashing: usize,
-    /// conditionally allocated based on "flags"
-    metadata: Vec<Box<dyn Any>>,
+    // conditionally allocated based on "flags"
+    // metadata: Vec<Box<dyn Any>>,
 }
 
-impl<'a, V> KvStore<V>
-where
-    V: Default + PartialEq + Clone,
-{
+impl<'a, V> KvStore<V> {
     // num_dicts_bits is the log2 of the amount of dictionaries needed
     // (e.g. 0 for 1 dict, 3 for 8 dicts)
     pub fn create(num_dicts_bits: u64, flag: i32) -> Self {
@@ -99,7 +96,6 @@ where
                 dict_size_index,
                 overhead_hashtable_lut: 0,
                 overhead_hashtable_rehashing: 0,
-                metadata: Vec::new(),
             }
         }
     }
@@ -547,7 +543,7 @@ where
     pub fn dict_add_raw(&mut self, didx: i32, key: String) -> Option<NonNull<DictEntry<V>>> {
         unsafe {
             let d = self.create_dict_if_needed(didx);
-            if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw(key, V::default()) {
+            if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw_without_value(key) {
                 self.cumulative_key_count_add(didx, 1);
                 return Some(ret);
             }
@@ -576,7 +572,7 @@ where
     pub fn dict_set_val(&mut self, didx: i32, de: NonNull<DictEntry<V>>, val: V) {
         unsafe {
             let d = self.get_dict(didx as usize);
-            (*de.as_ptr()).val = val;
+            (*de.as_ptr()).val = Some(val);
         }
     }
 

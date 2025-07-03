@@ -115,7 +115,7 @@ impl Connection {
         write!(&mut buf, "{}", val)?;
 
         let pos = buf.position() as usize;
-        self.stream.write_all(&buf.as_ref()[..pos]).await?;
+        self.stream.write_all(&buf.get_ref()[..pos]).await?;
         self.stream.write_all(b"\r\n").await?;
 
         Ok(())

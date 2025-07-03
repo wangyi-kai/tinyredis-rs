@@ -23,10 +23,7 @@ pub enum DictResizeFlag {
 pub type DictScanFunction<V> = fn(de: &mut DictEntry<V>);
 pub type DictDefragAllocFunction = fn(ptr: *mut c_void);
 
-pub struct DictType<V>
-where
-    V: Default + PartialEq + Clone,
-{
+pub struct DictType<V> {
     pub hash_function: Option<Box<dyn Fn(&String) -> u64>>,
     pub rehashing_started: Option<Box<dyn Fn(&Dict<V>)>>,
     pub rehashing_completed: Option<Box<dyn Fn(&Dict<V>)>>,
@@ -44,10 +41,7 @@ pub fn dict_size_mask(exp: i32) -> u64 {
     return if exp == -1 { 0 } else { dict_size(exp) - 1 };
 }
 
-pub fn entry_mem_usage<V>() -> usize
-where
-    V: Default + PartialEq + Clone,
-{
+pub fn entry_mem_usage<V>() -> usize {
     size_of::<DictEntry<V>>()
 }
 

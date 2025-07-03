@@ -13,9 +13,7 @@ pub enum KeyStatus {
     KeyDeleted,
 }
 
-pub struct RedisDb<V>
-where V: Default + PartialEq + Clone,
-{
+pub struct RedisDb<V> {
     /// The keyspace for this DB. As metadata, holds key sizes histogram
     keys: KvStore<V>,
     /// Timeout of keys with a timeout set
@@ -39,14 +37,8 @@ where V: Default + PartialEq + Clone,
     receiver: crate::MpscReceiver,
 }
 
-impl<V> RedisDb<V>
-where V: Default + PartialEq + Clone,
-{
-    pub fn create(
-        slot_count_bits: u64,
-        flag: i32,
-        id: i32,
-    ) -> Self<V> {
+impl<V> RedisDb<V> {
+    pub fn create(slot_count_bits: u64, flag: i32, id: i32) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
         Self {
             keys: KvStore::create(slot_count_bits, flag),
@@ -67,7 +59,10 @@ where V: Default + PartialEq + Clone,
         while let Some((sender, command)) = self.receiver.recv().await {
             let frame = match command {
                 RedisCommand::Hash(cmd) => {
-                    cmd.apply(self)
+                    let db = unsafe {
+                        &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
+                    };
+                    cmd.apply(db)
                 }
                 _ => Err("Error".into())
             };
@@ -75,7 +70,7 @@ where V: Default + PartialEq + Clone,
         }
     }
 
-    pub fn lookup_key<K>(&self, key: &RedisObject<K>) -> Option<&mut V> {
+    pub fn lookup_key(&self, key: &RedisObject<String>) -> Option<&mut V> {
         let k = match &key.ptr {
             RedisValue::String(s) => s,
             _ => return None,
@@ -96,15 +91,10 @@ where V: Default + PartialEq + Clone,
     }
 
     pub fn add(&mut self, key: RedisObject<String>, val: V) -> Option<NonNull<DictEntry<V>>> {
-        self.add_internal(key, val, 0)
+        self.add_internal(key, val)
     }
 
-    fn add_internal(
-        &mut self,
-        key: RedisObject<String>,
-        val: RedisObject<V>,
-        update_if_exist: i32,
-    ) -> Option<NonNull<DictEntry<V>>> {
+    fn add_internal(&mut self, key: RedisObject<String>, val: V) -> Option<NonNull<DictEntry<V>>> {
         let slot = 0;
         let key = match key.ptr {
             RedisValue::String(s) => s,
@@ -126,13 +116,7 @@ where V: Default + PartialEq + Clone,
         }
     }
 
-    fn set_val(
-        &mut self,
-        key: RedisObject<String>,
-        val: RedisObject<V>,
-        overwrite: i32,
-        mut de: Option<NonNull<DictEntry<V>>>,
-    ) {
+    fn set_val(&mut self, key: RedisObject<String>, val: V, overwrite: i32, mut de: Option<NonNull<DictEntry<V>>>) {
         let slot = 0;
         let key = match key.ptr {
             RedisValue::String(s) => s,

@@ -57,7 +57,7 @@ pub fn quicklist_node_limit(fill: i32) -> (usize, u32) {
 pub fn quicklist_node_exceed_limit(fill: i32, new_sz: usize, new_count: u32) -> bool {
     let (sz_limit, count_limit) = quicklist_node_limit(fill);
 
-    if std::hint::likely(sz_limit != usize::MAX) {
+    if sz_limit != usize::MAX {
         return new_sz > sz_limit;
     } else if count_limit != u32::MAX {
         if !new_sz <= SIZE_SAFETY_LIMIT {

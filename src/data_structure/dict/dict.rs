@@ -16,9 +16,7 @@ use std::ptr::NonNull;
 use std::time::Instant;
 use crate::object::RedisObject;
 
-#[derive(Default, Clone)]
 pub enum Value<T> {
-    #[default]
     Val(RedisObject<T>),
     Sds(String),
     U64(u64),
@@ -26,49 +24,44 @@ pub enum Value<T> {
     F(f64),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DictEntry<V>
-where V: Default + PartialEq + Clone,
 {
     pub(crate) key: String,
-    pub(crate) val: V,
+    pub(crate) val: Option<V>,
     pub(crate) next: Option<NonNull<DictEntry<V>>>,
 }
 
 impl<V> Default for DictEntry<V>
-where V: Default + PartialEq + Clone,
 {
     fn default() -> Self {
         Self {
             key: "".to_string(),
-            val: "".to_string(),
+            val: None,
             next: None,
         }
     }
 }
 
-impl<V> Clone for DictEntry<V>
-where V: Default + PartialEq + Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            key: self.key.clone(),
-            val: self.val.clone(),
-            next: self.next.clone(),
-        }
-    }
-}
+// impl<V> Clone for DictEntry<V>
+// {
+//     fn clone(&self) -> Self {
+//         Self {
+//             key: self.key.clone(),
+//             val: self.val.clone(),
+//             next: self.next.clone(),
+//         }
+//     }
+// }
 
 impl<V> PartialEq for DictEntry<V>
-where V: Default + PartialEq + Clone,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key && self.val == other.val
+        self.key == other.key
     }
 }
 
 impl<V> DictEntry<V>
-where V: Default + PartialEq + Clone,
 {
     #[inline]
     pub fn get_key(&self) -> &str {
@@ -77,12 +70,14 @@ where V: Default + PartialEq + Clone,
 
     #[inline]
     pub fn get_val(&mut self) -> &mut V {
-        &mut self.val
+        self.val.as_mut().unwrap()
     }
 }
 
+unsafe impl<V: Send> Send for Dict<V> {}
+unsafe impl<V: Sync> Sync for Dict<V> {}
+
 pub struct Dict<V>
-where V: Default + PartialEq + Clone,
 {
     //pub dict_type: Arc<DictType<K, V>>,
     /// dict table
@@ -97,11 +92,10 @@ where V: Default + PartialEq + Clone,
     pause_auto_resize: u16,
     /// exponent of size. (size = 1<<exp)
     pub ht_size_exp: Vec<i32>,
-    pub metadata: Vec<Box<dyn Any>>,
+    //pub metadata: Vec<Box<dyn Any>>,
 }
 
 impl<V> Dict<V>
-where V: Default + PartialEq + Clone,
 {
     pub fn create() -> Self {
         unsafe {
@@ -120,7 +114,6 @@ where V: Default + PartialEq + Clone,
                 pause_rehash: 0,
                 pause_auto_resize: 0,
                 ht_size_exp: vec![DICT_HT_INITIAL_EXP as i32; 2],
-                metadata: vec![],
             }
         }
     }
@@ -250,7 +243,49 @@ where V: Default + PartialEq + Clone,
             let ht_idx: usize = if self.dict_is_rehashing() { 1 } else { 0 };
             let entry = NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry {
                 key,
-                val,
+                val: Some(val),
+                next: self.ht_table[ht_idx][idx as usize],
+            })));
+            self.ht_table[ht_idx][idx as usize] = Some(entry);
+            self.ht_used[ht_idx] += 1;
+            Ok(entry)
+        }
+    }
+
+    #[inline]
+    pub fn add_raw_without_value(&mut self, key: String) -> Result<NonNull<DictEntry<V>>, HashError> {
+        unsafe {
+            let hash = sys_hash(&key);
+            let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
+
+            //Rehash the dict table if needed
+            self.rehash_step_if_needed(idx);
+            self._expand_if_needed()?;
+
+            for table in 0..2 {
+                if table == 0 && (idx as i64) < self.rehash_idx {
+                    continue;
+                }
+                idx = hash & dict_size_mask(self.ht_size_exp[table]);
+                // Search if this slot does not already contain the given key
+                let mut he = self.ht_table[table][idx as usize];
+                while he.is_some() {
+                    let he_key = (*he.unwrap().as_ptr()).get_key();
+                    if key == *he_key {
+                        return Ok(he.unwrap());
+                        return Err(HashError::DictEntryDup);
+                    }
+                    he = (*he.unwrap().as_ptr()).next;
+                }
+                if !self.dict_is_rehashing() {
+                    break;
+                }
+            }
+
+            let ht_idx: usize = if self.dict_is_rehashing() { 1 } else { 0 };
+            let entry = NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry {
+                key,
+                val: None,
                 next: self.ht_table[ht_idx][idx as usize],
             })));
             self.ht_table[ht_idx][idx as usize] = Some(entry);
@@ -272,7 +307,7 @@ where V: Default + PartialEq + Clone,
             assert!(position.is_some());
             let entry = NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry {
                 key,
-                val: V::default(),
+                val: None,
                 next: position,
             })));
             self.ht_table[table][idx as usize] = Some(entry);
@@ -926,10 +961,7 @@ where V: Default + PartialEq + Clone,
     }
 }
 
-impl<V> Dict<V>
-where
-    V: Default + PartialEq + Clone,
-{
+impl<V> Dict<V> {
     #[inline]
     pub fn reset(&mut self, table: usize) {
         self.ht_table[table] = vec![];

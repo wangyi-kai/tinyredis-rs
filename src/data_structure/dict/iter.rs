@@ -4,18 +4,12 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 #[derive(Debug)]
-pub struct EntryIter<'a, V>
-where
-    V: Default + PartialEq + Clone,
-{
+pub struct EntryIter<'a, V> {
     cur: Option<&'a DictEntry<V>>,
     _boo: PhantomData<&'a (V)>,
 }
 
-impl<V> DictEntry<V>
-where
-    V: Default + PartialEq + Clone,
-{
+impl<V> DictEntry<V> {
     pub fn iter(&self) -> EntryIter<V> {
         EntryIter {
             cur: Some(self),
@@ -24,10 +18,7 @@ where
     }
 }
 
-impl<'a, V> Iterator for EntryIter<'a, V>
-where
-    V: Default + PartialEq + Clone,
-{
+impl<'a, V> Iterator for EntryIter<'a, V> {
     type Item = &'a DictEntry<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -47,10 +38,7 @@ where
     }
 }
 
-pub struct DictIterator<'a, V>
-where
-    V: Default + PartialEq + Clone,
-{
+pub struct DictIterator<'a, V> {
     pub(crate) dict: Option<&'a mut Dict<V>>,
     pub(crate) table: usize,
     pub(crate) index: i64,
@@ -58,10 +46,7 @@ where
     pub(crate) entry: Option<EntryIter<'a, V>>,
 }
 
-impl<'a, V> DictIterator<'a, V>
-where
-    V: Default + PartialEq + Clone,
-{
+impl<'a, V> DictIterator<'a, V> {
     pub fn reset(&mut self) {
         if !(self.index == -1 && self.table == 0) {
             if self.safe != 0 {
@@ -71,10 +56,7 @@ where
     }
 }
 
-impl<'a, V> Dict<V>
-where
-    V: Default + PartialEq + Clone,
-{
+impl<'a, V> Dict<V> {
     pub fn iter(&mut self) -> DictIterator<V> {
         DictIterator {
             dict: Some(self),
@@ -96,10 +78,7 @@ where
     }
 }
 
-impl<'a, V> Iterator for DictIterator<'a, V>
-where
-    V: Default + PartialEq + Clone,
-{
+impl<'a, V> Iterator for DictIterator<'a, V> {
     type Item = &'a DictEntry<V>;
 
     fn next(&mut self) -> Option<Self::Item> {

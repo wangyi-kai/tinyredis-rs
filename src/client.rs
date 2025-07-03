@@ -15,3 +15,23 @@ impl Client {
         Ok(Client { conn: connection })
     }
 }
+
+pub fn run_client() {
+    let mut command = String::new();
+    'clear: loop {
+        command.clear();
+        'cmd: loop {
+             std::io::stdin().read_line(&mut command).unwrap();
+            if command.ends_with("\n") {
+                command.remove(command.len() - 1);
+            }
+            if command.ends_with("\r") {
+                command.remove(command.len() - 1);
+            }
+            if !command.ends_with(";") {
+                command.push_str("\n");
+                continue 'cmd;
+            }
+        }
+    }
+}

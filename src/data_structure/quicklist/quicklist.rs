@@ -91,11 +91,11 @@ impl QuickListNode {
     pub fn _allow_insert(&self, fill: i32, sz: usize) -> bool {
         let new_sz = sz + SIZE_ESTIMATE_OVERHEAD;
 
-        if std::hint::unlikely(self.is_plain() || is_large_element(sz, fill)) {
+        if self.is_plain() || is_large_element(sz, fill) {
             return false;
         }
 
-        if std::hint::unlikely(quicklist_node_exceed_limit(fill, new_sz, self.count + 1)) {
+        if quicklist_node_exceed_limit(fill, new_sz, self.count + 1) {
             return false;
         }
         return true;
@@ -110,17 +110,16 @@ impl QuickListNode {
             return false;
         }
         unsafe {
-            if std::hint::unlikely(
-                (*a.unwrap().as_ptr()).is_plain() || (*b.unwrap().as_ptr()).is_plain(),
-            ) {
+            if (*a.unwrap().as_ptr()).is_plain() || (*b.unwrap().as_ptr()).is_plain()
+             {
                 return false;
             }
             let merge_sz = (*a.unwrap().as_ptr()).sz + (*b.unwrap().as_ptr()).sz - 7;
-            if std::hint::unlikely(quicklist_node_exceed_limit(
+            if quicklist_node_exceed_limit(
                 fill,
                 merge_sz,
                 (*a.unwrap().as_ptr()).count + (*b.unwrap().as_ptr()).count,
-            )) {
+            ) {
                 return false;
             }
             return true;

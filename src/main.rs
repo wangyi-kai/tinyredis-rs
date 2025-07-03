@@ -1,5 +1,6 @@
 use tokio::sync::{mpsc, oneshot};
-use redis_rs::parser::frame::Frame;
+use crate::parser::frame::Frame;
+use crate::client::run_client;
 use crate::cmd::command::RedisCommand;
 
 mod cluster;
@@ -19,4 +20,7 @@ pub type Result<T> = std::result::Result<T, redis_rs::Error>;
 type MpscSender = mpsc::Sender<(oneshot::Sender<Result<Frame>>, RedisCommand)>;
 type MpscReceiver = mpsc::Receiver<(oneshot::Sender<Result<Frame>>, RedisCommand)>;
 
-fn main() {}
+#[tokio::main]
+async fn main() {
+    run_client();
+}

@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
@@ -96,5 +97,36 @@ impl Handler {
             }
         }
     }
+}
+
+pub async fn run(listener: TcpListener, shutdown: impl Future, db_num: u32) {
+    let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
+    let mut server = Listener {
+        listener,
+        notify_shutdown: broadcast::channel(1).0,
+        limit_connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
+        db_handler: Arc::new(DbHandler::new(db_num)),
+        shutdown_complete_tx,
+        shutdown_complete_rx,
+    };
+    tokio::select! {
+        res = server.run() => {
+            if let Err(err) = res {
+                 error!(cause = %err, "failed to accept");
+            }
+        },
+        _ = shutdown => {
+             info!("server shutting down");
+       }
+    }
+    let Listener {
+        mut shutdown_complete_rx,
+        shutdown_complete_tx,
+        notify_shutdown,
+        ..
+    } = server;
+    drop(notify_shutdown);
+    drop(shutdown_complete_tx);
+    let _ = shutdown_complete_rx.recv().await;
 }
 
