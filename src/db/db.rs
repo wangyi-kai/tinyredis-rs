@@ -59,9 +59,11 @@ impl<V> RedisDb<V> {
         while let Some((sender, command)) = self.receiver.recv().await {
             let frame = match command {
                 RedisCommand::Hash(cmd) => {
+                    println!("DB command: {:?}", cmd);
                     let db = unsafe {
                         &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
                     };
+                    println!("execute");
                     cmd.apply(db)
                 }
                 _ => Err("Error".into())
@@ -100,7 +102,9 @@ impl<V> RedisDb<V> {
             RedisValue::String(s) => s,
             _ => { "".to_string() }
         };
+        println!("key: {}", key);
         let de = self.keys.add(slot, key, val);
+        println!("插入成功");
         de
     }
 

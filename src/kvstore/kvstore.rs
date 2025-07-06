@@ -1,17 +1,15 @@
 use crate::data_structure::adlist::adlist::{LinkList, Node};
 use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::data_structure::dict::iter::DictIterator;
-use crate::data_structure::dict::lib::{entry_mem_usage, DictScanFunction, DictType};
+use crate::data_structure::dict::lib::{entry_mem_usage, DictScanFunction};
 use crate::kvstore::iter::{KvStoreDictIterator, KvStoreIterator};
 use crate::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
 use crate::kvstore::{
     KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_FREE_EMPTY_DICTS,
 };
 use rand::Rng;
-use std::any::Any;
 use std::hash::Hash;
 use std::ptr::NonNull;
-use std::sync::Arc;
 use std::time::Instant;
 
 #[derive(Clone)]
@@ -66,12 +64,12 @@ impl<'a, V> KvStore<V> {
                 kv_size += size_of::<KvStoreMetadata>();
             }
             let num_dicts = 1 << num_dicts_bits;
-            let mut dicts = Vec::new();
+            let mut dicts = vec![None; num_dicts];
             let mut allocated_dicts = 0;
-            if flag & KVSTORE_ALLOCATE_DICTS_ON_DEMAND != 0 {
-                for _ in 0..num_dicts {
+            if (flag & KVSTORE_ALLOCATE_DICTS_ON_DEMAND) == 0 {
+                for i in 0..num_dicts {
                     let d = Dict::create();
-                    dicts.push(Some(NonNull::new_unchecked(Box::into_raw(Box::new(d)))));
+                    dicts[i] = (Some(NonNull::new_unchecked(Box::into_raw(Box::new(d)))));
                     allocated_dicts += 1;
                 }
             }
@@ -554,7 +552,9 @@ impl<'a, V> KvStore<V> {
     pub fn add(&mut self, didx: i32, key: String, val: V) -> Option<NonNull<DictEntry<V>>> {
         unsafe {
             let d = self.create_dict_if_needed(didx);
+            println!("创建dict");
             if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw(key, val) {
+                println!("dict 插入成功");
                 self.cumulative_key_count_add(didx, 1);
                 return Some(ret);
             }

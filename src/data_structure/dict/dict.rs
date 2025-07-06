@@ -105,15 +105,7 @@ impl<V> Dict<V>
     pub fn create() -> Self {
         unsafe {
             Self {
-                ht_table: vec![
-                    vec![
-                        Some(NonNull::new_unchecked(Box::into_raw(Box::new(
-                            DictEntry::default()
-                        ))));
-                        DICT_HT_INITIAL_SIZE
-                    ],
-                    vec![],
-                ],
+                ht_table: vec![vec![Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default())))); DICT_HT_INITIAL_SIZE], vec![]],
                 ht_used: vec![0; 2],
                 rehash_idx: -1,
                 pause_rehash: 0,
@@ -232,7 +224,7 @@ impl<V> Dict<V>
                 idx = hash & dict_size_mask(self.ht_size_exp[table]);
                 // Search if this slot does not already contain the given key
                 let mut he = self.ht_table[table][idx as usize];
-                while he.is_some() {
+                while !he.is_none() {
                     let he_key = (*he.unwrap().as_ptr()).get_key();
                     if key == *he_key {
                         return Ok(he.unwrap());

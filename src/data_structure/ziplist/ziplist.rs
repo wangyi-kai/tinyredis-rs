@@ -64,7 +64,7 @@ impl ZipList {
         let mut zl = vec![0u8; bytes as usize];
         zl[0..4].copy_from_slice(&bytes.to_le_bytes());
         zl[4..8].copy_from_slice(&ZIPLIST_HEADER_SIZE.to_le_bytes());
-        zl[8..10].copy_from_slice(&vec![0, 0]);
+        zl[8..10].copy_from_slice(&[0, 0]);
         zl[bytes as usize - 1] = ZIP_END;
 
         Self { data: zl }

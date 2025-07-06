@@ -92,7 +92,7 @@ impl Handler {
                         }
                          _ => todo!()
                     }
-                    Err(e) => return Err(e.into())
+                    Err(e) => return Err(e)
                 };
                 let frame = result_frame.unwrap_or_else(|e| Frame::Error(e.to_string()));
                 self.connection.write_frame(&frame).await?;

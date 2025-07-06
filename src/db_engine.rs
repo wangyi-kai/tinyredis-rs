@@ -8,7 +8,7 @@ pub struct DbHandler {
 
 impl DbHandler {
     pub fn new(db_num: u32) -> Self {
-        let slot_count_bits = 0;
+        let slot_count_bits = 4;
         let flag = KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
         let mut db_list = vec![];
         let mut sender_list = vec![];

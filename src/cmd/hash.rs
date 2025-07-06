@@ -71,8 +71,8 @@ impl HashCmd {
             HashCmd::HGet {key, field} => {
                 let key = RedisObject::<String>::create_string_object(key);
                 let mut o = db.lookup_key(&key);
-                if o.is_some() {
-                    let val = Self::hash_get(o.unwrap(), &field);
+                if let Some(o) = o {
+                    let val = Self::hash_get(o, &field);
                     Ok(Frame::Bulk(val.into()))
                 } else {
                     Ok(Frame::Null)
@@ -81,22 +81,23 @@ impl HashCmd {
             HashCmd::HDel {key, field} => {
                 let key = RedisObject::<String>::create_string_object(key);
                 let mut o = db.lookup_key(&key);
-                if o.is_some() {
-                    Self::hash_delete(o.unwrap(), &field);
+                if let Some(o) = o {
+                    Self::hash_delete(o, &field);
                 }
                 Ok(Frame::Simple("ok".to_string()))
             }
             HashCmd::HSet {key, field, value} => {
                 let key = RedisObject::<String>::create_string_object(key);
                 let mut o = db.lookup_key(&key);
-                if o.is_none() {
+                if let Some(o) = o {
+                    Self::hash_set(o, field, value);
+                } else {
                     let mut ht = RedisObject::<String>::create_hash_object();
                     Self::hash_set(&mut ht, field, value);
+                    println!("插入数据库");
                     db.add(key, ht);
-                } else {
-                    Self::hash_set(o.unwrap(), field, value);
                 }
-                Ok(Frame::Simple("ok".to_string()))
+                Ok(Frame::Simple("OK".to_string()))
             }
             HashCmd::HScan => todo!()
         }
@@ -113,6 +114,7 @@ impl HashCmd {
                 if entry.is_some() {
                     (*entry.unwrap().as_ptr()).val = Some(value);
                 } else {
+                    println!("field: {}, value: {}", field, value);
                     ht.add_raw(field, value).ok();
                 }
             }
@@ -139,7 +141,7 @@ impl HashCmd {
     fn hash_delete(o: &mut RedisObject<String>, field: &str) -> bool {
         let mut deleted = false;
         if o.encoding == OBJ_ENCODING_HT {
-            return match &mut o.ptr {
+           match &mut o.ptr {
                 RedisValue::Hash(ht) => {
                     ht.generic_delete(field).ok();
                     true
