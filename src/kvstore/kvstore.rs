@@ -552,9 +552,7 @@ impl<'a, V> KvStore<V> {
     pub fn add(&mut self, didx: i32, key: String, val: V) -> Option<NonNull<DictEntry<V>>> {
         unsafe {
             let d = self.create_dict_if_needed(didx);
-            println!("创建dict");
             if let Ok(ret) = (*d.unwrap().as_ptr()).add_raw(key, val) {
-                println!("dict 插入成功");
                 self.cumulative_key_count_add(didx, 1);
                 return Some(ret);
             }

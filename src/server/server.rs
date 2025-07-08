@@ -78,14 +78,13 @@ impl Handler {
                 res = self.connection.read_frame() => res?,
                 _ = self.shutdown.receiver() => return Ok(())
             };
-            println!("get frame: {:?}", frame);
+            //println!("get frame: {:?}", frame);
 
             if let Some(frame) = frame {
                 let result_cmd = RedisCommand::from_frame(frame);
                 let result_frame = match result_cmd {
                     Ok(command) => match command {
                         RedisCommand::Hash(cmd) => {
-                            println!("Command: {:?}", cmd);
                             let (sender, receiver) = oneshot::channel();
                             self.db_sender.send((sender, RedisCommand::Hash(cmd))).await?;
                             receiver.await?

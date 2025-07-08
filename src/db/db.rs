@@ -2,10 +2,11 @@ use crate::data_structure::dict::dict::{Dict, DictEntry, Value};
 use crate::kvstore::kvstore::KvStore;
 use crate::object::{RedisObject, RedisValue};
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use tokio::sync::mpsc;
-use crate::cmd::command::RedisCommand;
+use crate::cmd::command::{CommandStrategy, RedisCommand};
 
 pub enum KeyStatus {
     KeyValid = 0,
@@ -35,6 +36,7 @@ pub struct RedisDb<V> {
     expires_cursor: u64,
     pub(crate) sender: crate::MpscSender,
     receiver: crate::MpscReceiver,
+    _maker: PhantomData<V>,
 }
 
 impl<V> RedisDb<V> {
@@ -52,6 +54,7 @@ impl<V> RedisDb<V> {
             expires_cursor: 0,
             sender,
             receiver,
+            _maker: PhantomData,
         }
     }
 
@@ -59,11 +62,9 @@ impl<V> RedisDb<V> {
         while let Some((sender, command)) = self.receiver.recv().await {
             let frame = match command {
                 RedisCommand::Hash(cmd) => {
-                    println!("DB command: {:?}", cmd);
                     let db = unsafe {
                         &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
                     };
-                    println!("execute");
                     cmd.apply(db)
                 }
                 _ => Err("Error".into())
@@ -102,9 +103,7 @@ impl<V> RedisDb<V> {
             RedisValue::String(s) => s,
             _ => { "".to_string() }
         };
-        println!("key: {}", key);
         let de = self.keys.add(slot, key, val);
-        println!("插入成功");
         de
     }
 

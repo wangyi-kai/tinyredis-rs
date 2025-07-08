@@ -1,8 +1,18 @@
 use crate::cmd::error::CommandError;
 use crate::cmd::hash::HashCmd;
 use crate::parser::frame::Frame;
+use crate::client::client::Tokens;
+use crate::db::db::RedisDb;
+use crate::object::RedisObject;
+
+pub trait CommandStrategy {
+    fn into_frame(self) -> Frame;
+    fn from_frame(name: &str, frame: Frame) -> crate::Result<RedisCommand>;
+    fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame>;
+}
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum RedisCommand {
     Connection(ConnCmd),
     String(StringCmd),
@@ -16,14 +26,22 @@ impl RedisCommand {
     pub fn from_frame(frame: Frame) -> crate::Result<RedisCommand> {
         let cmd_name = get_command_name(&frame).ok().unwrap().to_lowercase();
         let command = match &cmd_name[..] {
-            "hset" | "hget" | "hdel" => RedisCommand::Hash(HashCmd::from_frame(&cmd_name, frame)?),
+            "hset" | "hget" | "hdel" => HashCmd::from_frame(&cmd_name, frame)?,
             _ => return Err(CommandError::ParseError(-101).into()),
         };
         Ok(command)
     }
+
+    pub fn into_frame(self) -> Frame {
+        match self {
+            RedisCommand::Hash(cmd) => cmd.into_frame(),
+            _ => unimplemented!()
+        }
+    }
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum ConnCmd {
     /// Authenticates the connection
     Auth,
@@ -43,6 +61,7 @@ pub enum ConnCmd {
     Select,
 }
 
+#[derive(Debug)]
 #[allow(dead_code)]
 pub enum ListCmd {
     /// Prepends one or more elements to a list. Creates the key if it doesn't exist
@@ -62,6 +81,7 @@ pub enum ListCmd {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum SetCmd {
     /// Returns the number of members in a set
     SCard,
@@ -78,6 +98,7 @@ pub enum SetCmd {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum SortedCmd {
     /// Adds one or more members to a sorted set, or updates their scores.
     ZAdd,
@@ -95,6 +116,7 @@ pub enum SortedCmd {
     ZInterStore,
 }
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum StringCmd {
     /// Appends a string to the value of a key. Creates the key if it doesn't exist
     Append,
