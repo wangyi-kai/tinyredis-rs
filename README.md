@@ -1,3 +1,4 @@
+
 # 🚀 tinyredis
 
 > A lightweight Redis reimplementation in Rust — fast, embeddable, and easy to understand.
