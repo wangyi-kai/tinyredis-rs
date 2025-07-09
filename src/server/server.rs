@@ -28,7 +28,7 @@ impl Listener {
         loop {
             self.limit_connections.acquire().await.unwrap().forget();
             let socket = self.accept().await?;
-            println!("accept new connection");
+            debug!("Accept new connection");
             let mut handler = Handler {
                 connection: Connection::new(socket),
                 limit_connections: self.limit_connections.clone(),

@@ -20,5 +20,5 @@ pub type Result<T> = std::result::Result<T, crate::Error>;
 type MpscSender = mpsc::Sender<(oneshot::Sender<Result<Frame>>, RedisCommand)>;
 type MpscReceiver = mpsc::Receiver<(oneshot::Sender<Result<Frame>>, RedisCommand)>;
 
-pub const DEFAULT_PORT: u16 = 6379;
+pub const DEFAULT_PORT: u16 = 8000;
 pub const DB_SIZE: usize = 256;

@@ -1,7 +1,8 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
+use tracing::{debug, error, info, instrument};
+use crate::client::config::Config;
 use crate::cmd::command::{CommandStrategy, RedisCommand};
 use crate::server::connection::Connection;
-use crate::cmd::hash::HashCmd;
 use crate::cmd::hash::HashCmd::{HDel, HGet, HSet};
 
 pub struct Client {
@@ -123,37 +124,18 @@ impl Tokens {
     }
 }
 
-pub async fn run_client() {
-    let mut client = Client::connect("127.0.0.1:6379").await.unwrap();
-    // let mut cmd = HashCmd::HSet {
-    //         key: "hello".to_string(),
-    //         field: "world1".to_string(),
-    //         value: "world2".to_string(),
-    //     };
-    // let frame = cmd.into_frame();
-    // let _ = client.conn.write_frame(&frame).await;
-    // let res = client.conn.read_frame().await;
-    // match res {
-    //     Ok(res) => println!("res: {}", res.unwrap()),
-    //     Err(e) => println!("error: {}", e),
-    // };
-    //
-    // let mut cmd = HashCmd::HGet {
-    //     key: "hello".to_string(),
-    //     field: "world1".to_string(),
-    // };
-    // let frame = cmd.into_frame();
-    // let _ = client.conn.write_frame(&frame).await;
-    // let res = client.conn.read_frame().await;
-    // match res {
-    //     Ok(res) => println!("res: {}", res.unwrap()),
-    //     Err(e) => println!("error: {}", e),
-    // };
+pub async fn run_client() -> crate::Result<()> {
+    tracing_subscriber::fmt::try_init()?;
+    let config = Config::new(None);
+    let host = config.get_value("server_ip").unwrap().trim_matches('"').to_string();
+    let port = config.get_value("server_port").unwrap();
+    let addr = format!("{}:{}", host, port);
 
+    let mut client = Client::connect(addr.clone()).await.unwrap();
     let mut command = String::new();
     'clear: loop {
         command.clear();
-        println!("<{}>: ", "127.0.0.1:6379");
+        println!("<{}>: ", addr);
         'cmd: loop {
              std::io::stdin().read_line(&mut command).unwrap();
             if command.ends_with("\n") {
@@ -178,4 +160,5 @@ pub async fn run_client() {
             continue 'clear;
         }
     }
+    Ok(())
 }
