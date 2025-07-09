@@ -36,9 +36,10 @@ cd tinyredis/src
 
 ### 启动 tinyredis
 
-```bash启动服务端
+```
+bash启动服务端
 cargo run --release --bin redis_server
-```bash启动客户端
+bash启动客户端
 cargo run --release --bin redis_cli
 
 默认监听地址为 `127.0.0.1:8000`
