@@ -1,8 +1,7 @@
 use std::fs::File;
-use std::io::{Read, Write};
-use ansi_term::Color::Fixed;
+use std::io::{Read};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::{Value};
 use json_comments::StripComments;
 
 

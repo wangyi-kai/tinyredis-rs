@@ -1,7 +1,6 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
-use tracing::{debug, error, info, instrument};
 use crate::client::config::Config;
-use crate::cmd::command::{CommandStrategy, RedisCommand};
+use crate::cmd::command::{RedisCommand};
 use crate::server::connection::Connection;
 use crate::cmd::hash::HashCmd::{HDel, HGet, HSet};
 
@@ -45,11 +44,9 @@ impl Tokens {
                     temp.push('\\')
                 }
                 '"' => is_str = !is_str,
-                ';' => if !is_str {
-                    if !temp.is_empty() {
-                        token.push(temp);
-                        break;
-                    }
+                ';' => if !is_str && !temp.is_empty() {
+                    token.push(temp);
+                    break;
                 },
                 c => temp.push(c)
             }
@@ -96,10 +93,6 @@ impl Tokens {
         } else { None }
     }
 
-    pub fn get_cmd(&self, index: usize) -> Option<&String> {
-        self.token.get(index)
-    }
-
     pub fn to_command(self) -> Option<RedisCommand> {
         let cmd_name = self.token[0].to_string();
         match &cmd_name[..] {
@@ -124,8 +117,8 @@ impl Tokens {
     }
 }
 
-pub async fn run_client() -> crate::Result<()> {
-    tracing_subscriber::fmt::try_init()?;
+pub async fn run_client() {
+    tracing_subscriber::fmt::try_init().expect("config log fail");
     let config = Config::new(None);
     let host = config.get_value("server_ip").unwrap().trim_matches('"').to_string();
     let port = config.get_value("server_port").unwrap();
@@ -154,11 +147,16 @@ pub async fn run_client() -> crate::Result<()> {
             let _ = client.conn.write_frame(&frame).await;
             let res = client.conn.read_frame().await;
             match res {
-                Ok(res) => println!("{}", res.unwrap()),
+                Ok(res) => {
+                    if let Some(res) = res {
+                        println!("{}", res);
+                    } else {
+                        println!("receive fail");
+                    }
+                },
                 Err(e) => println!("error: {}", e),
             };
             continue 'clear;
         }
     }
-    Ok(())
 }

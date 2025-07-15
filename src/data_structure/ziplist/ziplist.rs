@@ -103,7 +103,7 @@ impl ZipList {
                 .try_into()
                 .unwrap(),
         );
-        return if len < u16::MAX {
+        if len < u16::MAX {
             len as u32
         } else {
             let mut len: u32 = 0;
@@ -118,7 +118,7 @@ impl ZipList {
                     .copy_from_slice(&(len as u16).to_le_bytes());
             }
             len
-        };
+        }
     }
 
     fn incr_length(&mut self, incr: i32) {
@@ -349,19 +349,19 @@ impl ZipList {
         if self.data[pos] == ZIP_END {
             let tail = self.tail_offset();
             if self.data[tail] == ZIP_END {
-                return 0;
+                0
             } else {
-                return tail;
+                tail
             }
         } else if pos == ZIPLIST_HEADER_SIZE as usize {
-            return 0;
+            0
         } else {
             let (_, prev_len) = decode_prev_len(&self.data[pos..]);
             assert!(prev_len > 0);
             pos -= prev_len as usize;
             let zl_bytes = u32::from_le_bytes(self.data[0..4].try_into().unwrap());
             let _ = self.entry_safe(zl_bytes as usize, pos, 1);
-            return pos;
+            pos
         }
     }
 
@@ -601,7 +601,7 @@ impl ZipList {
     pub fn delete_range(&mut self, index: i32, num: usize) -> Result<(), ZipListError> {
         let pos = self.zip_index(index);
         if pos == 0 {
-            return Ok(());
+            Ok(())
         } else {
             self._delete(pos, num)
         }

@@ -1,7 +1,7 @@
-use crate::data_structure::dict::dict::{Dict, DictEntry, Value};
+use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::kvstore::kvstore::KvStore;
 use crate::object::{RedisObject, RedisValue};
-use std::hash::Hash;
+
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -79,7 +79,7 @@ impl<V> RedisDb<V> {
             _ => return None,
         };
 
-        let mut de = self.keys.dict_find(0, k);
+        let de = self.keys.dict_find(0, k);
         unsafe {
             if de.is_none() {
                 return None;
@@ -89,7 +89,7 @@ impl<V> RedisDb<V> {
         }
     }
 
-    pub fn find(&self, key: &str) -> Option<NonNull<DictEntry<V>>> {
+    pub fn _find(&self, key: &str) -> Option<NonNull<DictEntry<V>>> {
         self.keys.dict_find(0, key)
     }
 
@@ -119,7 +119,7 @@ impl<V> RedisDb<V> {
         }
     }
 
-    fn set_val(&mut self, key: RedisObject<String>, val: V, overwrite: i32, mut de: Option<NonNull<DictEntry<V>>>) {
+    fn set_val(&mut self, key: RedisObject<String>, _val: V, _overwrite: i32, mut de: Option<NonNull<DictEntry<V>>>) {
         let slot = 0;
         let key = match key.ptr {
             RedisValue::String(s) => s,
@@ -129,7 +129,7 @@ impl<V> RedisDb<V> {
             de = self.keys.dict_find(slot, &key);
         }
         unsafe {
-            let old = (*de.unwrap().as_ptr()).get_val();
+            let _old = (*de.unwrap().as_ptr()).get_val();
         }
     }
 

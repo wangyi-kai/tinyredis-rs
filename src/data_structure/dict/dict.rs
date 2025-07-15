@@ -7,10 +7,8 @@ use crate::data_structure::dict::lib::{
     DICT_HT_INITIAL_SIZE, HASHTABLE_MIN_FILL,
 };
 use crate::data_structure::skiplist::lib::gen_random;
-use std::any::Any;
 use std::cmp::PartialEq;
 use std::fmt::Debug;
-use std::hash::Hash;
 use std::mem;
 use std::ptr::NonNull;
 use std::time::Instant;
@@ -228,7 +226,7 @@ impl<V> Dict<V>
                     let he_key = (*he.unwrap().as_ptr()).get_key();
                     if key == *he_key {
                         return Ok(he.unwrap());
-                        return Err(HashError::DictEntryDup);
+                        //return Err(HashError::DictEntryDup);
                     }
                     he = (*he.unwrap().as_ptr()).next;
                 }
@@ -270,7 +268,7 @@ impl<V> Dict<V>
                     let he_key = (*he.unwrap().as_ptr()).get_key();
                     if key == *he_key {
                         return Ok(he.unwrap());
-                        return Err(HashError::DictEntryDup);
+                        //return Err(HashError::DictEntryDup);
                     }
                     he = (*he.unwrap().as_ptr()).next;
                 }
@@ -949,7 +947,7 @@ impl<V> Dict<V>
             return;
         }
         unsafe {
-            let box_node = Box::from_raw(he.unwrap().as_ptr());
+            let _ = Box::from_raw(he.unwrap().as_ptr());
             self.ht_used[table_index] -= 1;
             plink = (*he.unwrap().as_ptr()).next;
             let _ = self.shrink_if_needed();

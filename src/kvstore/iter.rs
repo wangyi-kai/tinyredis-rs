@@ -1,7 +1,7 @@
 use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::data_structure::dict::iter::DictIterator;
 use crate::kvstore::kvstore::KvStore;
-use std::hash::Hash;
+
 use std::ptr::NonNull;
 
 pub struct KvStoreIterator<'a, V> {
@@ -28,7 +28,7 @@ impl<'a, V> KvStoreIterator<'a, V> {
         }
     }
 
-    pub fn get_current_dict_index(&self) -> i32 {
+    pub fn _get_current_dict_index(&self) -> i32 {
         unsafe {
             assert!(self.didx >= 0 && self.didx < (*self.kvs).num_dicts as i32);
             self.didx
@@ -84,7 +84,7 @@ pub struct KvStoreDictIterator<'a, V> {
 }
 
 impl<'a, V> KvStoreDictIterator<'a, V> {
-    pub fn release_dict_iterator(&mut self) {
+    pub fn _release_dict_iterator(&mut self) {
         unsafe {
             if (*self.kvs).get_dict(self.didx as usize).is_some() {
                 self.di.as_mut().unwrap().reset();

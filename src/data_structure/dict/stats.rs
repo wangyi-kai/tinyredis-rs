@@ -1,7 +1,5 @@
 use crate::data_structure::dict::dict::Dict;
 use crate::data_structure::dict::lib::{dict_size, DICT_STATS_VECTLEN};
-use std::fmt::Display;
-use std::hash::Hash;
 
 use std::fmt::Write as _;
 
@@ -124,12 +122,9 @@ where V: Default + PartialEq + Clone,
     }
 
     pub fn get_stats(&self, buf: &mut String, mut buf_size: usize, full: bool) {
-        let mut l = 0;
-        let origin_buf = buf.clone();
-        let origin_buf_size = buf_size;
 
         let mut main_ht_stats = self.get_stats_ht(0, full);
-        l = dict_get_stats_msg(buf, buf_size, &mut main_ht_stats, full);
+        let l = dict_get_stats_msg(buf, buf_size, &mut main_ht_stats, full);
         buf_size -= l;
 
         if self.dict_is_rehashing() && buf_size > 0 {

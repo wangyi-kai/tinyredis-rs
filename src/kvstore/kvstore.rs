@@ -8,7 +8,6 @@ use crate::kvstore::{
     KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_FREE_EMPTY_DICTS,
 };
 use rand::Rng;
-use std::hash::Hash;
 use std::ptr::NonNull;
 use std::time::Instant;
 
@@ -69,7 +68,7 @@ impl<'a, V> KvStore<V> {
             if (flag & KVSTORE_ALLOCATE_DICTS_ON_DEMAND) == 0 {
                 for i in 0..num_dicts {
                     let d = Dict::create();
-                    dicts[i] = (Some(NonNull::new_unchecked(Box::into_raw(Box::new(d)))));
+                    dicts[i] = Some(NonNull::new_unchecked(Box::into_raw(Box::new(d))));
                     allocated_dicts += 1;
                 }
             }
@@ -317,8 +316,6 @@ impl<'a, V> KvStore<V> {
         };
         self.find_dict_index_by_key_index(target)
     }
-
-    pub fn get_stats(&self, buf: &mut String, buf_size: usize, full: bool) {}
 
     pub fn get_next_non_empty_dict_index(&self, didx: usize) -> i32 {
         if self.num_dicts == 1 {

@@ -141,12 +141,10 @@ impl Frame {
     pub fn get_frame_by_index(&self, index: usize) -> Option<&Frame> {
         return if let Frame::Array(array) = self {
             array.get(index)
+        } else if index == 0 {
+            Some(self)
         } else {
-            if index == 0 {
-                Some(self)
-            } else {
-                None
-            }
+            None
         };
     }
 

@@ -1,12 +1,11 @@
 use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::data_structure::dict::lib::*;
-use std::hash::Hash;
 use std::marker::PhantomData;
 
 #[derive(Debug)]
 pub struct EntryIter<'a, V> {
     cur: Option<&'a DictEntry<V>>,
-    _boo: PhantomData<&'a (V)>,
+    _boo: PhantomData<&'a V>,
 }
 
 impl<V> DictEntry<V> {

@@ -29,7 +29,7 @@ impl DbHandler {
     }
 
     pub fn get_sender(&self, idx: usize) -> Option<crate::MpscSender> {
-        self.sender.get(idx).map(|item| item.clone())
+        self.sender.get(idx).cloned()
     }
 
     pub fn get_size(&self) -> usize {

@@ -1,8 +1,6 @@
 use crate::data_structure::dict::dict::{Dict, DictEntry};
 use crate::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
 use rand::Rng;
-use std::ffi::c_void;
-use std::hash::Hash;
 
 pub(crate) const DICT_HT_INITIAL_EXP: usize = 2;
 pub(crate) const DICT_HT_INITIAL_SIZE: usize = 1 << DICT_HT_INITIAL_EXP;
@@ -21,7 +19,6 @@ pub enum DictResizeFlag {
 }
 
 pub type DictScanFunction<V> = fn(de: &mut DictEntry<V>);
-pub type DictDefragAllocFunction = fn(ptr: *mut c_void);
 
 pub struct DictType<V> {
     pub hash_function: Option<Box<dyn Fn(&String) -> u64>>,

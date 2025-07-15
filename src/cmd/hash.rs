@@ -133,7 +133,7 @@ impl HashCmd {
     fn hash_get(o: &mut RedisObject<String>, field: &str) -> Option<&'static str> {
         if o.encoding == OBJ_ENCODING_HT {
             let de = match &mut o.ptr {
-                RedisValue::Hash(ht) => ht.find(&field),
+                RedisValue::Hash(ht) => ht.find(field),
                 _ => return None
             };
             if let Some(de) = de {
