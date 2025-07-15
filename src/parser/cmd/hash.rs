@@ -3,7 +3,7 @@ use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::parser::cmd::error::CommandError;
 
 use crate::db::db::RedisDb;
-use crate::object::{OBJ_ENCODING_HT, RedisObject, RedisValue};
+use crate::db::object::{OBJ_ENCODING_HT, RedisObject, RedisValue};
 use crate::parser::frame::Frame;
 
 #[derive(Debug)]

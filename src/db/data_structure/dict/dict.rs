@@ -12,7 +12,7 @@ use std::fmt::Debug;
 use std::mem;
 use std::ptr::NonNull;
 use std::time::Instant;
-use crate::object::RedisObject;
+use crate::db::object::RedisObject;
 
 pub enum Value<T> {
     Val(RedisObject<T>),

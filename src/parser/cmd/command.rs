@@ -3,7 +3,7 @@ use crate::parser::cmd::hash::HashCmd;
 use crate::parser::frame::Frame;
 use crate::client::client::Tokens;
 use crate::db::db::RedisDb;
-use crate::object::RedisObject;
+use crate::db::object::RedisObject;
 
 pub trait CommandStrategy {
     fn into_frame(self) -> Frame;

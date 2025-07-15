@@ -7,8 +7,6 @@ use parser::cmd::command::RedisCommand;
 
 mod cluster;
 mod db;
-mod object;
-mod db_engine;
 pub mod server;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;

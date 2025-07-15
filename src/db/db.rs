@@ -1,6 +1,6 @@
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
 use crate::db::kvstore::kvstore::KvStore;
-use crate::object::{RedisObject, RedisValue};
+use crate::db::object::{RedisObject, RedisValue};
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
