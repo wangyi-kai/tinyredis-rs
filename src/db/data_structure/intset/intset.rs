@@ -1,7 +1,7 @@
-use crate::data_structure::intset::lib::intset_value_encoding;
-use crate::data_structure::intset::*;
+use crate::db::data_structure::intset::lib::intset_value_encoding;
+use crate::db::data_structure::intset::*;
 
-use crate::data_structure::skiplist::lib::gen_random;
+use crate::db::data_structure::skiplist::lib::gen_random;
 
 #[derive(Clone, Debug)]
 pub struct IntSet {

@@ -1,4 +1,4 @@
-use crate::data_structure::intset::*;
+use crate::db::data_structure::intset::*;
 
 pub fn intset_value_encoding(v: i64) -> u8 {
     if v < INT32_MIN || v > INT32_MAX {

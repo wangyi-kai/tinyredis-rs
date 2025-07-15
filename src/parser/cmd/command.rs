@@ -1,5 +1,5 @@
-use crate::cmd::error::CommandError;
-use crate::cmd::hash::HashCmd;
+use crate::parser::cmd::error::CommandError;
+use crate::parser::cmd::hash::HashCmd;
 use crate::parser::frame::Frame;
 use crate::client::client::Tokens;
 use crate::db::db::RedisDb;

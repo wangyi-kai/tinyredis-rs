@@ -1,5 +1,5 @@
-use crate::data_structure::adlist::adlist::Node;
-use crate::kvstore::kvstore::KvStoreDictMetadata;
+use crate::db::data_structure::adlist::adlist::Node;
+use crate::db::kvstore::kvstore::KvStoreDictMetadata;
 use std::ptr::NonNull;
 
 pub struct KvStoreDictMetaBase<T> {

@@ -1,7 +1,7 @@
 mod kvstore_test {
-    use crate::data_structure::dict::lib::DictType;
-    use crate::kvstore::kvstore::KvStore;
-    use crate::kvstore::{
+    use crate::db::data_structure::dict::lib::DictType;
+    use crate::db::kvstore::kvstore::KvStore;
+    use crate::db::kvstore::{
         KVSTORE_ALLOCATE_DICTS_ON_DEMAND, KVSTORE_ALLOC_META_KEYS_HIST, KVSTORE_FREE_EMPTY_DICTS,
     };
     use std::fmt::Write as _;

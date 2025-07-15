@@ -1,4 +1,4 @@
-use crate::data_structure::quicklist::quicklist::QuickListNode;
+use crate::db::data_structure::quicklist::quicklist::QuickListNode;
 
 pub struct QuickListBookmark {
     node: QuickListNode,

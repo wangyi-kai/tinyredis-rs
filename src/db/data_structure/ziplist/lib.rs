@@ -1,6 +1,6 @@
-use crate::data_structure::ziplist::error::ZipListError;
-use crate::data_structure::ziplist::ziplist::ZipList;
-use crate::data_structure::ziplist::*;
+use crate::db::data_structure::ziplist::error::ZipListError;
+use crate::db::data_structure::ziplist::ziplist::ZipList;
+use crate::db::data_structure::ziplist::*;
 use std::cmp;
 use std::str::from_utf8;
 

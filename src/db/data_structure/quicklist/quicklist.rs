@@ -1,12 +1,12 @@
 use std::ptr::NonNull;
 
-use crate::data_structure::quicklist::lib::QuickListLzf;
-use crate::data_structure::quicklist::{
+use crate::db::data_structure::quicklist::lib::QuickListLzf;
+use crate::db::data_structure::quicklist::{
     is_large_element, quicklist_node_exceed_limit, COMPRESS_MAX, FILL_MAX, MIN_COMPRESS_BYTES,
     MIN_COMPRESS_IMPROVE, QUICKLIST_NODE_CONTAINER_PACKED, QUICKLIST_NODE_CONTAINER_PLAIN,
     QUICKLIST_NODE_ENCODING_LZF, QUICKLIST_NODE_ENCODING_RAW, SIZE_ESTIMATE_OVERHEAD,
 };
-use crate::data_structure::ziplist::ziplist::ZipList;
+use crate::db::data_structure::ziplist::ziplist::ZipList;
 
 pub struct QuickListNode {
     prev: Option<NonNull<QuickListNode>>,

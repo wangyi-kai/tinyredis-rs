@@ -1,5 +1,5 @@
 use crate::db::db::RedisDb;
-use crate::kvstore::KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
+use crate::db::kvstore::KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
 
 #[derive(Debug)]
 pub struct DbHandler {

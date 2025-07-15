@@ -1,4 +1,4 @@
-use crate::crc::crc16::crc16;
+use crate::db::crc::crc16::crc16;
 #[inline]
 pub fn key_hash_slot(key: &str) -> u32 {
     let key_vec = key.as_bytes();

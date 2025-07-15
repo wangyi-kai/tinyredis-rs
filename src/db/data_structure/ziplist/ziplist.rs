@@ -1,9 +1,9 @@
 use std::str::from_utf8;
 
-use crate::data_structure::ziplist::error::ZipListError;
-use crate::data_structure::ziplist::lib::Content::{Char, Integer};
-use crate::data_structure::ziplist::lib::*;
-use crate::data_structure::ziplist::{
+use crate::db::data_structure::ziplist::error::ZipListError;
+use crate::db::data_structure::ziplist::lib::Content::{Char, Integer};
+use crate::db::data_structure::ziplist::lib::*;
+use crate::db::data_structure::ziplist::{
     ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE, ZIPLIST_LENGTH_OFFSET, ZIP_ENCODING_SIZE_INVALID,
     ZIP_END,
 };

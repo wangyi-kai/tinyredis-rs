@@ -1,8 +1,7 @@
 use bytes::Bytes;
-use crate::cmd::command::{CommandStrategy, RedisCommand};
-use crate::cmd::error::CommandError;
-use crate::data_structure::dict::dict::Value;
-use crate::data_structure::dict::dict::Value::Val;
+use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
+use crate::parser::cmd::error::CommandError;
+
 use crate::db::db::RedisDb;
 use crate::object::{OBJ_ENCODING_HT, RedisObject, RedisValue};
 use crate::parser::frame::Frame;
@@ -167,8 +166,8 @@ impl HashCmd {
 
 #[cfg(test)]
 mod test {
-    use crate::cmd::command::{CommandStrategy, get_command_name};
-    use crate::cmd::hash::HashCmd;
+    use crate::parser::cmd::command::{CommandStrategy, get_command_name};
+    use crate::parser::cmd::hash::HashCmd;
 
     #[test]
     fn cmd_to_frame() -> crate::Result<()> {

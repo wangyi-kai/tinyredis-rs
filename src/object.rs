@@ -1,10 +1,10 @@
-use crate::data_structure::dict::dict::Dict;
-use crate::data_structure::intset::intset::IntSet;
-use crate::data_structure::quicklist::quicklist::QuickList;
+use crate::db::data_structure::dict::dict::Dict;
+use crate::db::data_structure::intset::intset::IntSet;
+use crate::db::data_structure::skiplist::skiplist::SkipList;
+use crate::db::data_structure::ziplist::ziplist::ZipList;
+use crate::db::data_structure::adlist::adlist::LinkList;
+
 use std::hash::Hash;
-use crate::data_structure::skiplist::skiplist::SkipList;
-use crate::data_structure::ziplist::ziplist::ZipList;
-use crate::data_structure::adlist::adlist::LinkList;
 
 /// A redis object, that is a type able to hold a string / list / set
 

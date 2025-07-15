@@ -1,8 +1,8 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
 use crate::client::config::Config;
-use crate::cmd::command::{RedisCommand};
+use crate::parser::cmd::command::{RedisCommand};
 use crate::server::connection::Connection;
-use crate::cmd::hash::HashCmd::{HDel, HGet, HSet};
+use crate::parser::cmd::hash::HashCmd::{HDel, HGet, HSet};
 
 pub struct Client {
     conn: Connection,

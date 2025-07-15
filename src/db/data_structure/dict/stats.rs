@@ -1,5 +1,5 @@
-use crate::data_structure::dict::dict::Dict;
-use crate::data_structure::dict::lib::{dict_size, DICT_STATS_VECTLEN};
+use crate::db::data_structure::dict::dict::Dict;
+use crate::db::data_structure::dict::lib::{dict_size, DICT_STATS_VECTLEN};
 
 use std::fmt::Write as _;
 

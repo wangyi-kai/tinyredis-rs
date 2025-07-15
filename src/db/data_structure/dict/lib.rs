@@ -1,5 +1,5 @@
-use crate::data_structure::dict::dict::{Dict, DictEntry};
-use crate::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
+use crate::db::data_structure::dict::dict::{Dict, DictEntry};
+use crate::db::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
 use rand::Rng;
 
 pub(crate) const DICT_HT_INITIAL_EXP: usize = 2;

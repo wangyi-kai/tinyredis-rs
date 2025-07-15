@@ -1,5 +1,5 @@
-use crate::data_structure::dict::dict::{Dict, DictEntry};
-use crate::data_structure::dict::lib::*;
+use crate::db::data_structure::dict::dict::{Dict, DictEntry};
+use crate::db::data_structure::dict::lib::*;
 use std::marker::PhantomData;
 
 #[derive(Debug)]
