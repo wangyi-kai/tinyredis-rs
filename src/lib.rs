@@ -10,7 +10,7 @@ mod db;
 pub mod server;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
-pub type Result<T> = std::result::Result<T, crate::Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 type MpscSender = mpsc::Sender<(oneshot::Sender<Result<Frame>>, RedisCommand)>;
 type MpscReceiver = mpsc::Receiver<(oneshot::Sender<Result<Frame>>, RedisCommand)>;
 

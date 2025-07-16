@@ -28,7 +28,7 @@ impl Listener {
         loop {
             self.limit_connections.acquire().await.unwrap().forget();
             let socket = self.accept().await?;
-            debug!("Accept new connection");
+            info!("Accept new connection");
             let mut handler = Handler {
                 connection: Connection::new(socket),
                 limit_connections: self.limit_connections.clone(),
@@ -78,22 +78,12 @@ impl Handler {
                 res = self.connection.read_frame() => res?,
                 _ = self.shutdown.receiver() => return Ok(())
             };
-            //println!("get frame: {:?}", frame);
 
             if let Some(frame) = frame {
-                let result_cmd = RedisCommand::from_frame(frame);
-                let result_frame = match result_cmd {
-                    Ok(command) => match command {
-                        RedisCommand::Hash(cmd) => {
-                            let (sender, receiver) = oneshot::channel();
-                            self.db_sender.send((sender, RedisCommand::Hash(cmd))).await?;
-                            receiver.await?
-                        }
-                         _ => todo!()
-                    }
-                    Err(e) => return Err(e)
-                };
-                let frame = result_frame.unwrap_or_else(|e| Frame::Error(e.to_string()));
+                let result_cmd = RedisCommand::from_frame(frame)?;
+                let (sender, receiver) = oneshot::channel();
+                self.db_sender.send((sender, result_cmd)).await?;
+                let frame = receiver.await?.unwrap_or_else(|e| Frame::Error(e.to_string()));
                 self.connection.write_frame(&frame).await?;
             }
         }

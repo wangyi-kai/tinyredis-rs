@@ -125,7 +125,7 @@ impl HashCmd {
                 }
             }
         } else {
-            todo!()
+            unimplemented!()
         }
     }
 

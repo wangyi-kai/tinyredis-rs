@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use tokio::sync::mpsc;
+use tracing::info;
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 
 pub enum KeyStatus {
@@ -60,8 +61,15 @@ impl<V> RedisDb<V> {
 
     pub async fn run(&mut self) {
         while let Some((sender, command)) = self.receiver.recv().await {
+            info!("apply command {:?}", command);
             let frame = match command {
                 RedisCommand::Hash(cmd) => {
+                    let db = unsafe {
+                        &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
+                    };
+                    cmd.apply(db)
+                }
+                RedisCommand::String(cmd) => {
                     let db = unsafe {
                         &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
                     };

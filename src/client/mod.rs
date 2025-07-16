@@ -1,2 +1,2 @@
 pub mod client;
-mod config;
+pub mod config;

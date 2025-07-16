@@ -1,7 +1,7 @@
 use crate::parser::cmd::error::CommandError;
 use crate::parser::cmd::hash::HashCmd;
 use crate::parser::frame::Frame;
-use crate::client::client::Tokens;
+use crate::parser::cmd::string::StringCmd;
 use crate::db::db::RedisDb;
 use crate::db::object::RedisObject;
 
@@ -26,7 +26,10 @@ impl RedisCommand {
     pub fn from_frame(frame: Frame) -> crate::Result<RedisCommand> {
         let cmd_name = get_command_name(&frame).ok().unwrap().to_lowercase();
         let command = match &cmd_name[..] {
-            "hset" | "hget" | "hdel" => HashCmd::from_frame(&cmd_name, frame)?,
+            "hset" | "hget" | "hdel" =>
+                HashCmd::from_frame(&cmd_name, frame)?,
+            "append" | "set" | "get" | "setex" | "setnx" | "setpx" | "setxx" =>
+                StringCmd::from_frame(&cmd_name, frame)?,
             _ => return Err(CommandError::ParseError(-101).into()),
         };
         Ok(command)
@@ -35,6 +38,7 @@ impl RedisCommand {
     pub fn into_frame(self) -> Frame {
         match self {
             RedisCommand::Hash(cmd) => cmd.into_frame(),
+            RedisCommand::String(cmd) => cmd.into_frame(),
             _ => unimplemented!()
         }
     }
@@ -114,26 +118,6 @@ pub enum SortedCmd {
     ZInterCard,
     /// Stores the intersect of multiple sorted sets in a key
     ZInterStore,
-}
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum StringCmd {
-    /// Appends a string to the value of a key. Creates the key if it doesn't exist
-    Append,
-    /// Returns the string value of a key
-    Get,
-    /// Sets the string value of a key, ignoring its type. The key is created if it doesn't exist
-    Set,
-    /// Returns the length of a string value
-    Strlen,
-    /// Increments the integer value of a key by one
-    Incr,
-    /// Increments the integer value of a key by a number
-    IncrBy,
-    /// Decrements the integer value of a key by one
-    Decr,
-    /// Decrements a number from the integer value of a key
-    DecrBy,
 }
 
 pub fn get_command_name(frame: &Frame) -> crate::Result<String> {

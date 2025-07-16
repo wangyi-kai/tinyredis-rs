@@ -1,11 +1,12 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
-use crate::client::config::Config;
+
 use crate::parser::cmd::command::{RedisCommand};
 use crate::server::connection::Connection;
 use crate::parser::cmd::hash::HashCmd::{HDel, HGet, HSet};
+use crate::parser::cmd::string::StringCmd::{*};
 
 pub struct Client {
-    conn: Connection,
+    pub conn: Connection,
 }
 
 impl Client {
@@ -112,51 +113,12 @@ impl Tokens {
                 let field = self.token[2].to_string();
                 Some(RedisCommand::Hash(HDel {key, field}))
             }
+            "append" => {
+                let key = self.token[1].to_string();
+                let field = self.token[2].to_string();
+                Some(RedisCommand::String(Append { key, field }))
+            }
             _ => None
-        }
-    }
-}
-
-pub async fn run_client() {
-    tracing_subscriber::fmt::try_init().expect("config log fail");
-    let config = Config::new(None);
-    let host = config.get_value("server_ip").unwrap().trim_matches('"').to_string();
-    let port = config.get_value("server_port").unwrap();
-    let addr = format!("{}:{}", host, port);
-
-    let mut client = Client::connect(addr.clone()).await.unwrap();
-    let mut command = String::new();
-    'clear: loop {
-        command.clear();
-        println!("<{}>: ", addr);
-        'cmd: loop {
-             std::io::stdin().read_line(&mut command).unwrap();
-            if command.ends_with("\n") {
-                command.remove(command.len() - 1);
-            }
-            if command.ends_with("\r") {
-                command.remove(command.len() - 1);
-            }
-            if !command.ends_with(";") {
-                command.push_str("\n");
-                continue 'cmd;
-            }
-            let tokens = Tokens::from(&command);
-            let cmd = tokens.to_command().unwrap();
-            let frame = cmd.into_frame();
-            let _ = client.conn.write_frame(&frame).await;
-            let res = client.conn.read_frame().await;
-            match res {
-                Ok(res) => {
-                    if let Some(res) = res {
-                        println!("{}", res);
-                    } else {
-                        println!("receive fail");
-                    }
-                },
-                Err(e) => println!("error: {}", e),
-            };
-            continue 'clear;
         }
     }
 }
