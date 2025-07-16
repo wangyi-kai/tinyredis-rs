@@ -62,21 +62,10 @@ impl<V> RedisDb<V> {
     pub async fn run(&mut self) {
         while let Some((sender, command)) = self.receiver.recv().await {
             info!("apply command {:?}", command);
-            let frame = match command {
-                RedisCommand::Hash(cmd) => {
-                    let db = unsafe {
-                        &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
-                    };
-                    cmd.apply(db)
-                }
-                RedisCommand::String(cmd) => {
-                    let db = unsafe {
-                        &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
-                    };
-                    cmd.apply(db)
-                }
-                _ => Err("Error".into())
+            let db = unsafe {
+                &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
             };
+            let frame = command.apply(db);
             let _ = sender.send(frame);
         }
     }

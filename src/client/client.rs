@@ -118,6 +118,10 @@ impl Tokens {
                 let field = self.token[2].to_string();
                 Some(RedisCommand::String(Append { key, field }))
             }
+            "get" => {
+                let key = self.token[1].to_string();
+                Some(RedisCommand::String(Get {key}))
+            }
             _ => None
         }
     }

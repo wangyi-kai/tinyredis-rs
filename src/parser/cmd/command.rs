@@ -22,8 +22,16 @@ pub enum RedisCommand {
     Hash(HashCmd),
 }
 
-impl RedisCommand {
-    pub fn from_frame(frame: Frame) -> crate::Result<RedisCommand> {
+impl CommandStrategy for RedisCommand {
+    fn into_frame(self) -> Frame {
+        match self {
+            RedisCommand::Hash(cmd) => cmd.into_frame(),
+            RedisCommand::String(cmd) => cmd.into_frame(),
+            _ => unimplemented!()
+        }
+    }
+
+    fn from_frame(_name: &str, frame: Frame) -> crate::Result<RedisCommand> {
         let cmd_name = get_command_name(&frame).ok().unwrap().to_lowercase();
         let command = match &cmd_name[..] {
             "hset" | "hget" | "hdel" =>
@@ -35,10 +43,10 @@ impl RedisCommand {
         Ok(command)
     }
 
-    pub fn into_frame(self) -> Frame {
+    fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
         match self {
-            RedisCommand::Hash(cmd) => cmd.into_frame(),
-            RedisCommand::String(cmd) => cmd.into_frame(),
+            RedisCommand::Hash(cmd) => cmd.apply(db),
+            RedisCommand::String(cmd) => cmd.apply(db),
             _ => unimplemented!()
         }
     }

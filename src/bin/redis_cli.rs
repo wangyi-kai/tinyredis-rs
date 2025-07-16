@@ -1,6 +1,7 @@
 use tracing::info;
 use redis_rs::client::client::{Client, Tokens};
 use redis_rs::client::config::Config;
+use redis_rs::parser::cmd::command::CommandStrategy;
 
 pub async fn run_client() {
     print_logo();

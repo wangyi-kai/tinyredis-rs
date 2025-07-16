@@ -129,6 +129,20 @@ impl CommandStrategy for StringCmd {
                     Ok(Frame::Simple("OK".to_string()))
                 }
             },
+            StringCmd::Get {key} => {
+                let key = RedisObject::<String>::create_string_object(key);
+                let mut o = db.lookup_key(&key);
+                if let Some(o) = o {
+                    match &o.ptr {
+                        RedisValue::String(s) => {
+                            Ok(Frame::Bulk(Bytes::from(s.clone().into_bytes())))
+                        }
+                        _ => Ok(Frame::Null)
+                    }
+                } else {
+                    Ok(Frame::Null)
+                }
+            }
             _ => Err(CommandError::ParseError(-2).into())
         }
     }

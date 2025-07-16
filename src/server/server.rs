@@ -5,7 +5,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Semaphore, broadcast, oneshot};
 use tokio::time;
 use tracing::{debug, error, info, Instrument};
-use crate::parser::cmd::command::RedisCommand;
+use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
@@ -80,7 +80,7 @@ impl Handler {
             };
 
             if let Some(frame) = frame {
-                let result_cmd = RedisCommand::from_frame(frame)?;
+                let result_cmd = RedisCommand::from_frame("", frame)?;
                 let (sender, receiver) = oneshot::channel();
                 self.db_sender.send((sender, result_cmd)).await?;
                 let frame = receiver.await?.unwrap_or_else(|e| Frame::Error(e.to_string()));
