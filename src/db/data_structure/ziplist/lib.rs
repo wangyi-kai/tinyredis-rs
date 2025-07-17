@@ -476,7 +476,7 @@ pub fn ziplist_merge(first: &mut Option<ZipList>, second: &mut Option<ZipList>) 
 
 #[cfg(test)]
 mod test {
-    use crate::data_structure::ziplist::lib::string_to_number;
+    use crate::db::data_structure::ziplist::lib::string_to_number;
 
     #[test]
     fn to_number() {

@@ -31,3 +31,41 @@ pub fn crc16(buf: &[u8]) -> u16 {
     }
     crc
 }
+
+pub fn key_hash_slot(key: &[u8]) -> usize {
+    let len = key.len();
+    let mut s = 0;
+
+    while s < len {
+        if key[s] == b'{' {
+            break;
+        }
+        s += 1;
+    }
+    if s == len {
+        return (crc16(key) & 0x3FFF) as usize;
+    }
+    let mut e = s + 1;
+    while e < len {
+        if key[e] == b'}' {
+            break;
+        }
+        e += 1;
+    }
+    if e == len || e == s + 1 {
+        return (crc16(key) & 0x3FFF) as usize;
+    }
+    (crc16(&key[s + 1..e]) & 0x3FFF) as usize
+}
+
+#[cfg(test)]
+mod test {
+    use crate::db::crc::crc16::key_hash_slot;
+
+    #[test]
+    fn key_hash() {
+        let key = "askgdjhagdkjashgdk".as_bytes();
+        let slot = key_hash_slot(key);
+        println!("slot: {}", slot);
+    }
+}

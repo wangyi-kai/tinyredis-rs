@@ -5,6 +5,7 @@ use crate::db::object::{RedisObject, RedisValue};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::parser::cmd::error::CommandError;
 use crate::parser::cmd::error::CommandError::ObjectTypeError;
+use crate::parser::cmd::string::StringCmd::Strlen;
 use crate::parser::frame::Frame;
 
 #[allow(dead_code)]
@@ -15,12 +16,12 @@ pub enum StringCmd {
     /// Returns the string value of a key
     Get { key: String},
     /// Sets the string value of a key, ignoring its type. The key is created if it doesn't exist
-    SetEX { key: String, value: String, ttl: i128 },
-    SetPX { key: String, value: String, ttl: i128 },
+    SetEX { key: String, ttl: i128 },
+    SetPX { key: String, ttl: i128 },
     SetNX { key: String, value: String },
     SetXX { key: String, value: String },
     /// Returns the length of a string value
-    Strlen,
+    Strlen { s: String },
     /// Increments the integer value of a key by one
     Incr,
     /// Increments the integer value of a key by a number
@@ -40,16 +41,14 @@ impl CommandStrategy for StringCmd {
                 frame.push_bulk(Bytes::from(key.into_bytes()));
                 frame.push_bulk(Bytes::from(field.into_bytes()));
             }
-            StringCmd::SetEX {key, value, ttl} => {
+            StringCmd::SetEX {key, ttl} => {
                 frame.push_bulk(Bytes::from("setex".as_bytes()));
                 frame.push_bulk(Bytes::from(key.into_bytes()));
-                frame.push_bulk(Bytes::from(value.into_bytes()));
                 frame.push_bulk(Bytes::from(ttl.to_string().into_bytes()));
             }
-            StringCmd::SetPX {key, value, ttl} => {
+            StringCmd::SetPX {key, ttl} => {
                 frame.push_bulk(Bytes::from("setpx".as_bytes()));
                 frame.push_bulk(Bytes::from(key.into_bytes()));
-                frame.push_bulk(Bytes::from(value.into_bytes()));
                 frame.push_bulk(Bytes::from(ttl.to_string().into_bytes()));
             }
             StringCmd::SetNX {key, value} => {
@@ -66,6 +65,10 @@ impl CommandStrategy for StringCmd {
                 frame.push_bulk(Bytes::from("get".as_bytes()));
                 frame.push_bulk(Bytes::from(key.into_bytes()));
             }
+            StringCmd::Strlen { s } => {
+                frame.push_bulk(Bytes::from("strlen".as_bytes()));
+                frame.push_bulk(Bytes::from(s.into_bytes()));
+            }
             _ => return Frame::Null,
         }
         frame
@@ -80,15 +83,13 @@ impl CommandStrategy for StringCmd {
             }
             "setex" => {
                 let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
-                let value = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
-                let ttl: i128 = frame.get_frame_by_index(3).ok_or("command error 'set'")?.to_string().parse()?;
-                Ok(RedisCommand::String(StringCmd::SetEX {key, value, ttl: ttl * 1000}))
+                let ttl: i128 = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string().parse()?;
+                Ok(RedisCommand::String(StringCmd::SetEX {key, ttl: ttl * 1000}))
             }
             "setpx" => {
                 let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
-                let value = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
-                let ttl: i128 = frame.get_frame_by_index(3).ok_or("command error 'set'")?.to_string().parse()?;
-                Ok(RedisCommand::String(StringCmd::SetPX {key, value, ttl}))
+                let ttl: i128 = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string().parse()?;
+                Ok(RedisCommand::String(StringCmd::SetPX {key, ttl}))
             }
             "setnx" => {
                 let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
@@ -104,7 +105,11 @@ impl CommandStrategy for StringCmd {
                 let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
                 Ok(RedisCommand::String(StringCmd::Get {key}))
             }
-            _ => Err(CommandError::ParseError(-2).into())
+            "strlen" => {
+                let s = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
+                Ok(RedisCommand::String(Strlen {s}))
+            }
+            _ => Err(CommandError::ParseError(-3).into())
         }
     }
 
@@ -142,6 +147,38 @@ impl CommandStrategy for StringCmd {
                 } else {
                     Ok(Frame::Null)
                 }
+            }
+            StringCmd::SetNX {key, value} => {
+                let key = RedisObject::<String>::create_string_object(key);
+                let mut o = db.lookup_key(&key);
+                if let Some(_o) = o {
+                    Ok(Frame::Simple("key exists".to_string()))
+                } else {
+                    let value = RedisObject::<String>::create_string_object(value);
+                    db.add(key, value);
+                    Ok(Frame::Simple("OK".to_string()))
+                }
+            }
+            StringCmd::SetXX {key, value} => {
+                let key = RedisObject::<String>::create_string_object(key);
+                let mut o = db.lookup_key(&key);
+                if let Some(_o) = o {
+                    let value = RedisObject::<String>::create_string_object(value);
+                    db.set_val(&key, value);
+                    Ok(Frame::Simple("OK".to_string()))
+                } else {
+                    Ok(Frame::Simple("key not exists".to_string()))
+                }
+            }
+            StringCmd::SetPX {..} => {
+                Err(CommandError::NotSupport("setpx".to_string()).into())
+            }
+            StringCmd::SetEX {..} => {
+                Err(CommandError::NotSupport("setex".to_string()).into())
+            }
+            StringCmd::Strlen { s } => {
+                let len = s.len();
+                Ok(Frame::Simple(len.to_string()))
             }
             _ => Err(CommandError::ParseError(-2).into())
         }

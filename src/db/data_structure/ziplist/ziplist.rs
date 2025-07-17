@@ -54,6 +54,7 @@ impl ZlEntry {
     }
 }
 
+#[derive(Clone)]
 pub struct ZipList {
     pub data: Vec<u8>,
 }

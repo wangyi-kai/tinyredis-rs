@@ -15,6 +15,10 @@ pub enum KeyStatus {
     KeyDeleted,
 }
 
+pub fn get_key_slot(key: &str) {
+
+}
+
 pub struct RedisDb<V> {
     /// The keyspace for this DB. As metadata, holds key sizes histogram
     keys: KvStore<V>,
@@ -75,18 +79,19 @@ impl<V> RedisDb<V> {
             RedisValue::String(s) => s,
             _ => return None,
         };
-
         let de = self.keys.dict_find(0, k);
-        unsafe {
-            if de.is_none() {
-                return None;
+
+        if let Some(de) = de {
+            unsafe {
+                let val = (*de.as_ptr()).get_val();
+                Some(val)
             }
-            let val = (*de.unwrap().as_ptr()).get_val();
-            Some(val)
+        } else {
+            None
         }
     }
 
-    pub fn _find(&self, key: &str) -> Option<NonNull<DictEntry<V>>> {
+    pub fn find(&self, key: &str) -> Option<NonNull<DictEntry<V>>> {
         self.keys.dict_find(0, key)
     }
 
@@ -116,17 +121,12 @@ impl<V> RedisDb<V> {
         }
     }
 
-    fn set_val(&mut self, key: RedisObject<String>, _val: V, _overwrite: i32, mut de: Option<NonNull<DictEntry<V>>>) {
-        let slot = 0;
-        let key = match key.ptr {
-            RedisValue::String(s) => s,
-            _ => { "".to_string() }
-        };
-        if de.is_some() {
-            de = self.keys.dict_find(slot, &key);
-        }
-        unsafe {
-            let _old = (*de.unwrap().as_ptr()).get_val();
+    pub fn set_val(&mut self, key: &RedisObject<String>, val: V) {
+        let old = self.lookup_key(key);
+        if let Some(old) = old {
+            *old = val;
+        } else {
+            self.add(key.clone(), val);
         }
     }
 

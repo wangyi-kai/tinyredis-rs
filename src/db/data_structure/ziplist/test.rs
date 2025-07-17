@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod test {
-    use crate::data_structure::adlist::adlist::*;
-    use crate::data_structure::ziplist::error::ZipListError;
-    use crate::data_structure::ziplist::ziplist::{ZipList, ZlEntry};
-    use crate::data_structure::ziplist::{
+    use crate::db::data_structure::adlist::adlist::*;
+    use crate::db::data_structure::ziplist::error::ZipListError;
+    use crate::db::data_structure::ziplist::ziplist::{ZipList, ZlEntry};
+    use crate::db::data_structure::ziplist::{
         ZIPLIST_HEAD, ZIPLIST_HEADER_SIZE, ZIPLIST_TAIL, ZIP_BIG_PREVLEN, ZIP_END,
     };
 
-    use crate::data_structure::ziplist::lib::{
+    use crate::db::data_structure::ziplist::lib::{
         store_entry_encoding, store_prev_entry_length, ziplist_merge, ziplist_repr,
         ziplist_valid_integerity,
     };

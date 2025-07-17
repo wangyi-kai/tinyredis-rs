@@ -51,6 +51,7 @@ const OBJ_SHARED_REFCOUNT: i32 = i32::MAX;
 const OBJ_STATIC_REFCOUNT: i32 = i32::MAX - 1;
 const OBJ_FIRST_SPECIAL_REFCOUNT: i32 = OBJ_STATIC_REFCOUNT;
 
+#[derive(Clone)]
 pub enum RedisValue<T> {
     String(T),
     List(ListObject<T>),
@@ -59,11 +60,13 @@ pub enum RedisValue<T> {
     Set(IntSet),
 }
 
+#[derive(Clone)]
 pub enum ListObject<T> {
     LinkList(LinkList<T>),
     ZipList(ZipList),
 }
 
+#[derive(Clone)]
 pub struct RedisObject<T> {
     /// object type
     object_type: u32,

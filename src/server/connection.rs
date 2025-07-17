@@ -99,8 +99,7 @@ impl Connection {
             }
             // Encoding an `Array` from within a value cannot be done using a
             // recursive strategy. In general, async fns do not support
-            // recursion. Mini-redis has not needed to encode nested arrays yet,
-            // so for now it is skipped.
+            // recursion.
             Frame::Array(_val) => unreachable!(),
         }
 

@@ -10,6 +10,7 @@ use crate::db::kvstore::{
 use rand::Rng;
 use std::ptr::NonNull;
 use std::time::Instant;
+use crate::db::object::RedisObject;
 
 #[derive(Clone)]
 pub struct KvStoreMetadata {
@@ -529,10 +530,11 @@ impl<'a, V> KvStore<V> {
 
     pub fn dict_find(&self, didx: i32, key: &str) -> Option<NonNull<DictEntry<V>>> {
         let d = self.get_dict(didx as usize);
-        if d.is_none() {
-            return None;
+        if let Some(d) = d {
+            unsafe { (*d.as_ptr()).find(key) }
+        } else {
+            None
         }
-        unsafe { (*d.unwrap().as_ptr()).find(key) }
     }
 
     pub fn dict_add_raw(&mut self, didx: i32, key: String) -> Option<NonNull<DictEntry<V>>> {
@@ -557,17 +559,18 @@ impl<'a, V> KvStore<V> {
         }
     }
 
-    pub fn dict_set_key(&mut self, didx: i32, de: NonNull<DictEntry<V>>, key: String) {
+    pub fn dict_set_key(&mut self, didx: i32, old_key: &str, new_key: String) {
         unsafe {
-            let d = self.get_dict(didx as usize);
-            (*de.as_ptr()).key = key;
+            let d = self.dict_find(didx, &old_key);
+            let mut old = (*d.unwrap().as_ptr()).get_val();
         }
     }
 
-    pub fn dict_set_val(&mut self, didx: i32, de: NonNull<DictEntry<V>>, val: V) {
+    pub fn dict_set_val(&mut self, didx: i32, key: &str, val: RedisObject<String>) {
         unsafe {
-            let d = self.get_dict(didx as usize);
-            (*de.as_ptr()).val = Some(val);
+            let d = self.dict_find(didx, key);
+            let old = &mut *((*d.unwrap().as_ptr()).get_val() as *mut V as *mut RedisObject<String>);
+            *old = val;
         }
     }
 

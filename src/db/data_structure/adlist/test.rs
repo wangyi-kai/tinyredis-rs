@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::data_structure::adlist::adlist::LinkList;
+    use crate::db::data_structure::adlist::adlist::LinkList;
 
     #[test]
     fn list_insert() {

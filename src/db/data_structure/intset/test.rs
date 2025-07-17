@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod intset_test {
-    use crate::data_structure::intset::intset::IntSet;
-    use crate::data_structure::intset::lib::intset_value_encoding;
-    use crate::data_structure::intset::{INTSET_ENC_INT16, INTSET_ENC_INT32, INTSET_ENC_INT64};
-    use crate::data_structure::skiplist::lib::gen_random;
+    use crate::db::data_structure::intset::intset::IntSet;
+    use crate::db::data_structure::intset::lib::intset_value_encoding;
+    use crate::db::data_structure::intset::{INTSET_ENC_INT16, INTSET_ENC_INT32, INTSET_ENC_INT64};
+    use crate::db::data_structure::skiplist::lib::gen_random;
     use std::time::Instant;
 
     fn intset_repr(is: &IntSet) {

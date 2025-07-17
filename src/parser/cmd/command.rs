@@ -36,7 +36,7 @@ impl CommandStrategy for RedisCommand {
         let command = match &cmd_name[..] {
             "hset" | "hget" | "hdel" =>
                 HashCmd::from_frame(&cmd_name, frame)?,
-            "append" | "set" | "get" | "setex" | "setnx" | "setpx" | "setxx" =>
+            "append" | "set" | "get" | "setex" | "setnx" | "setpx" | "setxx" | "strlen" =>
                 StringCmd::from_frame(&cmd_name, frame)?,
             _ => return Err(CommandError::ParseError(-101).into()),
         };

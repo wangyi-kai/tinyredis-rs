@@ -80,6 +80,7 @@ impl<V> DictEntry<V>
 unsafe impl<V: Send> Send for Dict<V> {}
 unsafe impl<V: Sync> Sync for Dict<V> {}
 
+#[derive(Clone)]
 pub struct Dict<V>
 {
     //pub dict_type: Arc<DictType<K, V>>,

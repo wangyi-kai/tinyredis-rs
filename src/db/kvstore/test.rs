@@ -57,7 +57,7 @@ mod kvstore_test {
         {
             let mut iter = kvs1.iter();
             while let Some(de) = iter.next() {
-                curr_slot = iter.get_current_dict_index();
+                curr_slot = iter._get_current_dict_index();
                 let key = &de.key;
                 assert!(kvs1.dict_delete(curr_slot, key).is_some())
             }
@@ -74,7 +74,7 @@ mod kvstore_test {
         {
             let mut iter = kvs2.iter();
             while let Some(de) = iter.next() {
-                curr_slot = iter.get_current_dict_index();
+                curr_slot = iter._get_current_dict_index();
                 let key = &de.key;
                 assert!(kvs2.dict_delete(curr_slot, key).is_some())
             }
@@ -112,7 +112,7 @@ mod kvstore_test {
                 let key = &de.key;
                 assert!(kvs1.dict_delete(didx, key).is_some());
             }
-            iter.release_dict_iterator();
+            iter._release_dict_iterator();
 
             let d = kvs1.get_dict(didx as usize);
             assert!(d.is_some());
@@ -130,7 +130,7 @@ mod kvstore_test {
                 let key = &de.key;
                 assert!(kvs2.dict_delete(didx, key).is_some());
             }
-            iter.release_dict_iterator();
+            iter._release_dict_iterator();
 
             let d = kvs2.get_dict(didx as usize);
             assert!(d.is_none());
@@ -177,7 +177,7 @@ mod kvstore_test {
                         assert_eq!(kvs.non_empty_dicts(), 3 - idx as i32);
                     }
                 }
-                iter.release_dict_iterator();
+                iter._release_dict_iterator();
             }
             println!("PASS");
         }

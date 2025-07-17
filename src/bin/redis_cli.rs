@@ -31,7 +31,7 @@ pub async fn run_client() {
                 continue 'cmd;
             }
             let tokens = Tokens::from(&command);
-            let cmd = tokens.to_command().unwrap();
+            let cmd = tokens.to_command().unwrap().unwrap();
             let frame = cmd.into_frame();
             let _ = client.conn.write_frame(&frame).await;
             let res = client.conn.read_frame().await;

@@ -30,6 +30,7 @@ impl<T> Node<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct LinkList<T> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,

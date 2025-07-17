@@ -94,35 +94,59 @@ impl Tokens {
         } else { None }
     }
 
-    pub fn to_command(self) -> Option<RedisCommand> {
+    pub fn to_command(self) -> crate::Result<Option<RedisCommand>> {
         let cmd_name = self.token[0].to_string();
         match &cmd_name[..] {
             "hset" => {
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
                 let value = self.token[3].to_string();
-                Some(RedisCommand::Hash(HSet {key, field, value}))
+                Ok(Some(RedisCommand::Hash(HSet {key, field, value})))
             }
             "hget" => {
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
-                Some(RedisCommand::Hash(HGet {key, field}))
+                Ok(Some(RedisCommand::Hash(HGet {key, field})))
             }
             "hdel" => {
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
-                Some(RedisCommand::Hash(HDel {key, field}))
+                Ok(Some(RedisCommand::Hash(HDel {key, field})))
             }
             "append" => {
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
-                Some(RedisCommand::String(Append { key, field }))
+                Ok(Some(RedisCommand::String(Append { key, field })))
             }
             "get" => {
                 let key = self.token[1].to_string();
-                Some(RedisCommand::String(Get {key}))
+                Ok(Some(RedisCommand::String(Get {key})))
             }
-            _ => None
+            "setex" => {
+                let key = self.token[1].to_string();
+                let ttl:i128 = self.token[2].to_string().parse()?;
+                Ok(Some(RedisCommand::String(SetEX {key, ttl: ttl * 1000})))
+            }
+            "setpx" => {
+                let key = self.token[1].to_string();
+                let ttl:i128 = self.token[2].to_string().parse()?;
+                Ok(Some(RedisCommand::String(SetPX {key, ttl})))
+            }
+            "setnx" => {
+                let key = self.token[1].to_string();
+                let value = self.token[2].to_string();
+                Ok(Some(RedisCommand::String(SetNX {key, value})))
+            }
+            "setxx" => {
+                let key = self.token[1].to_string();
+                let value = self.token[2].to_string();
+                Ok(Some(RedisCommand::String(SetXX {key, value})))
+            }
+            "strlen" => {
+                let s = self.token[1].to_string();
+                Ok(Some(RedisCommand::String(Strlen {s})))
+            }
+            _ => Ok(None)
         }
     }
 }

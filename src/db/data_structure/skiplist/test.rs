@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod skiplist_test {
-    use crate::data_structure::skiplist::skiplist::SkipList;
+    use crate::db::data_structure::skiplist::skiplist::SkipList;
 
     #[test]
     #[warn(unused_unsafe)]
