@@ -29,30 +29,25 @@
 ## 🚀 快速开始
 
 ### 构建项目
-
 ```bash
 git clone https://github.com/wangyi-kai/tinyredis.git
 cd tinyredis/src
 ```
-
 ### 启动 tinyredis
-
 ```bash
 启动服务端
 cargo run --release --bin redis_server
 启动客户端
 cargo run --release --bin redis_cli
-
-默认监听地址为 `127.0.0.1:8000`
 ```
-
+默认监听地址为 `127.0.0.1:8000`
 ---
-
 ## 📦 已支持命令
 ```bash
 * `HSET key field value`
 * `HGET key field`
 * `HDEL key field`
+*  ...
 * 更多命令持续开发中...
 ```
 
@@ -63,21 +58,19 @@ cargo run --release --bin redis_cli
 
 *待开发
 ```
-
 ---
 
 ## 📚 架构设计
 ```bash
 src/
-├── server/      # 异步网络服务
-├── protocol/    # RESP 协议解析器
+|—— bin/         # 启动入口
+├── client/      # 客户端实现
+├── cluster/     # 集群相关
 ├── db/          # 数据库与数据结构实现
-├── command/     # 命令分发与执行逻辑
-└── main.rs
+├── parser/      # RESP 协议解析器
+└── server/      # 服务端实现
 ```
-
 ---
-
 ## 🛠️ 技术栈
 ```bash
 * [Rust](https://www.rust-lang.org/)
@@ -87,9 +80,7 @@ src/
 * [Tracing](https://docs.rs/tracing)
 * [Clap](https://docs.rs/clap)
 ```
-
 ---
-
 ## 📈 未来计划
 ```bash
 * [ ] 支持 RDB / AOF 持久化
@@ -99,9 +90,7 @@ src/
 * [ ] Lua 脚本支持
 * [ ] 集群协议兼容
 ```
-
 ---
-
 ## ❤️ 致谢
 ```bash
 * [Redis](https://redis.io/)
