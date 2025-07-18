@@ -77,36 +77,36 @@ impl CommandStrategy for StringCmd {
     fn from_frame(name: &str, frame: Frame) -> crate::Result<RedisCommand> {
         match name {
             "append" => {
-                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
-                let field = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
+                let key = frame.get_frame_by_index(1).ok_or("command error 'append'")?.to_string();
+                let field = frame.get_frame_by_index(2).ok_or("command error 'append'")?.to_string();
                 Ok(RedisCommand::String(StringCmd::Append {key, field}))
             }
             "setex" => {
-                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
-                let ttl: i128 = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string().parse()?;
+                let key = frame.get_frame_by_index(1).ok_or("command error 'setex'")?.to_string();
+                let ttl: i128 = frame.get_frame_by_index(2).ok_or("command error 'setex'")?.to_string().parse()?;
                 Ok(RedisCommand::String(StringCmd::SetEX {key, ttl: ttl * 1000}))
             }
             "setpx" => {
-                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
-                let ttl: i128 = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string().parse()?;
+                let key = frame.get_frame_by_index(1).ok_or("command error 'setpx'")?.to_string();
+                let ttl: i128 = frame.get_frame_by_index(2).ok_or("command error 'setpx'")?.to_string().parse()?;
                 Ok(RedisCommand::String(StringCmd::SetPX {key, ttl}))
             }
             "setnx" => {
-                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
-                let value = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
+                let key = frame.get_frame_by_index(1).ok_or("command error 'setnx'")?.to_string();
+                let value = frame.get_frame_by_index(2).ok_or("command error 'setnx'")?.to_string();
                 Ok(RedisCommand::String(StringCmd::SetNX {key, value}))
             }
             "setxx" => {
-                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
-                let value = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
+                let key = frame.get_frame_by_index(1).ok_or("command error 'setxx'")?.to_string();
+                let value = frame.get_frame_by_index(2).ok_or("command error 'setxx'")?.to_string();
                 Ok(RedisCommand::String(StringCmd::SetXX {key, value}))
             }
             "get" => {
-                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
+                let key = frame.get_frame_by_index(1).ok_or("command error 'get'")?.to_string();
                 Ok(RedisCommand::String(StringCmd::Get {key}))
             }
             "strlen" => {
-                let s = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
+                let s = frame.get_frame_by_index(1).ok_or("command error 'strlen'")?.to_string();
                 Ok(RedisCommand::String(Strlen {s}))
             }
             _ => Err(CommandError::ParseError(-3).into())

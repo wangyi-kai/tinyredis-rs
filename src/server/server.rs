@@ -62,7 +62,7 @@ impl Listener {
     }
 }
 
-struct Handler {
+pub struct Handler {
     connection: Connection,
     limit_connections: Arc<Semaphore>,
     shutdown: Shutdown,
@@ -81,12 +81,26 @@ impl Handler {
 
             if let Some(frame) = frame {
                 let result_cmd = RedisCommand::from_frame("", frame)?;
+                match &result_cmd {
+                    RedisCommand::Connection(cmd) => {
+                       let result = cmd.apply(self)?;
+                        self.connection.write_frame(&result).await?;
+                        continue;
+                    }
+                    _ => {}
+                };
                 let (sender, receiver) = oneshot::channel();
                 self.db_sender.send((sender, result_cmd)).await?;
                 let frame = receiver.await?.unwrap_or_else(|e| Frame::Error(e.to_string()));
                 self.connection.write_frame(&frame).await?;
             }
         }
+    }
+
+    pub fn change_db(&mut self, index: usize) -> crate::Result<()> {
+        let sender = self.db_handler.get_sender(index).ok_or("ERR invalid DB index")?;
+        self.db_sender = sender;
+        Ok(())
     }
 }
 

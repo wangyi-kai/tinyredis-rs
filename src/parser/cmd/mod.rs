@@ -1,4 +1,5 @@
 pub mod command;
 pub(crate) mod hash;
-mod error;
+pub mod error;
 pub mod string;
+pub mod conn;

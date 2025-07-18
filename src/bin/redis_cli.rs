@@ -12,12 +12,13 @@ pub async fn run_client() {
 
     let addr = format!("{}:{}", host, port);
     info!("<{}>", addr);
+    let mut db_idx = 0;
 
     let mut client = Client::connect(addr.clone()).await.unwrap();
     let mut command = String::new();
     'clear: loop {
         command.clear();
-        println!("Please input command: ");
+        println!("redis {}[{}]>", addr, db_idx);
         'cmd: loop {
              std::io::stdin().read_line(&mut command).unwrap();
             if command.ends_with("\n") {

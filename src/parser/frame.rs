@@ -192,8 +192,8 @@ fn skip(src: &mut Cursor<&[u8]>, n: usize) -> Result<(), Error> {
     if src.remaining() < n {
         return Err(Error::Incomplete);
     }
-
     src.advance(n);
+
     Ok(())
 }
 
@@ -201,7 +201,6 @@ fn get_decimal(src: &mut Cursor<&[u8]>) -> Result<u64, Error> {
     use atoi::atoi;
 
     let line = get_line(src)?;
-
     atoi::<u64>(line).ok_or_else(|| "protocol error; invalid frame format".into())
 }
 
@@ -215,7 +214,6 @@ fn get_line<'a>(src: &mut Cursor<&'a [u8]>) -> Result<&'a [u8], Error> {
         if src.get_ref()[i] == b'\r' && src.get_ref()[i + 1] == b'\n' {
             // We found a line, update the position to be *after* the \n
             src.set_position((i + 2) as u64);
-
             // Return the line
             return Ok(&src.get_ref()[start..i]);
         }
@@ -243,10 +241,8 @@ impl fmt::Display for Frame {
                         // use space as the array element display separator
                         write!(fmt, " ")?;
                     }
-
                     part.fmt(fmt)?;
                 }
-
                 Ok(())
             }
         }

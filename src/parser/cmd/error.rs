@@ -7,6 +7,8 @@ pub enum CommandError {
     ObjectTypeError(i64),
     #[error("Not Support Command({0})")]
     NotSupport(String),
+    #[error("{0} args error")]
+    ArgsErr(String),
 }
 
 unsafe impl Send for CommandError {}

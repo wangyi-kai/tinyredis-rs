@@ -1,9 +1,12 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
-
+use crate::Error;
+use crate::parser::cmd::error::CommandError::{*};
 use crate::parser::cmd::command::{RedisCommand};
 use crate::server::connection::Connection;
 use crate::parser::cmd::hash::HashCmd::{HDel, HGet, HSet};
 use crate::parser::cmd::string::StringCmd::{*};
+use crate::parser::cmd::conn::ConnCmd::{*};
+use crate::parser::cmd::error::CommandError;
 
 pub struct Client {
     pub conn: Connection,
@@ -104,11 +107,17 @@ impl Tokens {
                 Ok(Some(RedisCommand::Hash(HSet {key, field, value})))
             }
             "hget" => {
+                if self.token.len() != 3 {
+                    return Err(ArgsErr(cmd_name).into())
+                }
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
                 Ok(Some(RedisCommand::Hash(HGet {key, field})))
             }
             "hdel" => {
+                if self.token.len() != 3 {
+                    return Err(ArgsErr(cmd_name).into())
+                }
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
                 Ok(Some(RedisCommand::Hash(HDel {key, field})))
@@ -119,6 +128,9 @@ impl Tokens {
                 Ok(Some(RedisCommand::String(Append { key, field })))
             }
             "get" => {
+                if self.token.len() != 2 {
+                    return Err(ArgsErr(cmd_name).into())
+                }
                 let key = self.token[1].to_string();
                 Ok(Some(RedisCommand::String(Get {key})))
             }
@@ -146,7 +158,23 @@ impl Tokens {
                 let s = self.token[1].to_string();
                 Ok(Some(RedisCommand::String(Strlen {s})))
             }
-            _ => Ok(None)
+            "ping" => {
+                if self.token.len() > 1 {
+                    let s = self.token[1].to_string();
+                    Ok(Some(RedisCommand::Connection(Ping { msg: Some(s)})))
+                } else {
+                    Ok(Some(RedisCommand::Connection(Ping { msg: None })))
+                }
+            }
+            "echo" => {
+                let s = self.token[1].to_string();
+                Ok(Some(RedisCommand::Connection(Echo {msg: s})))
+            }
+            "select" => {
+                let idx: usize = self.token[1].to_string().parse()?;
+                Ok(Some(RedisCommand::Connection(Select {index: idx})))
+            }
+            _ => Err(NotSupport(cmd_name).into())
         }
     }
 }

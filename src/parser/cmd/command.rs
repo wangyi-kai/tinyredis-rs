@@ -4,6 +4,7 @@ use crate::parser::frame::Frame;
 use crate::parser::cmd::string::StringCmd;
 use crate::db::db::RedisDb;
 use crate::db::object::RedisObject;
+use crate::parser::cmd::conn::ConnCmd;
 
 pub trait CommandStrategy {
     fn into_frame(self) -> Frame;
@@ -27,6 +28,7 @@ impl CommandStrategy for RedisCommand {
         match self {
             RedisCommand::Hash(cmd) => cmd.into_frame(),
             RedisCommand::String(cmd) => cmd.into_frame(),
+            RedisCommand::Connection(cmd) => cmd.into_frame(),
             _ => unimplemented!()
         }
     }
@@ -38,6 +40,7 @@ impl CommandStrategy for RedisCommand {
                 HashCmd::from_frame(&cmd_name, frame)?,
             "append" | "set" | "get" | "setex" | "setnx" | "setpx" | "setxx" | "strlen" =>
                 StringCmd::from_frame(&cmd_name, frame)?,
+            "select" | "echo" | "ping" => ConnCmd::from_frame(&cmd_name, frame)?,
             _ => return Err(CommandError::ParseError(-101).into()),
         };
         Ok(command)
@@ -50,27 +53,6 @@ impl CommandStrategy for RedisCommand {
             _ => unimplemented!()
         }
     }
-}
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum ConnCmd {
-    /// Authenticates the connection
-    Auth,
-    /// A container for client connection commands
-    Client,
-    /// Returns the given string
-    Echo,
-    /// Handshakes with the Redis server
-    Hello,
-    /// Returns the server's liveliness response
-    Ping,
-    /// Closes the connection
-    Quit,
-    /// Resets the connection
-    Reset,
-    /// Changes the selected database
-    Select,
 }
 
 #[derive(Debug)]
