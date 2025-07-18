@@ -97,14 +97,14 @@ impl Tokens {
         } else { None }
     }
 
-    pub fn to_command(self) -> crate::Result<Option<RedisCommand>> {
+    pub fn to_command(self) -> crate::Result<RedisCommand> {
         let cmd_name = self.token[0].to_string();
         match &cmd_name[..] {
             "hset" => {
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
                 let value = self.token[3].to_string();
-                Ok(Some(RedisCommand::Hash(HSet {key, field, value})))
+                Ok(RedisCommand::Hash(HSet {key, field, value}))
             }
             "hget" => {
                 if self.token.len() != 3 {
@@ -112,7 +112,7 @@ impl Tokens {
                 }
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
-                Ok(Some(RedisCommand::Hash(HGet {key, field})))
+                Ok(RedisCommand::Hash(HGet {key, field}))
             }
             "hdel" => {
                 if self.token.len() != 3 {
@@ -120,59 +120,59 @@ impl Tokens {
                 }
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
-                Ok(Some(RedisCommand::Hash(HDel {key, field})))
+                Ok(RedisCommand::Hash(HDel {key, field}))
             }
             "append" => {
                 let key = self.token[1].to_string();
                 let field = self.token[2].to_string();
-                Ok(Some(RedisCommand::String(Append { key, field })))
+                Ok(RedisCommand::String(Append { key, field }))
             }
             "get" => {
                 if self.token.len() != 2 {
                     return Err(ArgsErr(cmd_name).into())
                 }
                 let key = self.token[1].to_string();
-                Ok(Some(RedisCommand::String(Get {key})))
+                Ok(RedisCommand::String(Get {key}))
             }
             "setex" => {
                 let key = self.token[1].to_string();
                 let ttl:i128 = self.token[2].to_string().parse()?;
-                Ok(Some(RedisCommand::String(SetEX {key, ttl: ttl * 1000})))
+                Ok(RedisCommand::String(SetEX {key, ttl: ttl * 1000}))
             }
             "setpx" => {
                 let key = self.token[1].to_string();
                 let ttl:i128 = self.token[2].to_string().parse()?;
-                Ok(Some(RedisCommand::String(SetPX {key, ttl})))
+                Ok(RedisCommand::String(SetPX {key, ttl}))
             }
             "setnx" => {
                 let key = self.token[1].to_string();
                 let value = self.token[2].to_string();
-                Ok(Some(RedisCommand::String(SetNX {key, value})))
+                Ok(RedisCommand::String(SetNX {key, value}))
             }
             "setxx" => {
                 let key = self.token[1].to_string();
                 let value = self.token[2].to_string();
-                Ok(Some(RedisCommand::String(SetXX {key, value})))
+                Ok(RedisCommand::String(SetXX {key, value}))
             }
             "strlen" => {
                 let s = self.token[1].to_string();
-                Ok(Some(RedisCommand::String(Strlen {s})))
+                Ok(RedisCommand::String(Strlen {s}))
             }
             "ping" => {
                 if self.token.len() > 1 {
                     let s = self.token[1].to_string();
-                    Ok(Some(RedisCommand::Connection(Ping { msg: Some(s)})))
+                    Ok(RedisCommand::Connection(Ping { msg: Some(s)}))
                 } else {
-                    Ok(Some(RedisCommand::Connection(Ping { msg: None })))
+                    Ok(RedisCommand::Connection(Ping { msg: None }))
                 }
             }
             "echo" => {
                 let s = self.token[1].to_string();
-                Ok(Some(RedisCommand::Connection(Echo {msg: s})))
+                Ok(RedisCommand::Connection(Echo {msg: s}))
             }
             "select" => {
                 let idx: usize = self.token[1].to_string().parse()?;
-                Ok(Some(RedisCommand::Connection(Select {index: idx})))
+                Ok(RedisCommand::Connection(Select {index: idx}))
             }
             _ => Err(NotSupport(cmd_name).into())
         }

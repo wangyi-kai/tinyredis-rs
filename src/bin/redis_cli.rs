@@ -2,8 +2,9 @@ use tracing::info;
 use redis_rs::client::client::{Client, Tokens};
 use redis_rs::client::config::Config;
 use redis_rs::parser::cmd::command::CommandStrategy;
+use redis_rs::Result;
 
-pub async fn run_client() {
+pub async fn run_client() -> Result<()> {
     print_logo();
     tracing_subscriber::fmt::try_init().expect("config log fail");
     let config = Config::new(None);
@@ -27,12 +28,20 @@ pub async fn run_client() {
             if command.ends_with("\r") {
                 command.remove(command.len() - 1);
             }
-            if !command.ends_with(";") {
-                command.push_str("\n");
-                continue 'cmd;
-            }
+            // if !command.ends_with(";") {
+            //     command.push_str("\n");
+            //     continue 'cmd;
+            // }
             let tokens = Tokens::from(&command);
-            let cmd = tokens.to_command().unwrap().unwrap();
+            let cmd = match tokens.to_command() {
+                Ok(cmd) => {
+                    cmd
+                }
+                Err(e) => {
+                    println!("{}, please input command again.", e);
+                    continue 'clear;
+                }
+            };
             let frame = cmd.into_frame();
             let _ = client.conn.write_frame(&frame).await;
             let res = client.conn.read_frame().await;
@@ -83,6 +92,6 @@ fn print_logo() {
 }
 
 #[tokio::main]
-async fn main() {
-    run_client().await;
+async fn main() -> Result<()> {
+    run_client().await
 }

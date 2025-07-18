@@ -144,7 +144,7 @@ impl HashCmd {
                 None
             }
         } else {
-            todo!()
+            unimplemented!()
         }
     }
 
