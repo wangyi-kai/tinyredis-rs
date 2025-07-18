@@ -47,7 +47,13 @@ cargo run --release --bin redis_cli
 * `HSET key field value`
 * `HGET key field`
 * `HDEL key field`
-*  ...
+* `echo message`
+* `ping`
+* `select db`
+* `setnx key value`
+* `setxx key value`
+* `strlen key`
+* `get key`
 * 更多命令持续开发中...
 ```
 
