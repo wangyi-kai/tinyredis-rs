@@ -5,7 +5,9 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Semaphore, broadcast, oneshot};
 use tokio::time;
 use tracing::{error, info};
+
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
+use crate::parser::cmd::conn::{*};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
@@ -28,7 +30,7 @@ impl Listener {
         loop {
             self.limit_connections.acquire().await.unwrap().forget();
             let socket = self.accept().await?;
-            info!("Accept new connection");
+            info!("accept new connection");
             let mut handler = Handler {
                 connection: Connection::new(socket),
                 limit_connections: self.limit_connections.clone(),
@@ -83,16 +85,25 @@ impl Handler {
                 let result_cmd = RedisCommand::from_frame("", frame)?;
                 match &result_cmd {
                     RedisCommand::Connection(cmd) => {
-                       let result = cmd.apply(self)?;
-                        self.connection.write_frame(&result).await?;
-                        continue;
+                        match cmd {
+                            ConnCmd::Quit => {
+                                self.shutdown.shutdown();
+                                return Ok(());
+                            }
+                            _ => {
+                              let result = cmd.apply(self)?;
+                                self.connection.write_frame(&result).await?;
+                                continue;
+                            }
+                        }
                     }
-                    _ => {}
+                    _ => {
+                        let (sender, receiver) = oneshot::channel();
+                        self.db_sender.send((sender, result_cmd)).await?;
+                        let frame = receiver.await?.unwrap_or_else(|e| Frame::Error(e.to_string()));
+                        self.connection.write_frame(&frame).await?;
+                    }
                 };
-                let (sender, receiver) = oneshot::channel();
-                self.db_sender.send((sender, result_cmd)).await?;
-                let frame = receiver.await?.unwrap_or_else(|e| Frame::Error(e.to_string()));
-                self.connection.write_frame(&frame).await?;
             }
         }
     }
@@ -101,6 +112,17 @@ impl Handler {
         let sender = self.db_handler.get_sender(index).ok_or("ERR invalid DB index")?;
         self.db_sender = sender;
         Ok(())
+    }
+
+    pub fn shutdown(&mut self) {
+        self.shutdown.shutdown()
+    }
+}
+
+impl Drop for Handler {
+    fn drop(&mut self) {
+        info!("handler quit");
+        self.limit_connections.add_permits(1);
     }
 }
 

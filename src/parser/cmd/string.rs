@@ -15,6 +15,7 @@ pub enum StringCmd {
     /// Returns the string value of a key
     Get { key: String},
     /// Sets the string value of a key, ignoring its type. The key is created if it doesn't exist
+    Set {key: String, value: String},
     SetEX { key: String, ttl: i128 },
     SetPX { key: String, ttl: i128 },
     SetNX { key: String, value: String },
@@ -64,6 +65,11 @@ impl CommandStrategy for StringCmd {
                 frame.push_bulk(Bytes::from("get".as_bytes()));
                 frame.push_bulk(Bytes::from(key.into_bytes()));
             }
+            StringCmd::Set { key, value} => {
+                frame.push_bulk(Bytes::from("set".as_bytes()));
+                frame.push_bulk(Bytes::from(key.into_bytes()));
+                frame.push_bulk(Bytes::from(value.into_bytes()));
+            }
             StringCmd::Strlen { s } => {
                 frame.push_bulk(Bytes::from("strlen".as_bytes()));
                 frame.push_bulk(Bytes::from(s.into_bytes()));
@@ -104,6 +110,11 @@ impl CommandStrategy for StringCmd {
                 let key = frame.get_frame_by_index(1).ok_or("command error 'get'")?.to_string();
                 Ok(RedisCommand::String(StringCmd::Get {key}))
             }
+            "set" => {
+                let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
+                let value = frame.get_frame_by_index(2).ok_or("command error 'set'")?.to_string();
+                Ok(RedisCommand::String(StringCmd::Set {key, value}))
+            }
             "strlen" => {
                 let s = frame.get_frame_by_index(1).ok_or("command error 'strlen'")?.to_string();
                 Ok(RedisCommand::String(Strlen {s}))
@@ -141,10 +152,27 @@ impl CommandStrategy for StringCmd {
                         RedisValue::String(s) => {
                             Ok(Frame::Bulk(Bytes::from(s.clone().into_bytes())))
                         }
-                        _ => Ok(Frame::Null)
+                        _ => return Err(ObjectTypeError(-3).into())
                     }
                 } else {
                     Ok(Frame::Null)
+                }
+            }
+            StringCmd::Set { key, value} => {
+                let key = RedisObject::<String>::create_string_object(key);
+                let o = db.find(&key);
+                if let Some(o) = o {
+                    match &mut o.ptr {
+                        RedisValue::String(s) => {
+                            *s = value;
+                            Ok(Frame::Simple("OK".to_string()))
+                        }
+                        _ => return Err(ObjectTypeError(-4).into())
+                    }
+                } else {
+                    let v = RedisObject::<String>::create_string_object(value);
+                    db.add(key, v);
+                    Ok(Frame::Simple("OK".to_string()))
                 }
             }
             StringCmd::SetNX {key, value} => {

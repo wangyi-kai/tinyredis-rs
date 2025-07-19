@@ -1,8 +1,10 @@
 use tracing::info;
 use redis_rs::client::client::{Client, Tokens};
 use redis_rs::client::config::Config;
-use redis_rs::parser::cmd::command::CommandStrategy;
+use redis_rs::parser::cmd::command::{CommandStrategy, RedisCommand};
+use redis_rs::parser::frame::Frame;
 use redis_rs::Result;
+use redis_rs::parser::cmd::conn::ConnCmd::{*};
 
 pub async fn run_client() -> Result<()> {
     print_logo();
@@ -19,8 +21,8 @@ pub async fn run_client() -> Result<()> {
     let mut command = String::new();
     'clear: loop {
         command.clear();
-        println!("redis {}[{}]>", addr, db_idx);
-        'cmd: loop {
+        eprint!("tinyredis {}[{}]>: ", addr, db_idx);
+        loop {
              std::io::stdin().read_line(&mut command).unwrap();
             if command.ends_with("\n") {
                 command.remove(command.len() - 1);
@@ -42,15 +44,21 @@ pub async fn run_client() -> Result<()> {
                     continue 'clear;
                 }
             };
+            let tmp_idx = match &cmd {
+                RedisCommand::Connection(Select { index}) => *index,
+                _ => db_idx,
+            };
             let frame = cmd.into_frame();
             let _ = client.conn.write_frame(&frame).await;
             let res = client.conn.read_frame().await;
             match res {
                 Ok(res) => {
                     if let Some(res) = res {
+                        db_idx = tmp_idx;
                         println!("{}", res);
                     } else {
-                        println!("receive fail");
+                        println!("client quit");
+                        return Ok(());
                     }
                 },
                 Err(e) => println!("error: {}", e),
@@ -71,7 +79,7 @@ fn print_logo() {
           _.-``__ ''-._
      _.-``    `.  `_.  ''-._           tinyredis {} (custom) 🦀
  .-`` .-```.  ```\/    _.,_ ''-._
-(    '      ,       .-`  | `,    )     Running in tiny mode 🚀
+(    '      ,       .-`  | `,    )     Running in single mode 🚀
 |`-._`-...-` __...-.``-._|'` _.-'|     Port: {}
 |    `-._   `._    /     _.-'    |     PID: {}
  `-._    `-._  `-./  _.-'    _.-'

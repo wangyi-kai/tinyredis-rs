@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use crate::parser::cmd::command::{RedisCommand};
-use crate::parser::cmd::conn::ConnCmd::{Echo, Ping, Select};
+use crate::parser::cmd::conn::ConnCmd::{Echo, Ping, Quit, Select};
 use crate::parser::cmd::error::CommandError;
 use crate::parser::frame::Frame;
 use crate::server::server::Handler;
@@ -67,6 +67,9 @@ impl  ConnCmd {
             "select" => {
                 let index: usize = frame.get_frame_by_index(1).ok_or("command error 'select'")?.to_string().parse()?;
                 Ok(RedisCommand::Connection(Select {index}))
+            }
+            "quit" => {
+                Ok(RedisCommand::Connection(Quit))
             }
             _ => Err(CommandError::ParseError(-4).into())
         }

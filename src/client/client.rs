@@ -132,6 +132,14 @@ impl Tokens {
                 let key = self.token[1].to_string();
                 Ok(RedisCommand::String(Get {key}))
             }
+            "set" => {
+                if self.token.len() != 3 {
+                    return Err(ArgsErr(cmd_name).into())
+                }
+                let key = self.token[1].to_string();
+                let value = self.token[2].to_string();
+                Ok(RedisCommand::String(Set {key, value}))
+            }
             "setex" => {
                 let key = self.token[1].to_string();
                 let ttl:i128 = self.token[2].to_string().parse()?;
@@ -171,6 +179,9 @@ impl Tokens {
             "select" => {
                 let idx: usize = self.token[1].to_string().parse()?;
                 Ok(RedisCommand::Connection(Select {index: idx}))
+            }
+            "quit" => {
+                Ok(RedisCommand::Connection(Quit))
             }
             _ => Err(NotSupport(cmd_name).into())
         }

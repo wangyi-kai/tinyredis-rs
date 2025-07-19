@@ -40,7 +40,7 @@ impl CommandStrategy for RedisCommand {
                 HashCmd::from_frame(&cmd_name, frame)?,
             "append" | "set" | "get" | "setex" | "setnx" | "setpx" | "setxx" | "strlen" =>
                 StringCmd::from_frame(&cmd_name, frame)?,
-            "select" | "echo" | "ping" => ConnCmd::from_frame(&cmd_name, frame)?,
+            "select" | "echo" | "ping" | "quit" => ConnCmd::from_frame(&cmd_name, frame)?,
             _ => return Err(CommandError::ParseError(-101).into()),
         };
         Ok(command)
