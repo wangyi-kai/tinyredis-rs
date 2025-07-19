@@ -7,6 +7,7 @@ use std::ptr::NonNull;
 
 use tokio::sync::mpsc;
 use tracing::info;
+use crate::cluster::cluster::key_hash_slot;
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 
 pub enum KeyStatus {
@@ -15,8 +16,9 @@ pub enum KeyStatus {
     KeyDeleted,
 }
 
-pub fn get_key_slot(key: &str) {
-
+pub fn get_key_slot(key: &str) -> usize {
+    //key_hash_slot(key)
+    0
 }
 
 pub struct RedisDb<V> {
@@ -74,7 +76,7 @@ impl<V> RedisDb<V> {
         }
     }
 
-    pub fn lookup_key(&self, key: &RedisObject<String>) -> Option<&mut V> {
+    pub fn find(&self, key: &RedisObject<String>) -> Option<&mut V> {
         let k = match &key.ptr {
             RedisValue::String(s) => s,
             _ => return None,
@@ -91,30 +93,30 @@ impl<V> RedisDb<V> {
         }
     }
 
-    pub fn find(&self, key: &str) -> Option<NonNull<DictEntry<V>>> {
-        self.keys.dict_find(0, key)
-    }
-
     pub fn add(&mut self, key: RedisObject<String>, val: V) -> Option<NonNull<DictEntry<V>>> {
         self.add_internal(key, val)
     }
 
     fn add_internal(&mut self, key: RedisObject<String>, val: V) -> Option<NonNull<DictEntry<V>>> {
-        let slot = 0;
         let key = match key.ptr {
             RedisValue::String(s) => s,
             _ => { "".to_string() }
         };
-        let de = self.keys.add(slot, key, val);
+        let slot = get_key_slot(&key);
+        let de = self.keys.add(slot as i32, key, val);
         de
     }
 
+    pub fn delete(&mut self, key: &RedisObject<String>) {
+        self.generic_delete(key)
+    }
+
     fn generic_delete(&mut self, key: &RedisObject<String>) {
-        let slot = 0;
         let key = match &key.ptr {
             RedisValue::String(s) => s,
             _ => { "" }
         };
+        let slot = get_key_slot(&key) as i32;
         let de = self.keys.dict_delete(slot, key);
         if de.is_some() {
             self.expires.dict_delete(slot, key);
@@ -122,7 +124,7 @@ impl<V> RedisDb<V> {
     }
 
     pub fn set_val(&mut self, key: &RedisObject<String>, val: V) {
-        let old = self.lookup_key(key);
+        let old = self.find(key);
         if let Some(old) = old {
             *old = val;
         } else {

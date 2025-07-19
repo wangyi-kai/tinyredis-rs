@@ -27,7 +27,7 @@ impl Default for Config {
 
 impl Config {
     pub fn new(config_path: Option<&str>) -> Self {
-        let mut config_path_show;
+        let config_path_show;
         let mut file = if let Some(path) = config_path {
             config_path_show = path;
             if let Ok(file) = File::open(&path) {

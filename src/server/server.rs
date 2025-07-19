@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Semaphore, broadcast, oneshot};
 use tokio::time;
-use tracing::{debug, error, info, Instrument};
+use tracing::{error, info};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;

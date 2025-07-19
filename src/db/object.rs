@@ -4,8 +4,6 @@ use crate::db::data_structure::skiplist::skiplist::SkipList;
 use crate::db::data_structure::ziplist::ziplist::ZipList;
 use crate::db::data_structure::adlist::adlist::LinkList;
 
-use std::hash::Hash;
-
 /// A redis object, that is a type able to hold a string / list / set
 
 /// The actual Redis Object

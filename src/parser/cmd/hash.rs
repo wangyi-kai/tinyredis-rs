@@ -46,7 +46,6 @@ impl CommandStrategy for HashCmd {
     }
 
     fn from_frame(name: &str, frame: Frame) -> crate::Result<RedisCommand> {
-        let len = frame.get_len();
         match name {
             "hset" => {
                 let key = frame.get_frame_by_index(1).ok_or("command error 'set'")?.to_string();
@@ -72,7 +71,7 @@ impl CommandStrategy for HashCmd {
         match self {
             HashCmd::HGet { key, field } => {
                 let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.lookup_key(&key);
+                let o = db.find(&key);
                 if let Some(o) = o {
                     let val = Self::hash_get(o, &field);
                     if let Some(val) = val {
@@ -86,7 +85,7 @@ impl CommandStrategy for HashCmd {
             }
             HashCmd::HDel { key, field } => {
                 let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.lookup_key(&key);
+                let mut o = db.find(&key);
                 if let Some(o) = o {
                     Self::hash_delete(o, &field);
                 }
@@ -94,7 +93,7 @@ impl CommandStrategy for HashCmd {
             }
             HashCmd::HSet { key, field, value } => {
                 let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.lookup_key(&key);
+                let mut o = db.find(&key);
                 if let Some(o) = o {
                     Self::hash_set(o, field, value);
                 } else {
@@ -112,7 +111,7 @@ impl CommandStrategy for HashCmd {
 impl HashCmd {
     fn hash_set(o: &mut RedisObject<String>, field: String, value: String) {
         if o.encoding == OBJ_ENCODING_HT {
-            let mut ht = match &mut o.ptr {
+            let ht = match &mut o.ptr {
                 RedisValue::Hash(ht) => ht,
                 _ => return,
             };
@@ -171,7 +170,7 @@ mod test {
 
     #[test]
     fn cmd_to_frame() -> crate::Result<()> {
-        let mut cmd = HashCmd::HSet {
+        let cmd = HashCmd::HSet {
             key: "hello".to_string(),
             field: "world1".to_string(),
             value: "world2".to_string(),

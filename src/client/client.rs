@@ -1,12 +1,10 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
-use crate::Error;
 use crate::parser::cmd::error::CommandError::{*};
 use crate::parser::cmd::command::{RedisCommand};
 use crate::server::connection::Connection;
 use crate::parser::cmd::hash::HashCmd::{HDel, HGet, HSet};
 use crate::parser::cmd::string::StringCmd::{*};
 use crate::parser::cmd::conn::ConnCmd::{*};
-use crate::parser::cmd::error::CommandError;
 
 pub struct Client {
     pub conn: Connection,

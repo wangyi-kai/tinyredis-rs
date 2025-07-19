@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use tracing::info;
 use crate::db::db::RedisDb;
 use crate::db::object::{RedisObject, RedisValue};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
@@ -117,7 +116,7 @@ impl CommandStrategy for StringCmd {
         match self {
             StringCmd::Append { key, field } => {
                 let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.lookup_key(&key);
+                let mut o = db.find(&key);
                 if let Some(o) = o {
                     return match &mut o.ptr {
                         RedisValue::String(s) => {
@@ -136,7 +135,7 @@ impl CommandStrategy for StringCmd {
             },
             StringCmd::Get {key} => {
                 let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.lookup_key(&key);
+                let o = db.find(&key);
                 if let Some(o) = o {
                     match &o.ptr {
                         RedisValue::String(s) => {
@@ -150,7 +149,7 @@ impl CommandStrategy for StringCmd {
             }
             StringCmd::SetNX {key, value} => {
                 let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.lookup_key(&key);
+                let o = db.find(&key);
                 if let Some(_o) = o {
                     Ok(Frame::Simple("key exists".to_string()))
                 } else {
@@ -161,7 +160,7 @@ impl CommandStrategy for StringCmd {
             }
             StringCmd::SetXX {key, value} => {
                 let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.lookup_key(&key);
+                let o = db.find(&key);
                 if let Some(_o) = o {
                     let value = RedisObject::<String>::create_string_object(value);
                     db.set_val(&key, value);
