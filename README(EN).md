@@ -9,41 +9,41 @@
 
 ---
 
-## ✨ 项目简介
+## ✨ Overview
 
-**tinyredis** 是一个用 Rust 编写的简易Redis，旨在学习 Redis 内部机制，并构建一个高性能、简洁易读的内存键值数据库。它兼容 RESP 协议，支持基础数据结构，并具备异步网络 IO 和高效内存管理。
+*tinyredis* is a lightweight Redis implementation written in Rust. It is designed to help understand the internal mechanisms of Redis while building a high-performance, clean, and readable in-memory key-value database. It is compatible with the RESP protocol, supports basic data structures, and features asynchronous network I/O and efficient memory management.
 
 ---
 
 ## 🧱 Features
 
-*  **学习友好**：核心数据结构和命令解析逻辑简洁明了
-* **异步运行**：基于 `tokio` 的异步网络模型
-* **多数据库支持**：兼容 Redis 的多 DB 架构
-* **RESP 协议解析**：支持 Redis 原生协议通信
-* **模块化设计**：便于扩展指令与数据结构
-* **测试覆盖**：包含单元测试
+* Beginner-Friendly: Core data structures and command parsing logic are simple and clear
+* Asynchronous Execution: Built on tokio asynchronous networking model
+* Multi-Database Support: Compatible with redis multi-DB architecture
+* RESP Protocol Parsing: Supports redis native protocol communication
+* Modular Design: Easy to extend commands and data structures
+* Test Coverage: Includes unit tests
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 构建项目
+### Build
 ```bash
 git clone https://github.com/wangyi-kai/tinyredis.git
 cd tinyredis/src
 ```
-### 启动 tinyredis
+### Run tinyredis
 ```bash
-启动服务端
+start server
 cargo run --release --bin redis_server
-启动客户端
+start client
 cargo run --release --bin redis_cli
-默认监听地址为 `127.0.0.1:8000`
+default bind address `127.0.0.1:8000`
 ```
 
 ---
-## 📦 已支持命令
+## 📦 Support Command
 * `HSET key field value`
 * `HGET key field`
 * `HDEL key field`
@@ -59,13 +59,13 @@ cargo run --release --bin redis_cli
 
 ---
 
-## 🧪 基准测试
+## 🧪 Benchmark
 
-* 待开发
+* To be developed
 
 ---
 
-## 📚 架构设计
+## 📚 Architecture Design
 
 ```bash
 src/
