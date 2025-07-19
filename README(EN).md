@@ -69,16 +69,16 @@ default bind address `127.0.0.1:8000`
 
 ```bash
 src/
-|—— bin/         # 启动入口
-├── client/      # 客户端实现
-├── cluster/     # 集群相关
-├── db/          # 数据库与数据结构实现
-├── parser/      # RESP 协议解析器
-└── server/      # 服务端实现
+|—— bin/         # Application entry point
+├── client/      # tinyredis Client
+├── cluster/     # Cluster
+├── db/          # Core database structures
+├── parser/      # RESP parser
+└── server/      # tinyredis Server
 ```
 ---
 
-## 🛠️ 技术栈
+## 🛠️ Technology
 * [Rust](https://www.rust-lang.org/)
 * [Tokio](https://tokio.rs/)
 * [Bytes](https://docs.rs/bytes)
@@ -88,17 +88,17 @@ src/
 
 
 ---
-## 📈 未来计划
+## 📈 Future Plan
 
-* [ ] 支持 RDB / AOF 持久化
-* [ ] 发布 Docker 镜像
-* [ ] 发布 benchmark 工具
-* [ ] 实现事务（MULTI/EXEC）
-* [ ] Lua 脚本支持
-* [ ] 集群协议兼容
+* [ ] Support for RDB / AOF persistence
+* [ ] Publish Docker image
+* [ ] Release benchmark tool
+* [ ] Implement transactions (MULTI/EXEC)
+* [ ] Lua scripting support
+* [ ] Cluster protocol compatibility
 
 ---
-## ❤️ 致谢
+## ❤️ Acknowledgements
 * [Redis](https://redis.io/)
 * [mini-redis](https://github.com/tokio-rs/mini-redis)
 * [kedis-rust](https://github.com/kwsc98/kedis-rust)
@@ -108,6 +108,6 @@ src/
 * [MIT](LICENSE)
 ---
 
-## 🗨️ 联系我
-欢迎在 [GitHub Discussions](https://github.com/wangyi-kai/tinyredis/discussions) 提问交流, 或提交 Issue / PR 🙌
+## 🗨️ Contact Me
+You're welcome to ask questions or start a discussion on GitHub Discussions, or submit an Issue / PR🙌.
 
