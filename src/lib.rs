@@ -1,13 +1,13 @@
-pub mod parser;
-
-pub mod client;
 use tokio::sync::{mpsc, oneshot};
 use crate::parser::frame::Frame;
 use parser::cmd::command::RedisCommand;
 
+pub mod parser;
+pub mod client;
 mod cluster;
-mod db;
+pub mod db;
 pub mod server;
+pub mod error;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;

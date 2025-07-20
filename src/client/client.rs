@@ -1,10 +1,11 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
 use crate::parser::cmd::error::CommandError::{*};
-use crate::parser::cmd::command::{RedisCommand};
+use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::server::connection::Connection;
 use crate::parser::cmd::hash::HashCmd::{HDel, HGet, HSet};
 use crate::parser::cmd::string::StringCmd::{*};
 use crate::parser::cmd::conn::ConnCmd::{*};
+use crate::parser::frame::Frame;
 
 pub struct Client {
     pub conn: Connection,
@@ -17,6 +18,18 @@ impl Client {
 
         Ok(Client { conn: connection })
     }
+
+    pub async fn benchmark_send_command(&mut self, cmd: &str) -> crate::Result<()> {
+        let tokens = Tokens::from(cmd);
+        let redis_cmd = tokens.to_command()?;
+        let frame = redis_cmd.into_frame();
+        let _ = self.conn.write_frame(&frame).await?;
+        Ok(())
+    }
+
+    pub async fn benchmark_receive(&mut self) -> crate::Result<Option<Frame>> {
+        self.conn.read_frame().await
+    }
 }
 
 pub struct Tokens {
@@ -25,7 +38,7 @@ pub struct Tokens {
 }
 
 impl Tokens {
-    pub fn from(str: &String) -> Self {
+    pub fn from(str: &str) -> Self {
         let mut is_str = false;
         let mut token = vec![];
         let mut temp = String::new();

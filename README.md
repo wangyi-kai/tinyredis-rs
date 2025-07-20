@@ -1,5 +1,5 @@
 
-# 🚀 tinyredis
+<h1 align="center">🚀 TinyRedis</h1>
 
 > A lightweight Redis reimplementation in Rust — fast, embeddable, and easy to understand.
 
