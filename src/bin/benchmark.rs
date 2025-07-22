@@ -50,6 +50,9 @@ pub fn num_to_str(value: i64) -> String {
 
 pub fn gen_command(cmd_type: &str, data: &str) -> String {
     match cmd_type {
+        "ping" => {
+            "ping".to_string()
+        }
         "set" => {
             let key = num_to_str(random_i32() as i64);
             format!("set key{} {}", key, data.clone())

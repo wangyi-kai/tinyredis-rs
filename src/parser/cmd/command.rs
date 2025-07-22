@@ -35,6 +35,7 @@ impl CommandStrategy for RedisCommand {
 
     fn from_frame(_name: &str, frame: Frame) -> crate::Result<RedisCommand> {
         let cmd_name = get_command_name(&frame).ok().unwrap().to_lowercase();
+
         let command = match &cmd_name[..] {
             "hset" | "hget" | "hdel" =>
                 HashCmd::from_frame(&cmd_name, frame)?,
@@ -53,6 +54,15 @@ impl CommandStrategy for RedisCommand {
             _ => unimplemented!()
         }
     }
+}
+
+pub fn parse_frame(frame_vec: Vec<Frame>) -> crate::Result<Vec<RedisCommand>> {
+    let mut cmd_vec= Vec::with_capacity(1024);
+    for frame in frame_vec {
+        let cmd = RedisCommand::from_frame("", frame)?;
+        cmd_vec.push(cmd);
+    }
+    Ok(cmd_vec)
 }
 
 #[derive(Debug)]

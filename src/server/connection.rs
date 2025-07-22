@@ -70,6 +70,25 @@ impl Connection {
         self.stream.flush().await
     }
 
+    pub async fn write_batch_frame(&mut self, frames: &Vec<Frame>) -> io::Result<()> {
+        for frame in frames {
+            match frame {
+                Frame::Array(val) => {
+                // Encode the frame type prefix. For an array, it is `*`.
+                self.stream.write_u8(b'*').await?;
+                // Encode the length of the array.
+                self.write_decimal(val.len() as u64).await?;
+
+                for entry in val {
+                    self.write_value(entry).await?;
+                }
+            }
+                _ => self.write_value(frame).await?
+            }
+        }
+        self.stream.flush().await
+    }
+
     async fn write_value(&mut self, frame: &Frame) -> io::Result<()> {
         match frame {
             Frame::Simple(val) => {

@@ -179,7 +179,7 @@ mod test {
         println!("frame {}", frame);
 
         let cmd_type = get_command_name(&frame)?;
-        let cmd = HashCmd::from_frame(&cmd_type, frame)?;
+        let (cmd, len) = HashCmd::from_frame(&cmd_type, frame)?;
 
         println!("cmd_type:{}, cmd: {:?}", cmd_type, cmd);
         Ok(())

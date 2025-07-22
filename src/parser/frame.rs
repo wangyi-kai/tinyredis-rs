@@ -157,6 +157,13 @@ impl Frame {
         }
     }
 
+    pub fn get_index_after(&self, index: usize) -> Frame {
+        match self {
+            Frame::Array(array) => Frame::Array(array[index..].to_vec()),
+            _ => return self.clone()
+        }
+    }
+
     pub(crate) fn to_error(&self) -> crate::Error {
         format!("unexpected frame: {}", self).into()
     }
