@@ -1,14 +1,15 @@
 use crate::parser::frame::Frame;
 
-use bytes::{Buf, BytesMut};
-use std::io::{self, Cursor};
+use bytes::{Buf, BufMut, BytesMut};
+use std::io::{self, Cursor, Write};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::net::TcpStream;
+use tracing::{debug, info};
 
 #[derive(Debug)]
 pub struct Connection {
-    stream: BufWriter<TcpStream>,
+    pub(crate) stream: BufWriter<TcpStream>,
     buffer: BytesMut,
 }
 
@@ -23,13 +24,14 @@ impl Connection {
     pub async fn read_frame(&mut self) -> crate::Result<Option<Frame>> {
         loop {
             if let Some(frame) = self.parse_frame()? {
+                debug!("read frame [{:?}]", frame);
                 return Ok(Some(frame))
             }
             if 0 == self.stream.read_buf(&mut self.buffer).await? {
-                if self.buffer.is_empty() {
-                    return Ok(None);
+                return if self.buffer.is_empty() {
+                    Ok(None)
                 } else {
-                    return Err("connection reset by peer".into());
+                    Err("connection reset by peer".into())
                 }
             }
         }
@@ -54,88 +56,48 @@ impl Connection {
     }
 
     pub async fn write_frame(&mut self, frame: &Frame) -> io::Result<()> {
-        match frame {
-            Frame::Array(val) => {
-                // Encode the frame type prefix. For an array, it is `*`.
-                self.stream.write_u8(b'*').await?;
-                // Encode the length of the array.
-                self.write_decimal(val.len() as u64).await?;
-
-                for entry in val {
-                    self.write_value(entry).await?;
-                }
-            }
-            _ => self.write_value(frame).await?
-        }
+        debug!("write frame [{:?}]", frame);
+        let mut bytes = vec![];
+        Self::write_value(frame, &mut bytes);
+        self.stream.write_all(bytes.as_mut_slice()).await?;
         self.stream.flush().await
     }
 
-    pub async fn write_batch_frame(&mut self, frames: &Vec<Frame>) -> io::Result<()> {
-        for frame in frames {
-            match frame {
-                Frame::Array(val) => {
-                // Encode the frame type prefix. For an array, it is `*`.
-                self.stream.write_u8(b'*').await?;
-                // Encode the length of the array.
-                self.write_decimal(val.len() as u64).await?;
-
-                for entry in val {
-                    self.write_value(entry).await?;
-                }
-            }
-                _ => self.write_value(frame).await?
-            }
-        }
-        self.stream.flush().await
-    }
-
-    async fn write_value(&mut self, frame: &Frame) -> io::Result<()> {
+    pub fn write_value(frame: &Frame, bytes: &mut Vec<u8>) {
         match frame {
-            Frame::Simple(val) => {
-                self.stream.write_u8(b'+').await?;
-                self.stream.write_all(val.as_bytes()).await?;
-                self.stream.write_all(b"\r\n").await?;
+            Frame::Simple(data) => {
+                bytes.extend_from_slice(b"+");
+                bytes.extend_from_slice(data.as_bytes());
+                bytes.extend_from_slice(b"\r\n");
             }
-            Frame::Error(val) => {
-                self.stream.write_u8(b'-').await?;
-                self.stream.write_all(val.as_bytes()).await?;
-                self.stream.write_all(b"\r\n").await?;
+            Frame::Error(data) => {
+                bytes.extend_from_slice(b"-");
+                bytes.extend_from_slice(data.as_bytes());
+                bytes.extend_from_slice(b"\r\n");
             }
-            Frame::Integer(val) => {
-                self.stream.write_u8(b':').await?;
-                self.write_decimal(*val).await?;
+            Frame::Integer(data) => {
+                bytes.extend_from_slice(b":");
+                bytes.extend_from_slice(data.to_string().as_bytes());
+                bytes.extend_from_slice(b"\r\n");
+            }
+            Frame::Bulk(data) => {
+                bytes.extend_from_slice(b"$");
+                bytes.extend_from_slice(data.len().to_string().as_bytes());
+                bytes.extend_from_slice(b"\r\n");
+                bytes.extend_from_slice(data);
+                bytes.extend_from_slice(b"\r\n");
             }
             Frame::Null => {
-                self.stream.write_all(b"$-1\r\n").await?;
+                bytes.extend_from_slice(b"$-1\r\n");
             }
-            Frame::Bulk(val) => {
-                let len = val.len();
-
-                self.stream.write_u8(b'$').await?;
-                self.write_decimal(len as u64).await?;
-                self.stream.write_all(val).await?;
-                self.stream.write_all(b"\r\n").await?;
+            Frame::Array(data) => {
+                bytes.extend_from_slice(b"*");
+                bytes.extend_from_slice(data.len().to_string().as_bytes());
+                bytes.extend_from_slice(b"\r\n");
+                for item in data {
+                    Self::write_value(item, bytes);
+                }
             }
-            // Encoding an `Array` from within a value cannot be done using a
-            // recursive strategy. In general, async fns do not support
-            // recursion.
-            Frame::Array(_val) => unreachable!(),
         }
-
-        Ok(())
-    }
-
-    async fn write_decimal(&mut self, val: u64) -> io::Result<()> {
-        use std::io::Write;
-
-        let mut buf = [0u8; 20];
-        let mut buf = Cursor::new(&mut buf[..]);
-        write!(&mut buf, "{}", val)?;
-
-        let pos = buf.position() as usize;
-        self.stream.write_all(&buf.get_ref()[..pos]).await?;
-        self.stream.write_all(b"\r\n").await?;
-
-        Ok(())
     }
 }

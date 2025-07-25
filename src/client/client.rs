@@ -1,3 +1,4 @@
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use crate::parser::cmd::error::CommandError::{*};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
@@ -19,11 +20,10 @@ impl Client {
         Ok(Client { conn: connection })
     }
 
-    pub async fn benchmark_send_command(&mut self, cmd: &str) -> crate::Result<()> {
-        let tokens = Tokens::from(cmd);
-        let redis_cmd = tokens.to_command()?;
-        let frame = redis_cmd.into_frame();
-        let _ = self.conn.write_frame(&frame).await?;
+    pub async fn benchmark_send_command(&mut self, mut buf: Vec<u8>) -> crate::Result<()>
+    {
+        self.conn.stream.write_all(buf.as_mut_slice()).await?;
+        self.conn.stream.flush().await?;
         Ok(())
     }
 

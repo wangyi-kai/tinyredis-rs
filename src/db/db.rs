@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use tokio::sync::mpsc;
-use tracing::info;
+use tracing::{debug, info};
 use crate::cluster::cluster::key_hash_slot;
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 
@@ -67,7 +67,7 @@ impl<V> RedisDb<V> {
 
     pub async fn run(&mut self) {
         while let Some((sender, command)) = self.receiver.recv().await {
-            info!("apply command {:?}", command);
+            debug!("apply command {:?}", command);
             let db = unsafe {
                 &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
             };

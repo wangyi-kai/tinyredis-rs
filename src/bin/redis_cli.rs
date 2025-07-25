@@ -7,7 +7,6 @@ use redis_rs::Result;
 use redis_rs::parser::cmd::conn::ConnCmd::{*};
 
 pub async fn run_client() -> Result<()> {
-    print_logo();
     tracing_subscriber::fmt::try_init().expect("config log fail");
     let config = Config::new(None);
     let host = config.get_value("server_ip").unwrap().trim_matches('"').to_string();
@@ -66,37 +65,6 @@ pub async fn run_client() -> Result<()> {
             continue 'clear;
         }
     }
-}
-
-fn print_logo() {
-    let version = "0.1.0";
-    let port = 8000;
-    let pid = std::process::id();
-
-    let logo = format!(
-        r#"
-               _._
-          _.-``__ ''-._
-     _.-``    `.  `_.  ''-._           tinyredis {} (custom) 🦀
- .-`` .-```.  ```\/    _.,_ ''-._
-(    '      ,       .-`  | `,    )     Running in single mode 🚀
-|`-._`-...-` __...-.``-._|'` _.-'|     Port: {}
-|    `-._   `._    /     _.-'    |     PID: {}
- `-._    `-._  `-./  _.-'    _.-'
-|`-._`-._    `-.__.-'    _.-'_.-'|
-|    `-._`-._        _.-'_.-'    |  github.com/wangyi-kai/tinyredis
- `-._    `-._`-.__.-'_.-'    _.-'
-|`-._`-._    `-.__.-'    _.-'_.-'|
-|    `-._`-._        _.-'_.-'    |
- `-._    `-._`-.__.-'_.-'    _.-'
-     `-._    `-.__.-'    _.-'
-         `-._        _.-'
-             `-.__.-'
-"#,
-        version, port, pid
-    );
-
-    println!("{}", logo)
 }
 
 #[tokio::main]
