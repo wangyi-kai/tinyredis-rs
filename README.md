@@ -44,9 +44,9 @@ cargo run --release --bin redis_cli
 
 ---
 ## 📦 已支持命令
-* `HSET key field value`
-* `HGET key field`
-* `HDEL key field`
+* `hset key field value`
+* `hget key field`
+* `hdel key field`
 * `echo message`
 * `ping`
 * `select db`

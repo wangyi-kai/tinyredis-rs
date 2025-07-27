@@ -44,9 +44,9 @@ default bind address `127.0.0.1:8000`
 
 ---
 ## 📦 Support Command
-* `HSET key field value`
-* `HGET key field`
-* `HDEL key field`
+* `hset key field value`
+* `hget key field`
+* `hdel key field`
 * `echo message`
 * `ping`
 * `select db`
@@ -54,7 +54,7 @@ default bind address `127.0.0.1:8000`
 * `setxx key value`
 * `strlen key`
 * `get key`
-* 更多命令持续开发中...
+*  More commands are being developed...
 
 
 ---
