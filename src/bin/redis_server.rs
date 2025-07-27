@@ -1,7 +1,6 @@
 use redis_rs::server::server::run_server;
 use redis_rs::{DB_SIZE, DEFAULT_PORT};
 
-
 use tokio::{net::TcpListener, signal};
 use tracing::info;
 
@@ -9,6 +8,8 @@ use tracing::info;
 async fn main() {
     tracing_subscriber::fmt::try_init().expect("config log fail");
     let port = DEFAULT_PORT;
+
+    // Bind a TCP listener
     let listener = TcpListener::bind(&format!("0.0.0.0:{}", port)).await.unwrap();
     print_logo();
     info!("Redis Server start");
@@ -24,14 +25,14 @@ pub fn print_logo() {
         r#"
                _._
           _.-``__ ''-._
-     _.-``    `.  `_.  ''-._           tinyredis {} (custom) 🦀
+     _.-``    `.  `_.  ''-._           TinyRedis {} (custom) 🦀
  .-`` .-```.  ```\/    _.,_ ''-._
 (    '      ,       .-`  | `,    )     Running in Standalone mode 🚀
 |`-._`-...-` __...-.``-._|'` _.-'|     Port: {}
 |    `-._   `._    /     _.-'    |     PID: {}
  `-._    `-._  `-./  _.-'    _.-'
 |`-._`-._    `-.__.-'    _.-'_.-'|
-|    `-._`-._        _.-'_.-'    |  github.com/wangyi-kai/tinyredis
+|    `-._`-._        _.-'_.-'    |     github.com/wangyi-kai/tinyredis
  `-._    `-._`-.__.-'_.-'    _.-'
 |`-._`-._    `-.__.-'    _.-'_.-'|
 |    `-._`-._        _.-'_.-'    |

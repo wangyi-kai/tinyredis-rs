@@ -7,30 +7,24 @@ use redis_rs::Result;
 use hdrhistogram::Histogram;
 use tokio::time::Instant;
 use tokio::sync::mpsc;
+use clap::Parser;
 use redis_rs::parser::cmd::command::CommandStrategy;
 use redis_rs::server::connection::Connection;
 
-#[derive(Debug, Clone)]
-pub struct BenchmarkConfig {
-    host: String,
-    port: u16,
-    num_clients: u32,
-    requests: u32,
-    key_size: u32,
-    data_size: u32,
-}
-
-impl Default for BenchmarkConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".to_string(),
-            port: 8000,
-            num_clients: 50,
-            requests: 100000,
-            key_size: 20,
-            data_size: 2,
-        }
-    }
+#[derive(Parser, Clone)]
+struct BenchmarkConfig {
+    #[arg(short, long, default_value = "127.0.0.1")]
+    pub ip: String,
+    #[arg(short, long, default_value_t = 8000)]
+    pub port: u16,
+    #[arg(short, long, default_value_t = 50)]
+    pub clients: u32,
+    #[arg(short, long, default_value_t = 100000)]
+    pub requests: u32,
+    #[arg(short, long, default_value_t = 3)]
+    pub data_size: u32,
+    #[arg(short, long, num_args = 1..)]
+    pub tests: Vec<String>,
 }
 
 unsafe impl Sync for BenchmarkConfig {}
@@ -48,13 +42,21 @@ fn gen_benchmark_data(count: u32) -> String {
     data
 }
 
-pub fn num_to_str(value: i64) -> String {
+fn test_is_selected(tests: &Vec<String>, name: &String) -> bool {
+    if tests.is_empty() {
+        true
+    } else {
+        tests.contains(name)
+    }
+}
+
+fn num_to_str(value: i64) -> String {
         let mut s = String::with_capacity(32);
         let _ = write!(&mut s, "{}", value);
         s
     }
 
-pub fn gen_command(cmd_type: &str, data: &str) -> String {
+fn gen_command(cmd_type: &str, data: &str) -> String {
     match cmd_type {
         "ping" => {
             "ping".to_string()
@@ -79,44 +81,48 @@ pub fn gen_command(cmd_type: &str, data: &str) -> String {
     }
 }
 
-pub async fn create_client(config: Arc<BenchmarkConfig>) -> Client {
-    let host = config.host.clone();
+fn cmd_to_bytes(cmd: &str, data: &str) -> Vec<u8> {
+    let cmd = gen_command(cmd, data);
+    let tokens = Tokens::from(&cmd);
+    let redis_cmd = tokens.to_command().unwrap();
+    let frame = redis_cmd.into_frame();
+    let mut buf = vec![];
+    Connection::write_value(&frame, &mut buf);
+    buf
+}
+
+async fn create_client(config: Arc<BenchmarkConfig>) -> Client {
+    let host = config.ip.clone();
     let port = config.port;
     let addr = format!("{}:{}", host, port);
     Client::connect(addr).await.unwrap()
 }
 
-
 pub async fn benchmark_pipe(cmd: &str, config: Arc<BenchmarkConfig>) -> Result<()> {
     println!("======{}======", cmd.to_uppercase());
     let mut hist = Histogram::<u64>::new_with_bounds(1, 3_600_000, 3).unwrap();
-    let (tx, mut rx) = mpsc::channel::<Vec<u8>>(config.num_clients as usize);
+    let (tx, mut rx) = mpsc::channel::<Vec<u8>>(config.clients as usize);
     let data = gen_benchmark_data(config.data_size);
-    for _ in 0..config.num_clients {
-        let mut cmd_vec = Vec::with_capacity(config.num_clients as usize);
+    for _ in 0..config.clients {
+        let mut cmd_vec = Vec::with_capacity(config.clients as usize);
         for _ in 0..config.requests {
-            let cmd = gen_command(cmd, &data);
-            let tokens = Tokens::from(&cmd);
-            let redis_cmd = tokens.to_command()?;
-            let frame = redis_cmd.into_frame();
-            let mut buf = vec![];
-            Connection::write_value(&frame, &mut buf);
+            let buf = cmd_to_bytes(cmd, &data);
             cmd_vec.extend_from_slice(&buf);
         }
         let _ = tx.send(cmd_vec).await;
     }
 
-    let mut handles = Vec::with_capacity(config.num_clients as usize);
+    let mut handles = Vec::with_capacity(config.clients as usize);
 
     let st = Instant::now();
-    for _i in 0..config.num_clients {
+    for _i in 0..config.clients {
         let config = config.clone();
         let requests = config.requests;
         let cmd = rx.recv().await.unwrap();
+        let mut client = create_client(config).await;
         let handle = tokio::spawn(async move {
-            let mut client = create_client(config).await;
             let _ = client.benchmark_send_command(cmd).await;
-            for _i in 0..requests{
+            for _i in 0..requests {
                 let _res = client.benchmark_receive().await;
             }
         });
@@ -125,33 +131,38 @@ pub async fn benchmark_pipe(cmd: &str, config: Arc<BenchmarkConfig>) -> Result<(
     for handle in handles {
         let _ = handle.await;
     }
-    let end = st.elapsed().as_secs_f64();
-    let req_per_sec = config.requests as f64 / end;
-    println!(" {} requests completed in {} seconds", config.requests, end);
-    println!(" {} parallel clients", config.num_clients);
+    let end = st.elapsed().as_millis() as f64;
+    let req_per_sec = config.requests as f64 / end ;
+    println!(" {:.3} requests completed in {} seconds", config.requests, end / 1000f64);
+    println!(" {} parallel clients", config.clients);
     println!(" Latency by percentile distribution:");
     hist.record(end as u64).unwrap();
     println!(" Summary:");
-    println!("     Throughput summary: {} requests per second", req_per_sec);
-    println!("     Latency summary (msec): ");
+    println!("     Throughput summary: {:.2} requests per second", req_per_sec * 1000f64);
+    println!("     Latency summary (sec): ");
     println!("               {}  {}   {}   {}  {}  {}", "avg", "min", "p50", "p95", "p99", "max");
-    println!("               {}  {}  {}  {}  {}  {}", 0, hist.min(), hist.value_at_quantile(0.5), hist.value_at_quantile(0.95), hist.value_at_quantile(0.99), hist.max());
-
-    // println!("Count: {}", hist.len());
-    // println!("Min: {} s", hist.min());
-    // println!("P50: {} s", hist.value_at_quantile(0.5));
-    // println!("P95: {} s", hist.value_at_quantile(0.95));
-    // println!("P99: {} s", hist.value_at_quantile(0.99));
-    // println!("Max: {} s", hist.max());
-    // println!("Latency: {:.3}s", end);
+    println!("               {}  {}   {} {} {} {}", 0, hist.min(), hist.value_at_quantile(0.5) as f64, hist.value_at_quantile(0.95), hist.value_at_quantile(0.99), hist.max());
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config = Arc::new(BenchmarkConfig::default());
-    benchmark_pipe("ping", config).await?;
-    //benchmark_pipe("hset", config).await?;
+    let config: BenchmarkConfig = BenchmarkConfig::parse();
+    let cmd = &config.tests;
+    let config = Arc::new(config.clone());
+    if test_is_selected(cmd, &"ping".to_string()) {
+        benchmark_pipe("ping", config.clone()).await?;
+    }
+    if test_is_selected(cmd, &"set".to_string()) {
+        benchmark_pipe("set", config.clone()).await?;
+    }
+    if test_is_selected(cmd, &"get".to_string()) {
+        benchmark_pipe("get", config.clone()).await?;
+    }
+    if test_is_selected(cmd, &"hset".to_string()) {
+        benchmark_pipe("hset", config.clone()).await?;
+    }
+
     Ok(())
 }

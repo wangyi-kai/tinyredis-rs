@@ -27,6 +27,7 @@ struct Listener {
 
 impl Listener {
     async fn run(&mut self) -> crate::Result<()> {
+        info!("Ready to accept connection");
         loop {
             self.limit_connections.acquire().await.unwrap().forget();
             let socket = self.accept().await?;
