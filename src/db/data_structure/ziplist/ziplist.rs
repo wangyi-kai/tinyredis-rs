@@ -1,3 +1,4 @@
+use std::panic::set_hook;
 use std::str::from_utf8;
 
 use crate::db::data_structure::ziplist::error::ZipListError;
@@ -7,6 +8,7 @@ use crate::db::data_structure::ziplist::{
     ZIPLIST_END_SIZE, ZIPLIST_HEADER_SIZE, ZIPLIST_LENGTH_OFFSET, ZIP_ENCODING_SIZE_INVALID,
     ZIP_END,
 };
+use crate::db::data_structure::ziplist::error::ZipListError::NotFund;
 
 #[derive(Clone, Debug)]
 pub struct ZipListEntry {
@@ -629,6 +631,33 @@ impl ZipList {
         true
     }
 
+    pub fn find(&self, entry: &String, mut pos: usize) -> Result<usize, ZipListError> {
+        let bytes = self.ziplist_len();
+
+        while self.data[pos] != ZIP_END {
+            let mut q = 0;
+            let e = self.entry_safe(bytes, pos, 1)?;
+            q = pos + (e.prev_raw_len_size + e.len_size) as usize;
+            if is_string(e.encoding) {
+                if self.compare(pos, entry) {
+                    return Ok(pos);
+                }
+            } else {
+                match try_encoding(entry) {
+                    Some((vll, _)) => {
+                        let ll = load_integer(&self.data[q..], e.encoding);
+                        if vll == ll {
+                            return Ok(pos);
+                        }
+                    }
+                    None => {}
+                }
+            }
+            pos = q + e.len as usize;
+        }
+        Err(NotFund(format!("{}", entry)))
+    }
+
     pub fn replace(&mut self, mut pos: usize, s: &str) -> Result<(), ZipListError> {
         let entry = self.zip_entry(pos);
 
@@ -671,9 +700,8 @@ impl ZipList {
             if entry.len == sstr.len() as u32 {
                 let s = from_utf8(
                     &self.data[pos + entry.head_size as usize
-                        ..pos + (entry.head_size + entry.len) as usize],
-                )
-                .unwrap();
+                        ..pos + (entry.head_size + entry.len) as usize]).unwrap();
+                //return self.data[pos + entry.head_size as usize..pos + (entry.head_size + entry.len) as usize] == *sstr.as_bytes();
                 return s == sstr;
             } else {
                 return false;

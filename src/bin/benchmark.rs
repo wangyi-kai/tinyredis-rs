@@ -103,9 +103,10 @@ pub async fn benchmark_pipe(cmd: &str, config: Arc<BenchmarkConfig>) -> Result<(
     let mut hist = Histogram::<u64>::new_with_bounds(1, 3_600_000, 3).unwrap();
     let (tx, mut rx) = mpsc::channel::<Vec<u8>>(config.clients as usize);
     let data = gen_benchmark_data(config.data_size);
+    let per_req = config.requests / config.clients;
     for _ in 0..config.clients {
         let mut cmd_vec = Vec::with_capacity(config.clients as usize);
-        for _ in 0..config.requests {
+        for _ in 0..per_req {
             let buf = cmd_to_bytes(cmd, &data);
             cmd_vec.extend_from_slice(&buf);
         }
@@ -117,12 +118,12 @@ pub async fn benchmark_pipe(cmd: &str, config: Arc<BenchmarkConfig>) -> Result<(
     let st = Instant::now();
     for _i in 0..config.clients {
         let config = config.clone();
-        let requests = config.requests;
+        let per_req = config.requests / config.clients;
         let cmd = rx.recv().await.unwrap();
         let mut client = create_client(config).await;
         let handle = tokio::spawn(async move {
             let _ = client.benchmark_send_command(cmd).await;
-            for _i in 0..requests {
+            for _i in 0..per_req {
                 let _res = client.benchmark_receive().await;
             }
         });

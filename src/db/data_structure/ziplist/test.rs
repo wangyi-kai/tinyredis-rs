@@ -212,9 +212,9 @@ mod test {
         print!("[TEST]Get element at index -5 (reverse out of range): ");
         {
             let mut pos = 0;
-            let mut entry = String::default();
-            let mut elen: u32 = 0;
-            let mut value: i64 = 0;
+            let entry = String::default();
+            let elen: u32 = 0;
+            let value: i64 = 0;
             zl = create();
             pos = zl.zip_index(-5);
             if pos == 0 {
@@ -412,7 +412,7 @@ mod test {
             let mut pos = 0;
             let entry = String::default();
             let elen: u32 = 0;
-            let value: i64 = 0;
+            let _value: i64 = 0;
 
             zl = create(); /* "hello", "foo", "quux", "1024" */
             pos = zl.zip_index(0);
@@ -625,7 +625,7 @@ mod test {
                 let mut list = LinkList::create();
                 let len = rand::rng().random::<u32>() % 256;
 
-                for j in 0..len {
+                for _j in 0..len {
                     let is_head = if rand::rng().random::<u32>() & 1 == 1 {
                         true
                     } else {
@@ -720,8 +720,9 @@ mod test {
         print!("benchmark ziplist Find: ");
         {
             let start = Instant::now();
-            for i in 0..2000 {
-                let fptr = zl.zip_index(0);
+            for i in 0..200 {
+                let mut fptr = zl.zip_index(0);
+                fptr = zl.find(&"asdf".to_string(), fptr)?;
             }
             let end = start.elapsed();
             println!("Done, time = {:?}", end);

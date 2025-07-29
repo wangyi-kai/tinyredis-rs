@@ -1,5 +1,5 @@
 mod error;
-mod lib;
+pub mod lib;
 mod test;
 pub mod ziplist;
 

@@ -115,9 +115,9 @@ impl<T> RedisObject<T> {
     // }
 
     pub fn create_hash_object() -> Self {
-        let ht = Dict::create();
-        let mut o = RedisObject::create(OBJ_HASH, RedisValue::Hash(ht));
-        o.encoding = OBJ_ENCODING_HT;
+        let zp = ZipList::new();
+        let mut o = RedisObject::create(OBJ_HASH, RedisValue::List(ListObject::ZipList(zp)));
+        o.encoding = OBJ_ENCODING_ZIPLIST;
         o
     }
 

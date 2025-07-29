@@ -3,7 +3,8 @@ use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::parser::cmd::error::CommandError;
 
 use crate::db::db::RedisDb;
-use crate::db::object::{OBJ_ENCODING_HT, RedisObject, RedisValue};
+use crate::db::object::{OBJ_ENCODING_HT, OBJ_ENCODING_ZIPLIST, RedisObject, RedisValue, ListObject};
+use crate::db::data_structure::ziplist::lib::Content;
 use crate::parser::frame::Frame;
 
 #[derive(Debug)]
@@ -123,12 +124,28 @@ impl HashCmd {
                     ht.add_raw(field, value).ok();
                 }
             }
-        } else {
-            unimplemented!()
+        } else if o.encoding == OBJ_ENCODING_ZIPLIST {
+            let zp = match &mut o.ptr {
+                RedisValue::List(list) => {
+                    match list {
+                        ListObject::ZipList(zp) => zp,
+                        _ => return,
+                    }
+                }
+                _ => return,
+            };
+            let pos = zp.zip_index(0);
+            if let Ok(pos) = zp.find(&field, pos) {
+                let next = zp.next_entry_position(pos);
+                let _ = zp.replace(next, &value);
+            } else {
+                let _ = zp.push(&field, false);
+                let _ = zp.push(&value, false);
+            }
         }
     }
 
-    fn hash_get(o: &mut RedisObject<String>, field: &str) -> Option<&'static str> {
+    fn hash_get(o: &mut RedisObject<String>, field: &String) -> Option<String> {
         if o.encoding == OBJ_ENCODING_HT {
             let de = match &mut o.ptr {
                 RedisValue::Hash(ht) => ht.find(field),
@@ -137,13 +154,36 @@ impl HashCmd {
             if let Some(de) = de {
                 unsafe {
                     let value = (*de.as_ptr()).value();
-                    Some(value)
+                    Some(value.clone())
                 }
             } else {
                 None
             }
+        } else if o.encoding == OBJ_ENCODING_ZIPLIST {
+            let zp = match &mut o.ptr {
+                RedisValue::List(list) => {
+                    match list {
+                        ListObject::ZipList(zp) => zp,
+                        _ => return None,
+                    }
+                }
+                _ => return None,
+            };
+            let pos = zp.zip_index(0);
+            if let Ok(pos) = zp.find(field, pos) {
+                let next = zp.next_entry_position(pos);
+                return if let Some(entry) = zp.zip_get_entry(next) {
+                    match entry {
+                        Content::Char(s) => Some(s.clone()),
+                        Content::Integer(v) => Some(v.to_string())
+                    }
+                } else {
+                    None
+                }
+            }
+            None
         } else {
-            unimplemented!()
+            todo!()
         }
     }
 
@@ -179,7 +219,7 @@ mod test {
         println!("frame {}", frame);
 
         let cmd_type = get_command_name(&frame)?;
-        let (cmd, len) = HashCmd::from_frame(&cmd_type, frame)?;
+        let cmd = HashCmd::from_frame(&cmd_type, frame)?;
 
         println!("cmd_type:{}, cmd: {:?}", cmd_type, cmd);
         Ok(())

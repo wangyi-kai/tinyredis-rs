@@ -18,4 +18,6 @@ pub enum ZipListError {
     OverFlowNegative,
     #[error("Positive overflow")]
     OverFlowPositive,
+    #[error("{0} not found")]
+    NotFund(String),
 }
