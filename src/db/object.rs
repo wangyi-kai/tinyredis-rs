@@ -131,7 +131,7 @@ impl<T> RedisObject<T> {
     pub fn create_list_object() -> Self {
         let z = ZipList::new();
         let mut o = RedisObject::create(OBJ_LIST, RedisValue::List(ListObject::ZipList(z)));
-        o.encoding = OBJ_ENCODING_HT;
+        o.encoding = OBJ_ENCODING_ZIPLIST;
         o
     }
 

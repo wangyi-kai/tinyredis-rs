@@ -13,7 +13,9 @@ async fn main() {
     let listener = TcpListener::bind(&format!("0.0.0.0:{}", port)).await.unwrap();
     print_logo();
     info!("Redis Server start");
-    run_server(listener, signal::ctrl_c(), DB_SIZE as u32).await;
+    unsafe {
+        run_server(listener, signal::ctrl_c(), DB_SIZE as u32).await;
+    }
 }
 
 pub fn print_logo() {
@@ -25,9 +27,9 @@ pub fn print_logo() {
         r#"
                _._
           _.-``__ ''-._
-     _.-``    `.  `_.  ''-._           TinyRedis {} (custom) 🦀
+     _.-``    `.  `_.  ''-._           TinyRedis {} (custom)
  .-`` .-```.  ```\/    _.,_ ''-._
-(    '      ,       .-`  | `,    )     Running in Standalone mode 🚀
+(    '      ,       .-`  | `,    )     Running in Standalone mode
 |`-._`-...-` __...-.``-._|'` _.-'|     Port: {}
 |    `-._   `._    /     _.-'    |     PID: {}
  `-._    `-._  `-./  _.-'    _.-'

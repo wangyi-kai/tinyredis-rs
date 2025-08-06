@@ -1,5 +1,5 @@
 
-<h1 align="center">🚀 TinyRedis</h1>
+<h1 align="center">TinyRedis</h1>
 
 > A lightweight Redis reimplementation in Rust — fast, embeddable, and easy to understand.
 
@@ -9,13 +9,13 @@
 
 ---
 
-## ✨ 项目简介
+## 项目简介
 
 **tinyredis** 是一个用 Rust 编写的简易Redis，旨在学习 Redis 内部机制，并构建一个高性能、简洁易读的内存键值数据库。它兼容 RESP 协议，支持基础数据结构，并具备异步网络 IO 和高效内存管理。
 
 ---
 
-## 🧱 Features
+## Features
 
 *  **学习友好**：核心数据结构和命令解析逻辑简洁明了
 * **异步运行**：基于 `tokio` 的异步网络模型
@@ -26,7 +26,7 @@
 
 ---
 
-## 🚀 快速开始
+## 快速开始
 
 ### 构建项目
 ```bash
@@ -43,7 +43,7 @@ cargo run --release --bin redis_cli
 ```
 
 ---
-## 📦 已支持命令
+## 已支持命令
 * `hset key field value`
 * `hget key field`
 * `hdel key field`
@@ -59,13 +59,13 @@ cargo run --release --bin redis_cli
 
 ---
 
-## 🧪 基准测试
-
-* 待开发
-
+## 基准测试
+```
+* cargo run --release --bin benchmark
+```
 ---
 
-## 📚 架构设计
+## 架构设计
 
 ```bash
 src/
@@ -78,7 +78,7 @@ src/
 ```
 ---
 
-## 🛠️ 技术栈
+## 技术栈
 * [Rust](https://www.rust-lang.org/)
 * [Tokio](https://tokio.rs/)
 * [Bytes](https://docs.rs/bytes)
@@ -88,26 +88,25 @@ src/
 
 
 ---
-## 📈 未来计划
+## 未来计划
 
 * [ ] 支持 RDB / AOF 持久化
 * [ ] 发布 Docker 镜像
-* [ ] 发布 benchmark 工具
 * [ ] 实现事务（MULTI/EXEC）
 * [ ] Lua 脚本支持
 * [ ] 集群协议兼容
 
 ---
-## ❤️ 致谢
+## 致谢
 * [Redis](https://redis.io/)
 * [mini-redis](https://github.com/tokio-rs/mini-redis)
 * [kedis-rust](https://github.com/kwsc98/kedis-rust)
 ---
 
-## 📄 License
+## License
 * [MIT](LICENSE)
 ---
 
-## 🗨️ 联系我
+## 联系我
 欢迎在 [GitHub Discussions](https://github.com/wangyi-kai/tinyredis/discussions) 提问交流, 或提交 Issue / PR 🙌
 

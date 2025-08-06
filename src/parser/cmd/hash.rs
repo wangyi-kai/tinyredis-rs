@@ -1,11 +1,14 @@
 use bytes::Bytes;
+use tracing::info;
+use crate::db::data_structure::dict::dict::Dict;
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::parser::cmd::error::CommandError;
 
 use crate::db::db::RedisDb;
 use crate::db::object::{OBJ_ENCODING_HT, OBJ_ENCODING_ZIPLIST, RedisObject, RedisValue, ListObject};
-use crate::db::data_structure::ziplist::lib::Content;
+use crate::db::data_structure::ziplist::lib::{Content};
 use crate::parser::frame::Frame;
+use crate::server::REDIS_SERVER;
 
 #[derive(Debug)]
 pub enum HashCmd {
@@ -98,7 +101,7 @@ impl CommandStrategy for HashCmd {
                 if let Some(o) = o {
                     Self::hash_set(o, field, value);
                 } else {
-                    let mut ht = RedisObject::<String>::create_hash_object();
+                    let mut ht = RedisObject::<String>::create_list_object();
                     Self::hash_set(&mut ht, field, value);
                     db.add(key, ht);
                 }
@@ -111,6 +114,7 @@ impl CommandStrategy for HashCmd {
 
 impl HashCmd {
     fn hash_set(o: &mut RedisObject<String>, field: String, value: String) {
+        hash_type_try_conversion(o, &field, &value);
         if o.encoding == OBJ_ENCODING_HT {
             let ht = match &mut o.ptr {
                 RedisValue::Hash(ht) => ht,
@@ -141,6 +145,12 @@ impl HashCmd {
             } else {
                 let _ = zp.push(&field, false);
                 let _ = zp.push(&value, false);
+            }
+            let len = zp.entry_num() as usize;
+            unsafe {
+                if len > REDIS_SERVER.wait().hash_max_ziplist_entries {
+                    hash_type_convert(o);
+                }
             }
         }
     }
@@ -200,6 +210,50 @@ impl HashCmd {
         } else {
             deleted
         }
+    }
+}
+
+fn hash_type_try_conversion(o: &mut RedisObject<String>, field: &String, value: &String) {
+    if o.encoding == OBJ_ENCODING_ZIPLIST {
+        unsafe {
+            if field.len() > REDIS_SERVER.wait().hash_max_ziplist_value || value.len() > REDIS_SERVER.wait().hash_max_ziplist_value {
+                hash_type_convert(o);
+            }
+        }
+    }
+}
+
+fn hash_type_convert(o: &mut RedisObject<String>) {
+    if o.encoding != OBJ_ENCODING_ZIPLIST {
+        return;
+    }
+    match &mut o.ptr {
+        RedisValue::List(list) => {
+            match list {
+                ListObject::ZipList(zp) => {
+                    let mut iter = zp.hash_iter();
+                    let mut dict = Dict::create();
+                    while let Some(_) = iter.next() {
+                        let field = match zp.zip_get_entry(iter.field_pos).unwrap() {
+                            Content::Char(s) => s,
+                            Content::Integer(v) => v.to_string(),
+                        };
+                        let value = match zp.zip_get_entry(iter.value_pos).unwrap() {
+                            Content::Char(s) => s,
+                            Content::Integer(v) => v.to_string(),
+                        };
+                        if let Err(e) = dict.add_raw(field, value) {
+                            println!("Err: {e}");
+                        }
+                    }
+                    info!("ZipList convert to Dict");
+                    o.encoding = OBJ_ENCODING_HT;
+                    o.ptr = RedisValue::Hash(dict);
+                }
+                _ => return,
+            }
+        }
+        _ => panic!("Error type"),
     }
 }
 

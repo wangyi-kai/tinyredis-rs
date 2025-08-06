@@ -1,8 +1,8 @@
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc};
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, Semaphore, broadcast, oneshot};
+use tokio::sync::{mpsc, Semaphore, broadcast, oneshot, Mutex, RwLock};
 use tokio::time;
 use tracing::{error, info};
 
@@ -11,23 +11,26 @@ use crate::parser::cmd::conn::{*};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
+use crate::server::REDIS_SERVER;
 use crate::server::shutdown::Shutdown;
 
 const MAX_CONNECTIONS: usize = 250;
 
 #[derive(Debug)]
-struct Listener {
+pub struct RedisServer {
     listener: TcpListener,
     notify_shutdown: broadcast::Sender<()>,
     limit_connections: Arc<Semaphore>,
     db_handler: Arc<DbHandler>,
     shutdown_complete_tx: mpsc::Sender<()>,
     shutdown_complete_rx: mpsc::Receiver<()>,
+    pub hash_max_ziplist_entries: usize,
+    pub hash_max_ziplist_value: usize,
 }
 
-impl Listener {
+impl RedisServer {
     async fn run(&mut self) -> crate::Result<()> {
-        info!("Ready to accept connection");
+        info!("ready to accept connection");
         loop {
             self.limit_connections.acquire().await.unwrap().forget();
             let socket = self.accept().await?;
@@ -126,16 +129,20 @@ impl Drop for Handler {
     }
 }
 
-pub async fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
+pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
     let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
-    let mut server = Listener {
+    let mut server = RedisServer {
         listener,
         notify_shutdown: broadcast::channel(1).0,
         limit_connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
         db_handler: Arc::new(DbHandler::new(db_num)),
         shutdown_complete_tx,
         shutdown_complete_rx,
+        hash_max_ziplist_entries: 512,
+        hash_max_ziplist_value: 64,
     };
+    REDIS_SERVER.set(server).unwrap();
+    let server = REDIS_SERVER.get_mut().unwrap();
     tokio::select! {
         res = server.run() => {
             if let Err(err) = res {
@@ -146,7 +153,8 @@ pub async fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u3
              info!("server shutting down");
        }
     }
-    let Listener {
+    let server = REDIS_SERVER.take().unwrap();
+    let RedisServer {
         mut shutdown_complete_rx,
         shutdown_complete_tx,
         notify_shutdown,

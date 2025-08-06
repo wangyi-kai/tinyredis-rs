@@ -1,4 +1,3 @@
-use std::panic::set_hook;
 use std::str::from_utf8;
 
 use crate::db::data_structure::ziplist::error::ZipListError;
@@ -342,7 +341,7 @@ impl ZipList {
         }
         pos += self.zip_raw_entry_length(pos) as usize;
         if self.data[pos] == ZIP_END {
-            return pos;
+            return 0;
         }
         let _ = self.entry_safe(zl_bytes as usize, pos, 1);
         pos

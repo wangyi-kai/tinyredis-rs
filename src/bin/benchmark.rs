@@ -19,7 +19,7 @@ struct BenchmarkConfig {
     pub port: u16,
     #[arg(short, long, default_value_t = 50)]
     pub clients: u32,
-    #[arg(short, long, default_value_t = 100000)]
+    #[arg(short, long, default_value_t = 1000000)]
     pub requests: u32,
     #[arg(short, long, default_value_t = 3)]
     pub data_size: u32,

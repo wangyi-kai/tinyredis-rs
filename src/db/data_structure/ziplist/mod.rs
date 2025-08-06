@@ -1,7 +1,10 @@
+use crate::db::data_structure::ziplist::ziplist::ZipList;
+
 mod error;
 pub mod lib;
 mod test;
 pub mod ziplist;
+pub mod iter;
 
 const ZIPLIST_HEADER_SIZE: u32 = 10;
 const ZIPLIST_END_SIZE: u32 = 1;
