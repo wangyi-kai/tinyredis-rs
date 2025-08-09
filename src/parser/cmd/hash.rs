@@ -101,7 +101,7 @@ impl CommandStrategy for HashCmd {
                 if let Some(o) = o {
                     Self::hash_set(o, field, value);
                 } else {
-                    let mut ht = RedisObject::<String>::create_list_object();
+                    let mut ht = RedisObject::<String>::create_hash_object();
                     Self::hash_set(&mut ht, field, value);
                     db.add(key, ht);
                 }

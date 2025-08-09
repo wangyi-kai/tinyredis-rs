@@ -1,6 +1,6 @@
 use crate::db::data_structure::dict::dict::Dict;
 use crate::db::data_structure::intset::intset::IntSet;
-use crate::db::data_structure::skiplist::skiplist::SkipList;
+use crate::db::data_structure::skiplist::skiplist::{SkipList, ZSet};
 use crate::db::data_structure::ziplist::ziplist::ZipList;
 use crate::db::data_structure::adlist::adlist::LinkList;
 
@@ -54,7 +54,7 @@ pub enum RedisValue<T> {
     String(T),
     List(ListObject<T>),
     Hash(Dict<T>),
-    SortSet(SkipList),
+    SortSet(ZSet<f64>),
     Set(IntSet),
 }
 
@@ -128,16 +128,11 @@ impl<T> RedisObject<T> {
         o
     }
 
-    pub fn create_list_object() -> Self {
-        let z = ZipList::new();
-        let mut o = RedisObject::create(OBJ_LIST, RedisValue::List(ListObject::ZipList(z)));
-        o.encoding = OBJ_ENCODING_ZIPLIST;
-        o
-    }
-
-    pub fn create_skiplist_object() -> Self {
-        let s = SkipList::new();
-        let mut o = RedisObject::create(OBJ_ZSET, RedisValue::SortSet(s));
+    pub fn create_zset_object() -> Self {
+        let dict = Dict::create();
+        let zsl = SkipList::new();
+        let zset = ZSet { dict, zsl};
+        let mut o = RedisObject::create(OBJ_ZSET, RedisValue::SortSet(zset));
         o.encoding = OBJ_ENCODING_SKIPLIST;
         o
     }

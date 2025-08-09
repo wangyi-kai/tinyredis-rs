@@ -9,6 +9,8 @@ pub enum CommandError {
     NotSupport(String),
     #[error("{0} args error")]
     ArgsErr(String),
+    #[error("{0} not exist")]
+    NotExist(String),
 }
 
 unsafe impl Send for CommandError {}

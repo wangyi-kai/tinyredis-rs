@@ -6,6 +6,8 @@ use crate::server::connection::Connection;
 use crate::parser::cmd::hash::HashCmd::{HDel, HGet, HSet};
 use crate::parser::cmd::string::StringCmd::{*};
 use crate::parser::cmd::conn::ConnCmd::{*};
+use crate::parser::cmd::error::CommandError;
+use crate::parser::cmd::zset::SortedCmd::{ZAdd, ZCard, ZScore};
 use crate::parser::frame::Frame;
 
 pub struct Client {
@@ -195,6 +197,34 @@ impl Tokens {
             }
             "quit" => {
                 Ok(RedisCommand::Connection(Quit))
+            }
+            "zadd" => {
+                let key = self.token[1].to_string();
+                let param = self.token[2].to_string();
+                let (arg, start) = if param.eq("nx") || param.eq("xx") {
+                    (Some(param), 3)
+                } else {
+                    (None, 2)
+                };
+                let len = self.token.len();
+                let mut values = Vec::with_capacity(len);
+                for i in start..len {
+                    values.push(self.token[i].clone())
+                }
+                Ok(RedisCommand::SortSet(ZAdd {key, arg, values}))
+            }
+            "zcard" => {
+                let key = self.token[1].to_string();
+                Ok(RedisCommand::SortSet(ZCard {key}))
+
+            }
+            "zscore" => {
+                if self.token.len() != 3 {
+                    return Err(ArgsErr("zscore".to_string()).into())
+                }
+                let key = self.token[1].to_string();
+                let member = self.token[2].to_string();
+                Ok(RedisCommand::SortSet(ZScore {key, member}))
             }
             _ => Err(NotSupport(cmd_name).into())
         }

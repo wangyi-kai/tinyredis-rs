@@ -5,6 +5,7 @@ use crate::parser::cmd::string::StringCmd;
 use crate::db::db::RedisDb;
 use crate::db::object::RedisObject;
 use crate::parser::cmd::conn::ConnCmd;
+use crate::parser::cmd::zset::SortedCmd;
 
 pub trait CommandStrategy {
     fn into_frame(self) -> Frame;
@@ -29,6 +30,7 @@ impl CommandStrategy for RedisCommand {
             RedisCommand::Hash(cmd) => cmd.into_frame(),
             RedisCommand::String(cmd) => cmd.into_frame(),
             RedisCommand::Connection(cmd) => cmd.into_frame(),
+            RedisCommand::SortSet(cmd) => cmd.into_frame(),
             _ => unimplemented!()
         }
     }
@@ -42,6 +44,7 @@ impl CommandStrategy for RedisCommand {
             "append" | "set" | "get" | "setex" | "setnx" | "setpx" | "setxx" | "strlen" =>
                 StringCmd::from_frame(&cmd_name, frame)?,
             "select" | "echo" | "ping" | "quit" => ConnCmd::from_frame(&cmd_name, frame)?,
+            "zadd" | "zcard" | "zscore" => SortedCmd::from_frame(&cmd_name, frame)?,
             _ => return Err(CommandError::ParseError(-101).into()),
         };
         Ok(command)
@@ -51,6 +54,7 @@ impl CommandStrategy for RedisCommand {
         match self {
             RedisCommand::Hash(cmd) => cmd.apply(db),
             RedisCommand::String(cmd) => cmd.apply(db),
+            RedisCommand::SortSet(cmd) => cmd.apply(db),
             _ => unimplemented!()
         }
     }
@@ -99,25 +103,6 @@ pub enum SetCmd {
     SInter,
     /// Returns the number of members of the intersect of multiple sets
     SInterCard,
-}
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum SortedCmd {
-    /// Adds one or more members to a sorted set, or updates their scores.
-    ZAdd,
-    /// Returns the number of members in a sorted set
-    ZCard,
-    /// Returns the score of a member in a sorted set
-    ZScore,
-    /// Returns the union of multiple sorted sets
-    ZUnion,
-    /// Returns the intersect of multiple sorted sets
-    ZInter,
-    /// Returns the number of members of the intersect of multiple sorted sets
-    ZInterCard,
-    /// Stores the intersect of multiple sorted sets in a key
-    ZInterStore,
 }
 
 pub fn get_command_name(frame: &Frame) -> crate::Result<String> {

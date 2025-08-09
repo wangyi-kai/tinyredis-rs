@@ -1,6 +1,13 @@
 use super::lib::{random_level, sds_cmp};
 use super::SKIP_LIST_MAX_LEVEL;
 use std::ptr::NonNull;
+use crate::db::data_structure::dict::dict::Dict;
+
+#[derive(Clone)]
+pub struct ZSet<T> {
+    pub(crate) dict: Dict<T>,
+    pub(crate) zsl: SkipList,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct Node {
@@ -62,7 +69,7 @@ pub struct SkipList {
     /// tail node
     pub tail: Option<NonNull<Node>>,
     /// number of nodes in skip_list
-    length: u64,
+    pub length: u64,
     /// level of node with max level
     level: usize,
 }
