@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use clap::builder::Str;
 use crate::db::db::RedisDb;
 use crate::db::object::{OBJ_ENCODING_SKIPLIST, RedisObject, RedisValue};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
@@ -31,12 +30,12 @@ impl CommandStrategy for SortedCmd {
         match self {
             SortedCmd::ZAdd {key, arg, values} => {
                 frame.push_bulk(Bytes::from("zadd".as_bytes()));
+                frame.push_bulk(Bytes::from(key.into_bytes()));
                 if let Some(arg) = arg {
                     frame.push_bulk(Bytes::from(arg.into_bytes()));
                 } else {
                     frame.push_bulk(Bytes::from("null".as_bytes()));
                 }
-                frame.push_bulk(Bytes::from(key.into_bytes()));
                 for value in values {
                     frame.push_bulk(Bytes::from(value.into_bytes()));
                 }
@@ -98,16 +97,19 @@ impl CommandStrategy for SortedCmd {
                     for i in (0..len - 1).step_by(2) {
                         let score: f64 = values[i].clone().parse()?;
                         let ele = values[i + 1].clone();
-                        Self::zadd(o, score, ele);
+                        Self::zadd(o, arg.clone(), score, ele);
                     }
                 } else {
                     let mut z_obj = RedisObject::<String>::create_zset_object();
                     for i in (0..len - 1).step_by(2) {
                         let score: f64 = values[i].clone().parse()?;
                         let ele = values[i + 1].clone();
-                        Self::zadd(&mut z_obj, score, ele);
+                        Self::zadd(&mut z_obj, arg.clone(), score, ele);
                     }
-                    db.add(key, z_obj);
+                    let o = db.add(key, z_obj);
+                    if o.is_none() {
+                        return Err(CommandError::ExecuteFail("zadd".to_string()).into());
+                    }
                 }
                 Ok(Frame::Simple((len >> 1).to_string()))
             }
@@ -155,16 +157,30 @@ impl CommandStrategy for SortedCmd {
 }
 
 impl SortedCmd {
-    pub fn zadd(o: &mut RedisObject<String>, score: f64, ele: String) {
+    pub fn zadd(o: &mut RedisObject<String>, arg: Option<String>, mut score: f64, ele: String) {
         if o.encoding == OBJ_ENCODING_SKIPLIST {
             let zs = match &mut o.ptr {
                 RedisValue::SortSet(zset) => zset,
                 _ => return,
             };
             let de = zs.dict.find(&ele);
+            let arg = if let Some(arg) = arg {
+                arg
+            } else {
+                "".to_string()
+            };
             if let Some(de) = de {
                 unsafe {
                     let cur_score = (*de.as_ptr()).value();
+                    if arg.eq("nx") {
+                        return;
+                    }
+                    if arg.eq("incr") {
+                        score += cur_score;
+                    }
+                    if (arg.eq("lt") && score >= *cur_score) || (arg.eq("gt") && score <= *cur_score) {
+                        return;
+                    }
                     if score != *cur_score {
                         let node = zs.zsl.update_score(*cur_score, &ele, score);
                         (*de.as_ptr()).val = Some((*node.as_ptr()).get_score());

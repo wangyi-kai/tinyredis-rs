@@ -27,7 +27,6 @@ unsafe impl<V: Sync> Sync for KvStore<V> {}
 
 pub struct KvStore<V> {
     flag: i32,
-    //pub(crate) dtype: Arc<DictType<K, V>>,
     pub(crate) dicts: Vec<Option<NonNull<Dict<V>>>>,
     pub(crate) num_dicts: u64,
     num_dicts_bits: u64,
@@ -604,19 +603,4 @@ impl<'a, V> KvStore<V> {
     pub fn non_empty_dicts(&self) -> i32 {
         self.non_empty_dicts
     }
-
-    // pub fn get_dict_metadata<T>(&self, didx: i32) -> Option<KvStoreDictMetadata> {
-    //     let mut d = self.get_dict(didx as usize);
-    //     if d.is_none() || (self.flag & KVSTORE_ALLOC_META_KEYS_HIST) != 0 {
-    //         return None;
-    //     }
-    //     unsafe {
-    //         let metadata = &(*d.unwrap().as_ptr()).metadata as KvStoreDictMetadata;
-    //         Some(metadata.mata)
-    //     }
-    // }
-
-    // pub fn get_metadata(&mut self) -> KvStoreMetadata {
-    //     &self.metadata as KvStoreMetadata
-    // }
 }

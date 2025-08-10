@@ -11,6 +11,8 @@ pub enum CommandError {
     ArgsErr(String),
     #[error("{0} not exist")]
     NotExist(String),
+    #[error("{0} execute fail")]
+    ExecuteFail(String),
 }
 
 unsafe impl Send for CommandError {}

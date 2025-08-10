@@ -201,7 +201,7 @@ impl Tokens {
             "zadd" => {
                 let key = self.token[1].to_string();
                 let param = self.token[2].to_string();
-                let (arg, start) = if param.eq("nx") || param.eq("xx") {
+                let (arg, start) = if param.eq("nx") || param.eq("xx") || param.eq("incr") || param.eq("lt") || param.eq("gt") {
                     (Some(param), 3)
                 } else {
                     (None, 2)
@@ -214,6 +214,9 @@ impl Tokens {
                 Ok(RedisCommand::SortSet(ZAdd {key, arg, values}))
             }
             "zcard" => {
+                if self.token.len() != 2 {
+                    return Err(ArgsErr("zcard".to_string()).into())
+                }
                 let key = self.token[1].to_string();
                 Ok(RedisCommand::SortSet(ZCard {key}))
 
