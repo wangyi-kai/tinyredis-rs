@@ -1,5 +1,5 @@
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
-use crate::db::data_structure::dict::iter::DictIterator;
+use crate::db::data_structure::dict::iter::{DictIter, DictIterator};
 use crate::db::kvstore::kvstore::KvStore;
 
 use std::ptr::NonNull;
@@ -28,7 +28,7 @@ impl<'a, V> KvStoreIterator<'a, V> {
         }
     }
 
-    pub fn _get_current_dict_index(&self) -> i32 {
+    pub fn get_current_dict_index(&self) -> i32 {
         unsafe {
             assert!(self.didx >= 0 && self.didx < (*self.kvs).num_dicts as i32);
             self.didx
@@ -80,14 +80,14 @@ impl<'a, V> Drop for KvStoreIterator<'a, V> {
 pub struct KvStoreDictIterator<'a, V> {
     pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
-    pub(crate) di: Option<DictIterator<'a, V>>,
+    pub(crate) di: Option<DictIter<'a, V>>,
 }
 
 impl<'a, V> KvStoreDictIterator<'a, V> {
     pub fn _release_dict_iterator(&mut self) {
         unsafe {
             if (*self.kvs).get_dict(self.didx as usize).is_some() {
-                self.di.as_mut().unwrap().reset();
+                //self.di.as_mut().unwrap().reset();
                 (*self.kvs).free_dict_if_needed(self.didx as usize);
             }
         }

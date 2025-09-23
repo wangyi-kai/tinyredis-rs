@@ -498,7 +498,7 @@ impl<'a, V> KvStore<V> {
     pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, V> {
         unsafe {
             let d = self.dicts[didx];
-            let dict_iter = (*d.unwrap().as_ptr()).safe_iter();
+            let dict_iter = (*d.unwrap().as_ptr()).iter();
             KvStoreDictIterator {
                 kvs: self,
                 didx: didx as i32,

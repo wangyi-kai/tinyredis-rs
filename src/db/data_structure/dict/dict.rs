@@ -80,7 +80,7 @@ impl<V> DictEntry<V>
 unsafe impl<V: Send> Send for Dict<V> {}
 unsafe impl<V: Sync> Sync for Dict<V> {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Dict<V>
 {
     //pub dict_type: Arc<DictType<K, V>>,
@@ -104,7 +104,7 @@ impl<V> Dict<V>
     pub fn create() -> Self {
         unsafe {
             Self {
-                ht_table: vec![vec![Some(NonNull::new_unchecked(Box::into_raw(Box::new(DictEntry::default())))); DICT_HT_INITIAL_SIZE], vec![]],
+                ht_table: vec![vec![None; DICT_HT_INITIAL_SIZE], vec![]],
                 ht_used: vec![0; 2],
                 rehash_idx: -1,
                 pause_rehash: 0,
@@ -223,13 +223,13 @@ impl<V> Dict<V>
                 idx = hash & dict_size_mask(self.ht_size_exp[table]);
                 // Search if this slot does not already contain the given key
                 let mut he = self.ht_table[table][idx as usize];
-                while !he.is_none() {
-                    let he_key = (*he.unwrap().as_ptr()).get_key();
+                while let Some(entry) = he {
+                    let he_key = (*entry.as_ptr()).get_key();
                     if key == *he_key {
                         return Ok(he.unwrap());
                         //return Err(HashError::DictEntryDup);
                     }
-                    he = (*he.unwrap().as_ptr()).next;
+                    he = (*entry.as_ptr()).next;
                 }
                 if !self.dict_is_rehashing() {
                     break;
@@ -265,13 +265,13 @@ impl<V> Dict<V>
                 idx = hash & dict_size_mask(self.ht_size_exp[table]);
                 // Search if this slot does not already contain the given key
                 let mut he = self.ht_table[table][idx as usize];
-                while he.is_some() {
-                    let he_key = (*he.unwrap().as_ptr()).get_key();
+                while let Some(entry) = he {
+                    let he_key = (*entry.as_ptr()).get_key();
                     if key == *he_key {
                         return Ok(he.unwrap());
                         //return Err(HashError::DictEntryDup);
                     }
-                    he = (*he.unwrap().as_ptr()).next;
+                    he = (*entry.as_ptr()).next;
                 }
                 if !self.dict_is_rehashing() {
                     break;
@@ -325,12 +325,12 @@ impl<V> Dict<V>
                 }
                 idx = hash & dict_size_mask(self.ht_size_exp[table]);
                 let mut he = self.ht_table[table][idx as usize];
-                while *he.unwrap().as_ptr() != DictEntry::default() {
-                    let he_key = (*he.unwrap().as_ptr()).get_key();
+                while let Some(entry) = he {
+                    let he_key = (*entry.as_ptr()).get_key();
                     if he_key == key {
                         return he;
                     }
-                    he = (*he.unwrap().as_ptr()).next;
+                    he = (*entry.as_ptr()).next;
                 }
                 if !self.dict_is_rehashing() {
                     break;
@@ -352,17 +352,14 @@ impl<V> Dict<V>
     pub fn fetch_value(&mut self, key: &String) -> Option<&V> {
         let he = self.find(key);
         unsafe {
-            if he.is_some() {
-                return Some((*he.unwrap().as_ptr()).get_val());
+            if let Some(entry) = he {
+                return Some((*entry.as_ptr()).get_val());
             }
             None
         }
     }
 
-    pub fn generic_delete(
-        &mut self,
-        key: &str,
-    ) -> Result<Option<NonNull<DictEntry<V>>>, HashError> {
+    pub fn generic_delete(&mut self, key: &str) -> Result<Option<NonNull<DictEntry<V>>>, HashError> {
         unsafe {
             if self.dict_size() == 0 {
                 return Ok(None);
@@ -378,17 +375,15 @@ impl<V> Dict<V>
                 }
                 idx = h & dict_size_mask(self.ht_size_exp[table]);
                 let mut he = self.ht_table[table][idx as usize];
-                let mut prev_he = Some(NonNull::new_unchecked(Box::into_raw(Box::new(
-                    DictEntry::default(),
-                ))));
-                while *he.unwrap().as_ptr() != DictEntry::default() {
-                    let next_de = (*he.unwrap().as_ptr()).next;
-                    let he_key = (*he.unwrap().as_ptr()).get_key();
+                let mut prev_he: Option<NonNull<DictEntry<V>>> = None;
+                while let Some(entry) = he {
+                    let next_de = (*entry.as_ptr()).next;
+                    let he_key = (*entry.as_ptr()).get_key();
                     if *key == *he_key {
-                        if *prev_he.unwrap().as_ptr() != DictEntry::default() {
+                        if prev_he.is_some() {
                             (*prev_he.unwrap().as_ptr()).next = next_de;
                         } else {
-                            self.ht_table[table][idx as usize] = (*he.unwrap().as_ptr()).next;
+                            self.ht_table[table][idx as usize] = (*entry.as_ptr()).next;
                         }
                         self.ht_used[table] -= 1;
                         self._shrink_if_expand()?;
@@ -409,24 +404,22 @@ impl<V> Dict<V>
         unsafe {
             let mut de = self.ht_table[0][idx as usize];
             let mut h = 0;
-            while *de.unwrap().as_ptr() != DictEntry::default() {
-                let next_de = (*de.unwrap().as_ptr()).next;
+            while let Some(entry) = de {
+                let next_de = (*entry.as_ptr()).next;
                 if self.ht_size_exp[1] > self.ht_size_exp[0] {
-                    h = sys_hash((*de.unwrap().as_ptr()).get_key())
+                    h = sys_hash((*entry.as_ptr()).get_key())
                         & dict_size_mask(self.ht_size_exp[1]);
                 } else {
                     // shrinking the table.
                     h = idx & dict_size_mask(self.ht_size_exp[1]);
                 }
-                (*de.unwrap().as_ptr()).next = self.ht_table[1][h as usize];
+                (*entry.as_ptr()).next = self.ht_table[1][h as usize];
                 self.ht_table[1][h as usize] = de;
                 self.ht_used[0] -= 1;
                 self.ht_used[1] += 1;
                 de = next_de;
             }
-            self.ht_table[0][idx as usize] = Some(NonNull::new_unchecked(Box::into_raw(Box::new(
-                DictEntry::default(),
-            ))));
+            self.ht_table[0][idx as usize] = None;
         }
     }
 
@@ -523,8 +516,7 @@ impl<V> Dict<V>
             }
             // rehashing not in progress if rehash_idx == -1
             if visited_index as i64 >= self.rehash_idx
-                && (*self.ht_table[0][visited_index as usize].unwrap().as_ptr())
-                    != DictEntry::default()
+                && self.ht_table[0][visited_index as usize].is_some()
             {
                 // If we have a valid dict entry at `idx` in ht0, we perform rehash on the bucket at `idx` (being more CPU cache friendly)
                 self.bucket_rehash(visited_index);
@@ -556,9 +548,7 @@ impl<V> Dict<V>
 
         unsafe {
             let new_ht_table = vec![
-                Some(NonNull::new_unchecked(Box::into_raw(Box::new(
-                    DictEntry::default()
-                ))));
+                None;
                 new_size as usize
             ];
             let new_ht_used = 0;
@@ -711,12 +701,12 @@ impl<V> Dict<V>
                     call_back.unwrap();
                 }
                 let mut he = self.ht_table[ht_idx][i as usize];
-                if *he.unwrap().as_ptr() == DictEntry::default() {
+                if he.is_none() {
                     continue;
                 }
 
-                while *he.unwrap().as_ptr() != DictEntry::default() {
-                    let box_node = Box::from_raw(he.unwrap().as_ptr());
+                while let Some(entry) = he {
+                    let box_node = Box::from_raw(entry.as_ptr());
                     he = box_node.next;
                     self.ht_used[ht_idx] -= 1;
                 }
