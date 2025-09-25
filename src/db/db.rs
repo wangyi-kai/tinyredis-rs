@@ -8,6 +8,7 @@ use std::ptr::NonNull;
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 use crate::cluster::cluster::key_hash_slot;
+use crate::db::kvstore::iter::KvStoreIterator;
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 
 pub enum KeyStatus {
@@ -23,9 +24,9 @@ pub fn get_key_slot(key: &str) -> usize {
 
 pub struct RedisDb<V> {
     /// The keyspace for this DB. As metadata, holds key sizes histogram
-    keys: KvStore<V>,
+    pub keys: KvStore<V>,
     /// Timeout of keys with a timeout set
-    expires: KvStore<V>,
+    pub expires: KvStore<V>,
     /// Keys with clients waiting for data (BLPOP)
     blocking_keys: Dict<V>,
     /// Keys with clients waiting for data,
@@ -136,3 +137,5 @@ impl<V> RedisDb<V> {
         self.keys.kvstore_size()
     }
 }
+
+

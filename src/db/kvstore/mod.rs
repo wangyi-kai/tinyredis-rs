@@ -1,4 +1,4 @@
-mod iter;
+pub mod iter;
 pub mod kvstore;
 mod lib;
 mod meta;

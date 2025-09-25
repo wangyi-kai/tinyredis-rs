@@ -1,5 +1,6 @@
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
-use crate::db::data_structure::dict::iter::{DictIter, DictIterator};
+use crate::db::data_structure::dict::iter::{DictIter};
+use crate::db::data_structure::dict::iter_mut::DictIterMut;
 use crate::db::kvstore::kvstore::KvStore;
 
 use std::ptr::NonNull;
@@ -8,7 +9,7 @@ pub struct KvStoreIterator<'a, V> {
     pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
     pub(crate) next_didx: i32,
-    pub(crate) di: Option<DictIterator<'a, V>>,
+    pub(crate) di: DictIterMut<'a, V>,
 }
 
 impl<'a, V> KvStoreIterator<'a, V> {
@@ -18,8 +19,7 @@ impl<'a, V> KvStoreIterator<'a, V> {
         }
         unsafe {
             if self.didx != -1 && (*self.kvs).get_dict(self.didx as usize).is_some() {
-                let iter = self.di.as_mut().unwrap();
-                (*iter).reset();
+                self.di.reset();
                 (*self.kvs).free_dict_if_needed(self.didx as usize);
             }
             self.didx = self.next_didx;
@@ -36,8 +36,7 @@ impl<'a, V> KvStoreIterator<'a, V> {
     }
 
     pub fn release(&mut self) {
-        let iter = self.di.as_mut();
-        iter.unwrap().reset();
+        self.di.reset();
         unsafe {
             (*self.kvs).free_dict_if_needed(self.didx as usize);
         }
@@ -45,30 +44,20 @@ impl<'a, V> KvStoreIterator<'a, V> {
 }
 
 impl<'a, V> Iterator for KvStoreIterator<'a, V> {
-    type Item = &'a DictEntry<V>;
+    type Item = &'a mut DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
-            let mut de = if self.di.as_ref().unwrap().dict.is_some() {
-                self.di.as_mut().unwrap().next()
+            if let Some(entry) = self.di.next() {
+                return Some(entry)
             } else {
-                None
-            };
-            if de.is_none() {
-                let d = self.next_dict();
-                if d.is_none() {
+                if let Some(d) = self.next_dict() {
+                    let iter = DictIterMut::new(&mut *d.as_ptr());
+                    self.di = iter;
+                    return self.di.next()
+                } else {
                     return None;
                 }
-                let dict_iter = DictIterator {
-                    dict: Some(&mut (*d.unwrap().as_ptr())),
-                    table: 0,
-                    index: -1,
-                    safe: 1,
-                    entry: None,
-                };
-                self.di = Some(dict_iter);
-                de = self.di.as_mut().unwrap().next();
             }
-            de
         }
     }
 }
@@ -80,14 +69,14 @@ impl<'a, V> Drop for KvStoreIterator<'a, V> {
 pub struct KvStoreDictIterator<'a, V> {
     pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
-    pub(crate) di: Option<DictIter<'a, V>>,
+    pub(crate) di: DictIterMut<'a, V>,
 }
 
 impl<'a, V> KvStoreDictIterator<'a, V> {
     pub fn _release_dict_iterator(&mut self) {
         unsafe {
             if (*self.kvs).get_dict(self.didx as usize).is_some() {
-                //self.di.as_mut().unwrap().reset();
+                self.di.reset();
                 (*self.kvs).free_dict_if_needed(self.didx as usize);
             }
         }
@@ -95,14 +84,14 @@ impl<'a, V> KvStoreDictIterator<'a, V> {
 }
 
 impl<'a, V> Iterator for KvStoreDictIterator<'a, V> {
-    type Item = &'a DictEntry<V>;
+    type Item = &'a mut DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let d = (*self.kvs).get_dict(self.didx as usize);
             if d.is_none() {
                 return None;
             }
-            self.di.as_mut().unwrap().next()
+            self.di.next()
         }
     }
 }

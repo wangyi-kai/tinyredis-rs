@@ -131,7 +131,7 @@ impl Drop for Handler {
 
 pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
     let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
-    let mut server = RedisServer {
+    let server = RedisServer {
         listener,
         notify_shutdown: broadcast::channel(1).0,
         limit_connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),

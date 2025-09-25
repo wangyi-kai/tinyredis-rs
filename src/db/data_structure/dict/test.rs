@@ -377,7 +377,7 @@ mod dict_test {
                     Some(entry) => {
                         let val = (*entry.as_ptr()).get_val();
                         assert_eq!(format!("val_{}", i.to_string()), *val);
-                        //println!("找到要查找key: {}, entry: {:?}", key, val);
+                        println!("找到要查找key: {}, val: {:?}", key, val);
                     }
                     None => {
                         println!("没有找到key: {}", key);
@@ -391,15 +391,11 @@ mod dict_test {
     #[test]
     fn dict_iter() -> Result<(), HashError> {
         unsafe {
-            // let benchmark_dict_type = Arc::new(DictType {
-            //     hash_function: None,
-            //     rehashing_started: None,
-            //     rehashing_completed: None,
-            //     dict_meta_data_bytes: None,
-            // });
             let mut dict = Dict::create();
             let num = 10;
             let start = Instant::now();
+            // let mut ht = HashMap::new();
+            // let ht_iter = ht.iter();
 
             for i in 1..num + 1 {
                 let key = format!("key_{}", i.to_string());
@@ -409,9 +405,9 @@ mod dict_test {
             let end = start.elapsed();
 
             let mut count = 0;
-            let iter = dict.iter();
+            let iter = dict.iter_mut();
             for entry in iter {
-                println!("key: {}, val: {}", entry.get_key(), entry.value());
+                println!("key: {}", entry.get_key());
                 count += 1;
             }
             assert_eq!(num, count);

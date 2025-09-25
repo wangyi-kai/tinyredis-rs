@@ -5,3 +5,4 @@ pub mod iter;
 pub mod lib;
 mod stats;
 mod test;
+pub mod iter_mut;

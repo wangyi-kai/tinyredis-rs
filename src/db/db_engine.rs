@@ -1,5 +1,6 @@
 use crate::db::db::RedisDb;
 use crate::db::kvstore::KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
+use crate::db::object::RedisObject;
 
 #[derive(Debug)]
 pub struct DbHandler {
@@ -13,7 +14,7 @@ impl DbHandler {
         let mut db_list = vec![];
         let mut sender_list = vec![];
         for i in 0..db_num {
-            let db: RedisDb<String> = RedisDb::create(slot_count_bits, flag, i as i32);
+            let db: RedisDb<RedisObject<String>> = RedisDb::create(slot_count_bits, flag, i as i32);
             sender_list.push(db.sender.clone());
             db_list.push(db);
         }

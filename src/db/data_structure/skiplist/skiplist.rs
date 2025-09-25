@@ -25,6 +25,10 @@ impl Node {
     pub fn get_score(&self) -> f64 {
         self.score
     }
+
+    pub fn back_ward(&self) -> Option<NonNull<Node>> {
+        self.backward
+    }
 }
 
 impl Node {

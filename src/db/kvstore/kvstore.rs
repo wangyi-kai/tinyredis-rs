@@ -1,6 +1,5 @@
 use crate::db::data_structure::adlist::adlist::{LinkList, Node};
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
-use crate::db::data_structure::dict::iter::DictIterator;
 use crate::db::data_structure::dict::lib::{entry_mem_usage, DictScanFunction};
 use crate::db::kvstore::iter::{KvStoreDictIterator, KvStoreIterator};
 use crate::db::kvstore::lib::{KvStoreExpandShouldSkipDictIndex, KvStoreScanShouldSkipDict};
@@ -10,6 +9,7 @@ use crate::db::kvstore::{
 use rand::Rng;
 use std::ptr::NonNull;
 use std::time::Instant;
+use crate::db::data_structure::dict::iter_mut::DictIterMut;
 use crate::db::object::RedisObject;
 
 #[derive(Clone)]
@@ -410,19 +410,17 @@ impl<'a, V> KvStore<V> {
     }
 
     pub fn iter(&mut self) -> KvStoreIterator<'a, V> {
-        let dict_iter = DictIterator {
-            dict: None,
-            table: 0,
-            safe: 0,
-            index: -1,
-            entry: None,
-        };
-        let next_didx = self.get_first_non_empty_dict_index() as i32;
-        KvStoreIterator {
-            kvs: self,
-            didx: -1,
-            next_didx,
-            di: Some(dict_iter),
+        unsafe {
+            let mut dict = self.get_dict(0).unwrap();
+            let dict_iter = DictIterMut::new(&mut *dict.as_mut());
+            let next_didx = self.get_first_non_empty_dict_index() as i32;
+
+            KvStoreIterator {
+                kvs: self,
+                didx: 0,
+                next_didx,
+                di: dict_iter,
+            }
         }
     }
 
@@ -485,11 +483,11 @@ impl<'a, V> KvStore<V> {
     pub fn get_dict_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, V> {
         unsafe {
             let d = self.dicts[didx];
-            let dict_iter = (*d.unwrap().as_ptr()).iter();
+            let dict_iter = (*d.unwrap().as_ptr()).iter_mut();
             let iter = KvStoreDictIterator {
                 kvs: self,
                 didx: didx as i32,
-                di: Some(dict_iter),
+                di: dict_iter,
             };
             iter
         }
@@ -498,11 +496,11 @@ impl<'a, V> KvStore<V> {
     pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, V> {
         unsafe {
             let d = self.dicts[didx];
-            let dict_iter = (*d.unwrap().as_ptr()).iter();
+            let dict_iter = (*d.unwrap().as_ptr()).safe_iter_mut();
             KvStoreDictIterator {
                 kvs: self,
                 didx: didx as i32,
-                di: Some(dict_iter),
+                di: dict_iter,
             }
         }
     }

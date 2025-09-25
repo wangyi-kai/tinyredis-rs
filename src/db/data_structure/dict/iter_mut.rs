@@ -7,7 +7,8 @@ use crate::db::data_structure::dict::lib::dict_size;
 pub struct DictIterMut<'a, V> {
     dict: &'a mut Dict<V>,
     table: usize,
-    bucket: usize,
+    bucket: u64,
+    safe: bool,
     current_entry: Option<NonNull<DictEntry<V>>>,
     remaining: usize,
     _marker: PhantomData<&'a mut DictEntry<V>>,
@@ -20,6 +21,22 @@ impl <'a, V> DictIterMut<'a, V> {
             dict,
             table: 0,
             bucket: 0,
+            safe: false,
+            current_entry: None,
+            remaining,
+            _marker: PhantomData,
+        };
+        iter.advance_to_next_entry();
+        iter
+    }
+
+    pub fn new_safe(dict: &'a mut Dict<V>) -> Self {
+         let remaining = dict.dict_size() as usize;
+        let mut iter = DictIterMut {
+            dict,
+            table: 0,
+            bucket: 0,
+            safe: true,
             current_entry: None,
             remaining,
             _marker: PhantomData,
@@ -41,14 +58,19 @@ impl <'a, V> DictIterMut<'a, V> {
             }
 
             while self.table < 2 {
+                if self.table == 0 && self.bucket == 0 {
+                    if self.safe {
+                        self.dict.pause_rehash();
+                    }
+                }
                 let table_size = dict_size(self.dict.ht_size_exp[self.table]);
                 if table_size == 0 {
                     self.table += 1;
                     self.bucket = 0;
                     continue;
                 }
-                while self.bucket < table_size as usize {
-                    if let Some(entry) = self.dict.ht_table[self.table][self.bucket] {
+                while self.bucket < table_size {
+                    if let Some(entry) = self.dict.ht_table[self.table][self.bucket as usize] {
                         self.current_entry = Some(entry);
                         self.bucket += 1;
                         return;
@@ -61,6 +83,14 @@ impl <'a, V> DictIterMut<'a, V> {
             break;
         }
     }
+    pub fn reset(&mut self) {
+        if !(self.bucket == 0 && self.table == 0) {
+            if self.safe {
+                self.dict.resume_rehash()
+            }
+        }
+    }
+
 }
 
 impl <'a, V> Iterator for DictIterMut<'a, V> {

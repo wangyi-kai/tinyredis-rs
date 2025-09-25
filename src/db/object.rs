@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use crate::db::data_structure::dict::dict::Dict;
 use crate::db::data_structure::intset::intset::IntSet;
 use crate::db::data_structure::skiplist::skiplist::{SkipList, ZSet};
@@ -8,15 +9,15 @@ use crate::db::data_structure::adlist::adlist::LinkList;
 
 /// The actual Redis Object
 /// String object
-const OBJ_STRING: u32 = 0;
+pub const OBJ_STRING: u32 = 0;
 /// List object
-const OBJ_LIST: u32 = 1;
+pub const OBJ_LIST: u32 = 1;
 /// Set object
-const OBJ_SET: u32 = 2;
+pub const OBJ_SET: u32 = 2;
 /// Sorted set object
-const OBJ_ZSET: u32 = 3;
+pub const OBJ_ZSET: u32 = 3;
 /// Hash object
-const OBJ_HASH: u32 = 4;
+pub const OBJ_HASH: u32 = 4;
 /// Max number of basic object types
 const OBJ_TYPE_BASIC_MAX: u32 = 5;
 
@@ -67,7 +68,7 @@ pub enum ListObject<T> {
 #[derive(Clone)]
 pub struct RedisObject<T> {
     /// object type
-    object_type: u32,
+    pub object_type: u32,
     /// object encoding
     pub encoding: u32,
     /// object last visit time
@@ -77,6 +78,9 @@ pub struct RedisObject<T> {
     /// actual object
     pub ptr: RedisValue<T>,
 }
+
+unsafe impl<T> Send for RedisObject<T> {}
+unsafe impl<T> Sync for RedisObject<T> {}
 
 #[allow(dead_code)]
 impl<T> RedisObject<T> {
@@ -91,7 +95,6 @@ impl<T> RedisObject<T> {
     }
 
     fn create_raw_string_object(s: String) -> RedisObject<String> {
-        //let s_object = Box::new(s);
         let s_object = RedisValue::String(s);
         RedisObject::create(OBJ_STRING, s_object)
     }

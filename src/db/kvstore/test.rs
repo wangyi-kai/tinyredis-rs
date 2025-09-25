@@ -57,7 +57,7 @@ mod kvstore_test {
         {
             let mut iter = kvs1.iter();
             while let Some(de) = iter.next() {
-                curr_slot = iter._get_current_dict_index();
+                curr_slot = iter.get_current_dict_index();
                 let key = &de.key;
                 assert!(kvs1.dict_delete(curr_slot, key).is_some())
             }
@@ -74,7 +74,7 @@ mod kvstore_test {
         {
             let mut iter = kvs2.iter();
             while let Some(de) = iter.next() {
-                curr_slot = iter._get_current_dict_index();
+                curr_slot = iter.get_current_dict_index();
                 let key = &de.key;
                 assert!(kvs2.dict_delete(curr_slot, key).is_some())
             }
