@@ -1,3 +1,4 @@
+use std::mem::size_of;
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
 use crate::db::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
 use rand::Rng;

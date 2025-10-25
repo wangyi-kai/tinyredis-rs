@@ -1,5 +1,6 @@
 use crate::db::data_structure::intset::lib::intset_value_encoding;
 use crate::db::data_structure::intset::*;
+use std::mem::size_of;
 
 use crate::db::data_structure::skiplist::lib::gen_random;
 
@@ -21,7 +22,7 @@ impl IntSet {
 
     pub fn resize(&mut self, len: u32) {
         let size = (len * self.encoding) as usize;
-        assert!(size <= (SIZE_MAX - size_of::<Self>()));
+        assert!(size <= (SIZE_MAX - std::mem::size_of::<Self>()));
         self.contents.resize(size, 0);
     }
 

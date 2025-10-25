@@ -1,3 +1,4 @@
+use std::mem::size_of;
 use crate::db::data_structure::adlist::adlist::{LinkList, Node};
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
 use crate::db::data_structure::dict::lib::{entry_mem_usage, DictScanFunction};

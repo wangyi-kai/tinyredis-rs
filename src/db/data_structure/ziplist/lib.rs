@@ -3,6 +3,7 @@ use crate::db::data_structure::ziplist::ziplist::ZipList;
 use crate::db::data_structure::ziplist::*;
 use std::cmp;
 use std::str::from_utf8;
+use std::mem::size_of;
 
 #[derive(Debug)]
 pub enum Content {

@@ -24,7 +24,7 @@ pub fn get_key_slot(key: &str) -> usize {
 
 pub struct RedisDb<V> {
     /// The keyspace for this DB. As metadata, holds key sizes histogram
-    pub keys: KvStore<V>,
+    pub kvs: KvStore<V>,
     /// Timeout of keys with a timeout set
     pub expires: KvStore<V>,
     /// Keys with clients waiting for data (BLPOP)
@@ -51,7 +51,7 @@ impl<V> RedisDb<V> {
     pub fn create(slot_count_bits: u64, flag: i32, id: i32) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
         Self {
-            keys: KvStore::create(slot_count_bits, flag),
+            kvs: KvStore::create(slot_count_bits, flag),
             expires: KvStore::create(slot_count_bits, flag),
             blocking_keys: Dict::create(),
             blocking_keys_unblock_on_nokey: Dict::create(),
@@ -82,7 +82,7 @@ impl<V> RedisDb<V> {
             RedisValue::String(s) => s,
             _ => return None,
         };
-        let de = self.keys.dict_find(0, k);
+        let de = self.kvs.dict_find(0, k);
 
         if let Some(de) = de {
             unsafe {
@@ -104,7 +104,7 @@ impl<V> RedisDb<V> {
             _ => { "".to_string() }
         };
         let slot = get_key_slot(&key);
-        let de = self.keys.add(slot as i32, key, val);
+        let de = self.kvs.add(slot as i32, key, val);
         de
     }
 
@@ -118,7 +118,7 @@ impl<V> RedisDb<V> {
             _ => { "" }
         };
         let slot = get_key_slot(&key) as i32;
-        let de = self.keys.dict_delete(slot, key);
+        let de = self.kvs.dict_delete(slot, key);
         if de.is_some() {
             self.expires.dict_delete(slot, key);
         }
@@ -134,7 +134,7 @@ impl<V> RedisDb<V> {
     }
 
     pub fn db_size(&self) -> u64 {
-        self.keys.kvstore_size()
+        self.kvs.kvstore_size()
     }
 }
 

@@ -39,7 +39,7 @@ impl Rdb {
         self.buf.extend_from_slice(b"RDB");
         self.buf.put_u8(RDB_OPCODE_SELECTDB);
 
-        let kvs_it = self.db.lock().unwrap().keys.iter();
+        let kvs_it = self.db.lock().unwrap().kvs.iter();
         for mut dict in kvs_it {
             let key = dict.get_key();
             let value = dict.value();
