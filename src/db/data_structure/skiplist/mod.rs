@@ -39,7 +39,7 @@ pub fn is_in_range(zsl: SkipList, range_spec: RangeSpec) -> bool {
     {
         return false;
     }
-    let x = zsl.tail;
+    let x = zsl.tail();
     unsafe {
         if let Some(x) = x {
             if !value_gte_min((*x.as_ptr()).get_score(), range_spec) {
@@ -48,7 +48,7 @@ pub fn is_in_range(zsl: SkipList, range_spec: RangeSpec) -> bool {
         } else {
             return false;
         }
-        let x = (*zsl.head.unwrap().as_ptr()).level[0].forward;
+        let x = zsl.head().unwrap().as_ref().level[0].forward();
         if let Some(x) = x {
             if !value_lte_max((*x.as_ptr()).get_score(), range_spec) {
                 return false;

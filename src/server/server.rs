@@ -11,6 +11,7 @@ use crate::parser::cmd::conn::{*};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
+use crate::persistence::rdb::SaveParam;
 use crate::server::REDIS_SERVER;
 use crate::server::shutdown::Shutdown;
 
@@ -26,6 +27,10 @@ pub struct RedisServer {
     shutdown_complete_rx: mpsc::Receiver<()>,
     pub hash_max_ziplist_entries: usize,
     pub hash_max_ziplist_value: usize,
+    // Save points array for RDB
+    //pub save_param: SaveParam,
+    // Changes to DB from the last save
+    //dirty: u64,
 }
 
 impl RedisServer {

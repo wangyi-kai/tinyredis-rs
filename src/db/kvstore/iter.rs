@@ -24,7 +24,7 @@ impl<'a, V> KvStoreIterator<'a, V> {
             }
             self.didx = self.next_didx;
             self.next_didx = (*self.kvs).get_next_non_empty_dict_index(self.didx as usize);
-            (*self.kvs).dicts[self.didx as usize]
+            (&(*self.kvs).dicts)[self.didx as usize].as_ref().map(|node| *node)
         }
     }
 
