@@ -32,7 +32,7 @@ impl Rdb {
     }
 
     pub async fn save(&mut self, db_id: usize) -> Result<(), PersistError> {
-        let res = self.file.seek(SeekFrom::Start(0)).await;
+        self.file.seek(SeekFrom::Start(0)).await?;
         self.buf.extend_from_slice(b"RDB");
         self.buf.put_u8(RDB_OPCODE_SELECTDB);
 

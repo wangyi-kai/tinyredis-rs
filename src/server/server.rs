@@ -108,7 +108,8 @@ impl Handler {
             };
 
             if let Some(frame) = frame {
-                let result_cmd = RedisCommand::from_frame("", frame)?;match &result_cmd {
+                let result_cmd = RedisCommand::from_frame("", frame)?;
+                match &result_cmd {
                     RedisCommand::Connection(cmd) => {
                         match cmd {
                             ConnCmd::Quit => {
