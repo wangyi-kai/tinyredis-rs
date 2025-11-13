@@ -1,5 +1,7 @@
+use std::io;
 
-#[derive(thiserror::Error, Debug, Clone)]
+
+#[derive(thiserror::Error, Debug)]
 pub enum PersistError {
     #[error("[RDB] open file error({0})")]
     FileError(i64),
@@ -9,4 +11,6 @@ pub enum PersistError {
     EncodingErr(String),
     #[error("[RDB] {0}")]
     TypeErr(String),
+    #[error("I/O error: {0}")]
+    Io(#[from] io::Error),
 }

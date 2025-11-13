@@ -9,14 +9,14 @@ pub const CONFIG_PATH_TOML: &str = "./config.toml";
 pub const CONFIG_PATH_JSON: &str = "./config.json";
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Config {
+pub struct ClientConfig {
     #[serde(default = "server_ip")]
     server_ip: String,
     #[serde(default = "server_port")]
     server_port: u16,
 }
 
-impl Default for Config {
+impl Default for ClientConfig {
     fn default() -> Self {
         Self {
             server_port: server_port(),
@@ -25,7 +25,7 @@ impl Default for Config {
     }
 }
 
-impl Config {
+impl ClientConfig {
     pub fn new(config_path: Option<&str>) -> Self {
         let config_path_show;
         let mut file = if let Some(path) = config_path {
@@ -34,7 +34,7 @@ impl Config {
                 file
             } else {
                 println!("Config File: {} Read Fail, Use Default Config. ", config_path_show);
-                return Config::default();
+                return ClientConfig::default();
             }
         } else {
             if let Ok(file) = File::open(CONFIG_PATH_JSON) {
@@ -46,14 +46,14 @@ impl Config {
                     file
                 } else {
                     println!("Config File: {} Read Fail, Use Default Config. ", CONFIG_PATH_JSON);
-                    return Config::default();
+                    return ClientConfig::default();
                 }
             }
         };
         let mut config_string = String::new();
         if let Err(e) = file.read_to_string(&mut config_string) {
             println!("Config File: {} Read Fail{e}, Use Default Config. ", config_path_show);
-            return Config::default();
+            return ClientConfig::default();
         }
         println!("Config File: {}", config_path_show);
         if let Ok(config) = toml::from_str(&config_string) {
@@ -64,7 +64,7 @@ impl Config {
                 Ok(data) => data,
                 Err(e) => {
                     println!("Config File: {} Read Fail{e}, Use Default Config.", config_path_show);
-                    Config::default()
+                    ClientConfig::default()
                 }
             }
         }

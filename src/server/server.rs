@@ -1,11 +1,12 @@
 use std::future::Future;
 use std::sync::{Arc};
 use std::time::Duration;
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Semaphore, broadcast, oneshot, Mutex, RwLock};
 use tokio::time;
 use tracing::{error, info};
-
+use crate::config::ServerConfig;
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand, parse_frame};
 use crate::parser::cmd::conn::{*};
 use crate::server::connection::Connection;
@@ -24,11 +25,24 @@ pub struct RedisServer {
     db_handler: Arc<DbHandler>,
     shutdown_complete_tx: mpsc::Sender<()>,
     shutdown_complete_rx: mpsc::Receiver<()>,
-    pub hash_max_ziplist_entries: usize,
-    pub hash_max_ziplist_value: usize,
+    config: ServerConfig,
 }
 
 impl RedisServer {
+    pub fn new(listener: TcpListener, redis_config: ServerConfig) -> Self {
+        let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
+
+        Self {
+            listener,
+            notify_shutdown: broadcast::channel(1).0,
+            limit_connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
+            db_handler: Arc::new(DbHandler::new(redis_config.db_num)),
+            shutdown_complete_tx,
+            shutdown_complete_rx,
+            config: redis_config,
+        }
+    }
+
     async fn run(&mut self) -> crate::Result<()> {
         info!("ready to accept connection");
         loop {
@@ -65,6 +79,14 @@ impl RedisServer {
             time::sleep(Duration::from_secs(backoff)).await;
             backoff *= 2;
         }
+    }
+
+    pub fn get_hash_max_ziplist_entries(&self) -> usize {
+        self.config.hash_max_ziplist_entries
+    }
+
+    pub fn get_hash_max_ziplist_value(&self) -> usize {
+        self.config.hash_max_ziplist_value
     }
 }
 
@@ -118,7 +140,7 @@ impl Handler {
     }
 
     pub fn shutdown(&mut self) {
-        self.shutdown.shutdown()
+        self.shutdown.shutdown();
     }
 }
 
@@ -130,17 +152,9 @@ impl Drop for Handler {
 }
 
 pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
-    let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
-    let server = RedisServer {
-        listener,
-        notify_shutdown: broadcast::channel(1).0,
-        limit_connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
-        db_handler: Arc::new(DbHandler::new(db_num)),
-        shutdown_complete_tx,
-        shutdown_complete_rx,
-        hash_max_ziplist_entries: 512,
-        hash_max_ziplist_value: 64,
-    };
+    let mut server_config = ServerConfig::default();
+    server_config.set_rdb_save_param(10, 10);
+    let server = RedisServer::new(listener, server_config);
     REDIS_SERVER.set(server).unwrap();
     let server = REDIS_SERVER.get_mut().unwrap();
     tokio::select! {

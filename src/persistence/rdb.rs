@@ -1,11 +1,8 @@
-use std::io::{Seek, Write};
-use std::{
-    fs::{File, OpenOptions},
-    io::SeekFrom,
-    sync::Arc
-};
-use std::sync::Mutex;
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::{io::SeekFrom};
+use tokio::{fs::File};
+use bytes::{BufMut, BytesMut};
+use std::sync::{Mutex, Arc};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use crate::db::db::RedisDb;
 use crate::persistence::error::PersistError;
 use crate::db::object::{*};
@@ -18,24 +15,24 @@ pub struct Rdb {
 }
 
 impl Rdb {
-    pub fn create(db: Arc<Mutex<RedisDb<RedisObject<String>>>>) -> Self {
+    pub async fn create(db: Arc<Mutex<RedisDb<RedisObject<String>>>>) -> Result<Self, PersistError> {
         let file_path = "dump.rdb".to_string();
-        let rdb_file = OpenOptions::new()
-            .read(true)
-            .create(true)
-            .write(true)
-            .open(file_path.clone()).expect("Open RDB File Fail!");
+        let rdb_file = File::create(file_path).await;
 
-        Self {
-            file: rdb_file,
-            db,
-            buf: BytesMut::with_capacity(1024 * 8),
+        match rdb_file {
+            Ok(file) => {
+                Ok(Self {
+                    file,
+                    db,
+                    buf: BytesMut::with_capacity(1024 * 8),
+                })
+            }
+            Err(_e) => Err(PersistError::FileError(-1))
         }
     }
 
-    pub fn save(&mut self, db_id: usize) -> Result<(), PersistError> {
-        self.file.seek(SeekFrom::Start(0))
-            .map_err(|_| PersistError::FileError(-1))?;
+    pub async fn save(&mut self, db_id: usize) -> Result<(), PersistError> {
+        let res = self.file.seek(SeekFrom::Start(0)).await;
         self.buf.extend_from_slice(b"RDB");
         self.buf.put_u8(RDB_OPCODE_SELECTDB);
 
@@ -45,6 +42,7 @@ impl Rdb {
             let value = dict.value();
             self.rdb_save_key_value_pair(key, value)?;
         }
+        self.file.write_all(&self.buf).await?;
 
         Ok(())
     }

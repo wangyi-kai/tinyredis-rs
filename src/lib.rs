@@ -9,6 +9,7 @@ pub mod db;
 pub mod server;
 pub mod error;
 mod persistence;
+mod config;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;

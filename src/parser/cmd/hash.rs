@@ -148,7 +148,7 @@ impl HashCmd {
             }
             let len = zp.entry_num() as usize;
             unsafe {
-                if len > REDIS_SERVER.get().unwrap().hash_max_ziplist_entries {
+                if len > REDIS_SERVER.get().unwrap().get_hash_max_ziplist_entries() {
                     hash_type_convert(o);
                 }
             }
@@ -216,7 +216,7 @@ impl HashCmd {
 fn hash_type_try_conversion(o: &mut RedisObject<String>, field: &String, value: &String) {
     if o.encoding == OBJ_ENCODING_ZIPLIST {
         unsafe {
-            if field.len() > REDIS_SERVER.get().unwrap().hash_max_ziplist_value || value.len() > REDIS_SERVER.get().unwrap().hash_max_ziplist_value {
+            if field.len() > REDIS_SERVER.get().unwrap().get_hash_max_ziplist_value() || value.len() > REDIS_SERVER.get().unwrap().get_hash_max_ziplist_value() {
                 hash_type_convert(o);
             }
         }

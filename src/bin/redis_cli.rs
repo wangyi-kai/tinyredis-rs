@@ -1,6 +1,6 @@
 use tracing::info;
 use redis_rs::client::client::{Client, Tokens};
-use redis_rs::client::config::Config;
+use redis_rs::client::config::ClientConfig;
 use redis_rs::parser::cmd::command::{CommandStrategy, RedisCommand};
 use redis_rs::parser::frame::Frame;
 use redis_rs::Result;
@@ -8,7 +8,7 @@ use redis_rs::parser::cmd::conn::ConnCmd::{*};
 
 pub async fn run_client() -> Result<()> {
     tracing_subscriber::fmt::try_init().expect("config log fail");
-    let config = Config::new(None);
+    let config = ClientConfig::new(Some("./config.json"));
     let host = config.get_value("server_ip").unwrap().trim_matches('"').to_string();
     let port = config.get_value("server_port").unwrap();
 
