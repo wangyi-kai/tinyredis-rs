@@ -407,7 +407,9 @@ mod dict_test {
             let mut count = 0;
             let iter = dict.iter_mut();
             for entry in iter {
-                println!("key: {}", entry.get_key());
+                unsafe {
+                    println!("key: {}", (*entry).get_key());
+                }
                 count += 1;
             }
             assert_eq!(num, count);

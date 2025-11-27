@@ -37,10 +37,12 @@ impl Rdb {
         self.buf.put_u8(RDB_OPCODE_SELECTDB);
 
         let kvs_it = self.db.lock().unwrap().kvs.iter();
-        for mut dict in kvs_it {
-            let key = dict.get_key();
-            let value = dict.value();
+        unsafe {
+            for mut dict in kvs_it {
+            let key = (*dict).get_key();
+            let value = (*dict).value();
             self.rdb_save_key_value_pair(key, value)?;
+        }
         }
         self.file.write_all(&self.buf).await?;
 
@@ -150,11 +152,13 @@ impl Rdb {
                         let ht_iter = ht.iter();
                         let size = ht.dict_size();
                         nwritten += self.rdb_save_len(size as u64)?;
-                        for entry in ht_iter {
-                            let field = entry.get_key();
-                            let value = entry.value();
-                            nwritten += self.rdb_save_string(field)?;
-                            nwritten += self.rdb_save_string(value)?;
+                        unsafe {
+                            for entry in ht_iter {
+                                let field = (*entry).get_key();
+                                let value = (*entry).value();
+                                nwritten += self.rdb_save_string(field)?;
+                                nwritten += self.rdb_save_string(value)?;
+                            }
                         }
                     }
                     _ => {}

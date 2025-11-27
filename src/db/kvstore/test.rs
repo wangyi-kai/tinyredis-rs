@@ -55,13 +55,15 @@ mod kvstore_test {
             "[TEST] kvstore Iterator case 1: removing all keys does not delete the empty dict: "
         );
         {
-            let mut iter = kvs1.iter();
-            while let Some(de) = iter.next() {
-                curr_slot = iter.get_current_dict_index();
-                let key = &de.key;
-                assert!(kvs1.dict_delete(curr_slot, key).is_some())
+            unsafe {
+                let mut iter = kvs1.iter();
+                while let Some(de) = iter.next() {
+                    curr_slot = iter.get_current_dict_index();
+                    let key = &(*de).key;
+                    assert!(kvs1.dict_delete(curr_slot, key).is_some())
+                }
+                iter.release();
             }
-            iter.release();
 
             let d = kvs1.get_dict(didx as usize);
             assert!(d.is_some());
@@ -75,8 +77,10 @@ mod kvstore_test {
             let mut iter = kvs2.iter();
             while let Some(de) = iter.next() {
                 curr_slot = iter.get_current_dict_index();
-                let key = &de.key;
-                assert!(kvs2.dict_delete(curr_slot, key).is_some())
+                unsafe {
+                    let key = &(*de).key;
+                    assert!(kvs2.dict_delete(curr_slot, key).is_some())
+                }
             }
             iter.release();
 
@@ -109,8 +113,10 @@ mod kvstore_test {
         {
             let mut iter = kvs1.get_dict_safe_iterator(didx as usize);
             while let Some(de) = iter.next() {
-                let key = &de.key;
-                assert!(kvs1.dict_delete(didx, key).is_some());
+                unsafe {
+                    let key = &(*de).key;
+                    assert!(kvs1.dict_delete(didx, key).is_some());
+                }
             }
             iter._release_dict_iterator();
 
@@ -127,8 +133,10 @@ mod kvstore_test {
         {
             let mut iter = kvs2.get_dict_safe_iterator(didx as usize);
             while let Some(de) = iter.next() {
-                let key = &de.key;
-                assert!(kvs2.dict_delete(didx, key).is_some());
+                unsafe {
+                    let key = &(*de).key;
+                    assert!(kvs2.dict_delete(didx, key).is_some());
+                }
             }
             iter._release_dict_iterator();
 
@@ -171,8 +179,10 @@ mod kvstore_test {
             for idx in 0..4 {
                 let mut iter = kvs.get_dict_safe_iterator(idx);
                 while let Some(de) = iter.next() {
-                    let key = de.get_key();
-                    assert!(kvs.dict_delete(idx as i32, key).is_some());
+                    unsafe {
+                         let key = (*de).get_key();
+                        assert!(kvs.dict_delete(idx as i32, key).is_some());
+                    }
                     if kvs.dict_size(idx) == 0 {
                         assert_eq!(kvs.non_empty_dicts(), 3 - idx as i32);
                     }

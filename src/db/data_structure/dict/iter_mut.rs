@@ -4,18 +4,18 @@ use crate::db::data_structure::dict::dict::{Dict, DictEntry};
 use crate::db::data_structure::dict::iter::DictIter;
 use crate::db::data_structure::dict::lib::dict_size;
 
-pub struct DictIterMut<'a, V> {
-    dict: &'a mut Dict<V>,
+pub struct DictIterMut<V> {
+    dict: *mut Dict<V>,
     table: usize,
     bucket: u64,
     safe: bool,
     current_entry: Option<NonNull<DictEntry<V>>>,
     remaining: usize,
-    _marker: PhantomData<&'a mut DictEntry<V>>,
+    //_marker: PhantomData<&'a mut DictEntry<V>>,
 }
 
-impl <'a, V> DictIterMut<'a, V> {
-    pub fn new(dict: &'a mut Dict<V>) -> Self {
+impl <V> DictIterMut<V> {
+    pub fn new(dict: &mut Dict<V>) -> Self {
         let remaining = dict.dict_size() as usize;
         let mut iter = DictIterMut {
             dict,
@@ -24,13 +24,15 @@ impl <'a, V> DictIterMut<'a, V> {
             safe: false,
             current_entry: None,
             remaining,
-            _marker: PhantomData,
+            //_marker: PhantomData,
         };
-        iter.advance_to_next_entry();
+        unsafe {
+            iter.advance_to_next_entry();
+        }
         iter
     }
 
-    pub fn new_safe(dict: &'a mut Dict<V>) -> Self {
+    pub fn new_safe(dict: &mut Dict<V>) -> Self {
          let remaining = dict.dict_size() as usize;
         let mut iter = DictIterMut {
             dict,
@@ -39,13 +41,15 @@ impl <'a, V> DictIterMut<'a, V> {
             safe: true,
             current_entry: None,
             remaining,
-            _marker: PhantomData,
+            //_marker: PhantomData,
         };
-        iter.advance_to_next_entry();
+        unsafe {
+            iter.advance_to_next_entry();
+        }
         iter
     }
 
-    fn advance_to_next_entry(&mut self) {
+    unsafe fn advance_to_next_entry(&mut self) {
         loop {
             if let Some(entry) = self.current_entry {
                 unsafe {
@@ -60,17 +64,17 @@ impl <'a, V> DictIterMut<'a, V> {
             while self.table < 2 {
                 if self.table == 0 && self.bucket == 0 {
                     if self.safe {
-                        self.dict.pause_rehash();
+                        (*self.dict).pause_rehash();
                     }
                 }
-                let table_size = dict_size(self.dict.ht_size_exp[self.table]);
+                let table_size = dict_size((*self.dict).ht_size_exp[self.table]);
                 if table_size == 0 {
                     self.table += 1;
                     self.bucket = 0;
                     continue;
                 }
                 while self.bucket < table_size {
-                    if let Some(entry) = self.dict.ht_table[self.table][self.bucket as usize] {
+                    if let Some(entry) = (*self.dict).ht_table[self.table][self.bucket as usize] {
                         self.current_entry = Some(entry);
                         self.bucket += 1;
                         return;
@@ -86,15 +90,17 @@ impl <'a, V> DictIterMut<'a, V> {
     pub fn reset(&mut self) {
         if !(self.bucket == 0 && self.table == 0) {
             if self.safe {
-                self.dict.resume_rehash()
+                unsafe {
+                    (*self.dict).resume_rehash()
+                }
             }
         }
     }
 
 }
 
-impl <'a, V> Iterator for DictIterMut<'a, V> {
-    type Item = &'a mut DictEntry<V>;
+impl <V> Iterator for DictIterMut<V> {
+    type Item = *mut DictEntry<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {

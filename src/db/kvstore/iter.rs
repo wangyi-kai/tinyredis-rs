@@ -5,14 +5,14 @@ use crate::db::kvstore::kvstore::KvStore;
 
 use std::ptr::NonNull;
 
-pub struct KvStoreIterator<'a, V> {
+pub struct KvStoreIterator<V> {
     pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
     pub(crate) next_didx: i32,
-    pub(crate) di: DictIterMut<'a, V>,
+    pub(crate) di: DictIterMut<V>,
 }
 
-impl<'a, V> KvStoreIterator<'a, V> {
+impl<V> KvStoreIterator<V> {
     pub fn next_dict(&mut self) -> Option<NonNull<Dict<V>>> {
         if self.next_didx == -1 {
             return None;
@@ -43,8 +43,8 @@ impl<'a, V> KvStoreIterator<'a, V> {
     }
 }
 
-impl<'a, V> Iterator for KvStoreIterator<'a, V> {
-    type Item = &'a mut DictEntry<V>;
+impl<V> Iterator for KvStoreIterator<V> {
+    type Item = *mut DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             if let Some(entry) = self.di.next() {
@@ -62,17 +62,17 @@ impl<'a, V> Iterator for KvStoreIterator<'a, V> {
     }
 }
 
-impl<'a, V> Drop for KvStoreIterator<'a, V> {
+impl<V> Drop for KvStoreIterator<V> {
     fn drop(&mut self) {}
 }
 
-pub struct KvStoreDictIterator<'a, V> {
+pub struct KvStoreDictIterator<V> {
     pub(crate) kvs: *mut KvStore<V>,
     pub(crate) didx: i32,
-    pub(crate) di: DictIterMut<'a, V>,
+    pub(crate) di: DictIterMut<V>,
 }
 
-impl<'a, V> KvStoreDictIterator<'a, V> {
+impl<V> KvStoreDictIterator<V> {
     pub fn _release_dict_iterator(&mut self) {
         unsafe {
             if (*self.kvs).get_dict(self.didx as usize).is_some() {
@@ -83,8 +83,8 @@ impl<'a, V> KvStoreDictIterator<'a, V> {
     }
 }
 
-impl<'a, V> Iterator for KvStoreDictIterator<'a, V> {
-    type Item = &'a mut DictEntry<V>;
+impl<V> Iterator for KvStoreDictIterator<V> {
+    type Item = *mut DictEntry<V>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let d = (*self.kvs).get_dict(self.didx as usize);
@@ -96,6 +96,6 @@ impl<'a, V> Iterator for KvStoreDictIterator<'a, V> {
     }
 }
 
-impl<'a, V> Drop for KvStoreDictIterator<'a, V> {
+impl<V> Drop for KvStoreDictIterator<V> {
     fn drop(&mut self) {}
 }

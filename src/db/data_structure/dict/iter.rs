@@ -4,18 +4,18 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use crate::db::data_structure::dict::iter_mut::DictIterMut;
 
-pub struct DictIter<'a, V> {
-    pub dict: &'a Dict<V>,
+pub struct DictIter<V> {
+    pub dict: *const Dict<V>,
     table: usize,
     index: u64,
     safe: bool,
     remaining: usize,
     entry: Option<NonNull<DictEntry<V>>>,
-    _marker: PhantomData<&'a DictEntry<V>>,
+    //_marker: PhantomData<&'a DictEntry<V>>,
 }
 
-impl <'a, V> DictIter<'a, V> {
-    pub fn new(dict: &'a Dict<V>) -> Self {
+impl <V> DictIter<V> {
+    pub fn new(dict: &Dict<V>) -> Self {
         let mut iter = DictIter {
             dict,
             table: 0,
@@ -23,13 +23,15 @@ impl <'a, V> DictIter<'a, V> {
             safe: false,
             entry: None,
             remaining: dict.dict_size() as usize,
-            _marker: PhantomData,
+            //_marker: PhantomData,
         };
-        iter.advance_next_entry();
+        unsafe {
+            iter.advance_next_entry();
+        }
         iter
     }
 
-    pub fn new_safe(dict: &'a Dict<V>) -> Self {
+    pub fn new_safe(dict: &Dict<V>) -> Self {
         let mut iter = DictIter {
             dict,
             table: 0,
@@ -37,13 +39,15 @@ impl <'a, V> DictIter<'a, V> {
             safe: true,
             entry: None,
             remaining: dict.dict_size() as usize,
-            _marker: PhantomData,
+            //_marker: PhantomData,
         };
-        iter.advance_next_entry();
+        unsafe {
+            iter.advance_next_entry();
+        }
         iter
     }
 
-    fn advance_next_entry(&mut self) {
+    unsafe fn advance_next_entry(&mut self) {
         loop {
             if let Some(entry) = self.entry {
                 unsafe {
@@ -56,14 +60,14 @@ impl <'a, V> DictIter<'a, V> {
             }
 
             while self.table < 2 {
-                let table_size = dict_size(self.dict.ht_size_exp[self.table]);
+                let table_size = dict_size((*self.dict).ht_size_exp[self.table]);
                 if table_size == 0 {
                     self.table += 1;
                     self.index = 0;
                     continue;
                 }
                 while self.index < table_size {
-                    if let Some(entry) = self.dict.ht_table[self.table][self.index as usize] {
+                    if let Some(entry) = (*self.dict).ht_table[self.table][self.index as usize] {
                         self.entry = Some(entry);
                         self.index += 1;
                         return;
@@ -78,8 +82,8 @@ impl <'a, V> DictIter<'a, V> {
     }
 }
 
-impl <'a, V> Iterator for DictIter<'a, V> {
-    type Item = &'a DictEntry<V>;
+impl <V> Iterator for DictIter<V> {
+    type Item = *const DictEntry<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {

@@ -53,7 +53,7 @@ pub struct KvStore<V> {
     // metadata: Vec<Box<dyn Any>>,
 }
 
-impl<'a, V> KvStore<V> {
+impl<V> KvStore<V> {
     // num_dicts_bits is the log2 of the amount of dictionaries needed
     // (e.g. 0 for 1 dict, 3 for 8 dicts)
     pub fn create(num_dicts_bits: u64, flag: i32) -> Self {
@@ -410,7 +410,7 @@ impl<'a, V> KvStore<V> {
         *cursor = *cursor << self.num_dicts_bits | didx as u64;
     }
 
-    pub fn iter(&mut self) -> KvStoreIterator<'a, V> {
+    pub fn iter(&mut self) -> KvStoreIterator<V> {
         unsafe {
             let mut dict = self.get_dict(0).unwrap();
             let dict_iter = DictIterMut::new(&mut *dict.as_mut());
@@ -481,7 +481,7 @@ impl<'a, V> KvStore<V> {
         unsafe { (*d.unwrap().as_ptr()).dict_size() as u64 }
     }
 
-    pub fn get_dict_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, V> {
+    pub fn get_dict_iterator(&mut self, didx: usize) -> KvStoreDictIterator<V> {
         unsafe {
             let d = self.dicts[didx];
             let dict_iter = (*d.unwrap().as_ptr()).iter_mut();
@@ -494,7 +494,7 @@ impl<'a, V> KvStore<V> {
         }
     }
 
-    pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<'a, V> {
+    pub fn get_dict_safe_iterator(&mut self, didx: usize) -> KvStoreDictIterator<V> {
         unsafe {
             let d = self.dicts[didx];
             let dict_iter = (*d.unwrap().as_ptr()).safe_iter_mut();
