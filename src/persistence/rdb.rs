@@ -8,43 +8,40 @@ use crate::persistence::error::PersistError;
 use crate::db::object::{*};
 use crate::persistence::{*};
 
+#[derive(Clone)]
 pub struct Rdb {
-    file: File,
-    db: Arc<Mutex<RedisDb<RedisObject<String>>>>,
+    db: Vec<Arc<RedisDb<RedisObject<String>>>>,
     buf: BytesMut,
 }
 
 impl Rdb {
-    pub async fn create(db: Arc<Mutex<RedisDb<RedisObject<String>>>>) -> Result<Self, PersistError> {
-        let file_path = "dump.rdb".to_string();
-        let rdb_file = File::create(file_path).await;
-
-        match rdb_file {
-            Ok(file) => {
-                Ok(Self {
-                    file,
-                    db,
-                    buf: BytesMut::with_capacity(1024 * 8),
-                })
-            }
-            Err(_e) => Err(PersistError::FileError(-1))
-        }
+    pub fn create(db: Vec<Arc<RedisDb<RedisObject<String>>>>) -> Self {
+        let buf = BytesMut::with_capacity(1024 * 8);
+        Self { db, buf }
     }
 
     pub async fn save(&mut self, db_id: usize) -> Result<(), PersistError> {
-        self.file.seek(SeekFrom::Start(0)).await?;
+        let tmp_path = "tmp.rdb".to_string();
+        let mut tmp_file = File::create(&tmp_path).await?;
+
+        tmp_file.seek(SeekFrom::Start(0)).await?;
         self.buf.extend_from_slice(b"RDB");
         self.buf.put_u8(RDB_OPCODE_SELECTDB);
+        self.buf.extend_from_slice(&db_id.to_le_bytes());
 
-        let kvs_it = self.db.lock().unwrap().kvs.iter();
+        let db = self.db[db_id].clone();
         unsafe {
-            for mut dict in kvs_it {
-            let key = (*dict).get_key();
-            let value = (*dict).value();
-            self.rdb_save_key_value_pair(key, value)?;
+            let db_mut = Arc::into_raw(db) as *mut RedisDb<RedisObject<String>>;
+            let iter = (&mut *db_mut).db_iter();
+            for mut dict in iter {
+                let key = (*dict).get_key();
+                let value = (*dict).value();
+                self.rdb_save_key_value_pair(key, value)?;
+            }
         }
-        }
-        self.file.write_all(&self.buf).await?;
+        tmp_file.write_all(&self.buf).await?;
+        let rdb_path = "dump.rdb".to_string();
+        tokio::fs::rename(&tmp_path, &rdb_path).await?;
 
         Ok(())
     }

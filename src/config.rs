@@ -3,7 +3,7 @@ use std::io::Read;
 use json_comments::StripComments;
 use serde::{Deserialize, Serialize};
 use crate::client::config::{ClientConfig, CONFIG_PATH_JSON, CONFIG_PATH_TOML};
-use crate::persistence::rdb_config::RdbConfig;
+use crate::persistence::rdb_config::{RdbConfig, SaveParam};
 
 pub const SERVER_CONFIG_JSON: &str = "./server_config.json";
 pub const SERVER_CONFIG_TOML: &str = "./server_config.toml";
@@ -74,5 +74,9 @@ impl ServerConfig {
 
     pub fn set_rdb_save_param(&mut self, seconds: u64, changes: usize) {
         self.rdb_config.set_save_params(seconds, changes);
+    }
+
+    pub fn get_param(&self) -> &Vec<SaveParam> {
+        self.rdb_config.get_save_params()
     }
 }

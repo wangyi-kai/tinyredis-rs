@@ -136,6 +136,10 @@ impl<V> RedisDb<V> {
     pub fn db_size(&self) -> u64 {
         self.kvs.kvstore_size()
     }
+
+    pub fn db_iter(&mut self) -> KvStoreIterator<V> {
+        self.kvs.iter()
+    }
 }
 
 

@@ -12,7 +12,8 @@ use crate::parser::cmd::conn::{*};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
-use crate::server::REDIS_SERVER;
+use crate::persistence::rdb_config::SaveParam;
+use crate::server::{REDIS_CONFIG, REDIS_SERVER};
 use crate::server::shutdown::Shutdown;
 
 const MAX_CONNECTIONS: usize = 250;
@@ -25,21 +26,20 @@ pub struct RedisServer {
     db_handler: Arc<DbHandler>,
     shutdown_complete_tx: mpsc::Sender<()>,
     shutdown_complete_rx: mpsc::Receiver<()>,
-    config: ServerConfig,
 }
 
 impl RedisServer {
-    pub fn new(listener: TcpListener, redis_config: ServerConfig) -> Self {
+    pub fn new(listener: TcpListener) -> Self {
         let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
+        let db_num = REDIS_CONFIG.get().unwrap().db_num;
 
         Self {
             listener,
             notify_shutdown: broadcast::channel(1).0,
             limit_connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
-            db_handler: Arc::new(DbHandler::new(redis_config.db_num)),
+            db_handler: Arc::new(DbHandler::new(db_num)),
             shutdown_complete_tx,
             shutdown_complete_rx,
-            config: redis_config,
         }
     }
 
@@ -79,14 +79,6 @@ impl RedisServer {
             time::sleep(Duration::from_secs(backoff)).await;
             backoff *= 2;
         }
-    }
-
-    pub fn get_hash_max_ziplist_entries(&self) -> usize {
-        self.config.hash_max_ziplist_entries
-    }
-
-    pub fn get_hash_max_ziplist_value(&self) -> usize {
-        self.config.hash_max_ziplist_value
     }
 }
 
@@ -155,7 +147,8 @@ impl Drop for Handler {
 pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
     let mut server_config = ServerConfig::default();
     server_config.set_rdb_save_param(10, 10);
-    let server = RedisServer::new(listener, server_config);
+    REDIS_CONFIG.set(server_config).unwrap();
+    let server = RedisServer::new(listener);
     REDIS_SERVER.set(server).unwrap();
     let server = REDIS_SERVER.get_mut().unwrap();
     tokio::select! {

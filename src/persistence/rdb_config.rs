@@ -28,4 +28,8 @@ impl RdbConfig {
         let save_param = SaveParam {seconds, changes};
         self.save_param.push(save_param);
     }
+
+    pub fn get_save_params(&self) -> &Vec<SaveParam> {
+        &self.save_param
+    }
 }
