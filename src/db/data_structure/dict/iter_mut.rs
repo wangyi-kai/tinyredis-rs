@@ -52,11 +52,9 @@ impl <V> DictIterMut<V> {
     unsafe fn advance_to_next_entry(&mut self) {
         loop {
             if let Some(entry) = self.current_entry {
-                unsafe {
-                    if let Some(next_entry) = (*entry.as_ptr()).next {
-                        self.current_entry = Some(next_entry);
-                        return;
-                    }
+                if let Some(next_entry) = (*entry.as_ptr()).next {
+                    self.current_entry = Some(next_entry);
+                    return;
                 }
                 self.current_entry = None;
             }

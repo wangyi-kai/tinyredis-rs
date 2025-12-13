@@ -12,6 +12,7 @@ use crate::parser::cmd::conn::{*};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
+use crate::persistence::rdb::Rdb;
 use crate::persistence::rdb_config::SaveParam;
 use crate::server::{REDIS_CONFIG, REDIS_SERVER};
 use crate::server::shutdown::Shutdown;
@@ -32,12 +33,25 @@ impl RedisServer {
     pub fn new(listener: TcpListener) -> Self {
         let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
         let db_num = REDIS_CONFIG.get().unwrap().db_num;
+        let db_handler = Arc::new(DbHandler::new(db_num));
+        let db_sender = db_handler.db_sender.clone();
+
+        let rdb = Arc::new(Mutex::new(Rdb::create(db_sender)));
+        for save_params in REDIS_CONFIG.get().unwrap().get_param() {
+            let interval = Duration::from_secs(save_params.seconds);
+            let rdb = rdb.clone();
+            tokio::spawn(async move {
+                let mut rdb_guard = rdb.lock().await;
+                tokio::time::sleep(interval).await;
+                let _ = rdb_guard.save(0).await;
+            });
+        }
 
         Self {
             listener,
             notify_shutdown: broadcast::channel(1).0,
             limit_connections: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
-            db_handler: Arc::new(DbHandler::new(db_num)),
+            db_handler,
             shutdown_complete_tx,
             shutdown_complete_rx,
         }
@@ -46,7 +60,7 @@ impl RedisServer {
     async fn run(&mut self) -> crate::Result<()> {
         info!("ready to accept connection");
         loop {
-            self.limit_connections.acquire().await.unwrap().forget();
+            self.limit_connections.acquire().await?.forget();
             let socket = self.accept().await?;
             info!("accept new connection");
             let mut handler = Handler {
@@ -146,11 +160,9 @@ impl Drop for Handler {
 
 pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
     let mut server_config = ServerConfig::default();
-    server_config.set_rdb_save_param(10, 10);
+    server_config.set_rdb_save_param(1, 10);
     REDIS_CONFIG.set(server_config).unwrap();
-    let server = RedisServer::new(listener);
-    REDIS_SERVER.set(server).unwrap();
-    let server = REDIS_SERVER.get_mut().unwrap();
+    let mut server = RedisServer::new(listener);
     tokio::select! {
         res = server.run() => {
             if let Err(err) = res {
@@ -161,7 +173,6 @@ pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_
              info!("server shutting down");
        }
     }
-    let server = REDIS_SERVER.take().unwrap();
     let RedisServer {
         mut shutdown_complete_rx,
         shutdown_complete_tx,

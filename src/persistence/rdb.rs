@@ -1,23 +1,25 @@
 use std::{io::SeekFrom};
 use tokio::{fs::File};
 use bytes::{BufMut, BytesMut};
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::sync::mpsc::Sender;
 use crate::db::db::RedisDb;
+use crate::db::db_engine::DbCommand;
 use crate::persistence::error::PersistError;
 use crate::db::object::{*};
 use crate::persistence::{*};
 
 #[derive(Clone)]
-pub struct Rdb {
-    db: Vec<Arc<RedisDb<RedisObject<String>>>>,
+pub struct Rdb<V> {
+    db_sender: Vec<Sender<DbCommand<V>>>,
     buf: BytesMut,
 }
 
-impl Rdb {
-    pub fn create(db: Vec<Arc<RedisDb<RedisObject<String>>>>) -> Self {
+impl<V> Rdb<V> {
+    pub fn create(db_sender: Vec<Sender<DbCommand<V>>>) -> Self {
         let buf = BytesMut::with_capacity(1024 * 8);
-        Self { db, buf }
+        Self { db_sender, buf }
     }
 
     pub async fn save(&mut self, db_id: usize) -> Result<(), PersistError> {
@@ -28,15 +30,23 @@ impl Rdb {
         self.buf.extend_from_slice(b"RDB");
         self.buf.put_u8(RDB_OPCODE_SELECTDB);
         self.buf.extend_from_slice(&db_id.to_le_bytes());
-
-        let db = self.db[db_id].clone();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let cmd = DbCommand::DbIter(tx);
+        let sender = self.db_sender[db_id].clone();
+        let _ = sender.send(cmd).await;
         unsafe {
-            let db_mut = Arc::into_raw(db) as *mut RedisDb<RedisObject<String>>;
-            let iter = (&mut *db_mut).db_iter();
-            for mut dict in iter {
-                let key = (*dict).get_key();
-                let value = (*dict).value();
-                self.rdb_save_key_value_pair(key, value)?;
+            match rx.recv().await {
+                Some(iter) => {
+                    for dict in iter {
+                        let key = (*dict).get_key();
+                        let value = (*dict).get_val();
+                        let v = &*(value as *mut V as *mut RedisObject<String>);
+                        self.rdb_save_key_value_pair(key, v)?;
+                    }
+                }
+                _ => {
+
+                }
             }
         }
         tmp_file.write_all(&self.buf).await?;

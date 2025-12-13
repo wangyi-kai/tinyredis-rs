@@ -12,6 +12,10 @@ pub struct KvStoreIterator<V> {
     pub(crate) di: DictIterMut<V>,
 }
 
+unsafe impl<V> Send for KvStoreIterator<V> {}
+
+unsafe impl<V> Sync for KvStoreIterator<V> {}
+
 impl<V> KvStoreIterator<V> {
     pub fn next_dict(&mut self) -> Option<NonNull<Dict<V>>> {
         if self.next_didx == -1 {

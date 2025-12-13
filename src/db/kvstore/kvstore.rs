@@ -66,13 +66,12 @@ impl<V> KvStore<V> {
             let num_dicts = 1 << num_dicts_bits;
             let mut dicts = vec![None; num_dicts];
             let mut allocated_dicts = 0;
-            if (flag & KVSTORE_ALLOCATE_DICTS_ON_DEMAND) == 0 {
-                for i in 0..num_dicts {
-                    let d = Dict::create();
-                    dicts[i] = Some(NonNull::new_unchecked(Box::into_raw(Box::new(d))));
-                    allocated_dicts += 1;
-                }
+            for i in 0..num_dicts {
+                let d = Dict::create();
+                dicts[i] = (Some(NonNull::new_unchecked(Box::into_raw(Box::new(d)))));
+                allocated_dicts += 1;
             }
+
             let rehashing = LinkList::create();
             let dict_size_index = if num_dicts > 1 {
                 vec![0; 8 * (1 + num_dicts)].to_vec()
@@ -412,8 +411,8 @@ impl<V> KvStore<V> {
 
     pub fn iter(&mut self) -> KvStoreIterator<V> {
         unsafe {
-            let mut dict = self.get_dict(0).unwrap();
-            let dict_iter = DictIterMut::new(&mut *dict.as_mut());
+            let dict = self.get_dict(0).unwrap().as_mut();
+            let dict_iter = DictIterMut::new(dict);
             let next_didx = self.get_first_non_empty_dict_index() as i32;
 
             KvStoreIterator {

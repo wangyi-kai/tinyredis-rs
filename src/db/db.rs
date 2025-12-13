@@ -4,10 +4,11 @@ use crate::db::object::{RedisObject, RedisValue};
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
-
+use tokio::select;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
-use crate::cluster::cluster::key_hash_slot;
+use crate::db::db_engine::DbCommand;
 use crate::db::kvstore::iter::KvStoreIterator;
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 
@@ -45,11 +46,14 @@ pub struct RedisDb<V> {
     pub(crate) sender: crate::MpscSender,
     receiver: crate::MpscReceiver,
     _maker: PhantomData<V>,
+    db_rx: Receiver<DbCommand<V>>,
+    pub db_tx: Sender<DbCommand<V>>,
 }
 
 impl<V> RedisDb<V> {
     pub fn create(slot_count_bits: u64, flag: i32, id: i32) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
+        let (tx, rx) = mpsc::channel(10);
         Self {
             kvs: KvStore::create(slot_count_bits, flag),
             expires: KvStore::create(slot_count_bits, flag),
@@ -63,17 +67,40 @@ impl<V> RedisDb<V> {
             sender,
             receiver,
             _maker: PhantomData,
+            db_rx: rx,
+            db_tx: tx,
         }
     }
 
     pub async fn run(&mut self) {
-        while let Some((sender, command)) = self.receiver.recv().await {
-            debug!("apply command {:?}", command);
-            let db = unsafe {
-                &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
-            };
-            let frame = command.apply(db);
-            let _ = sender.send(frame);
+        // while let Some((sender, command)) = self.receiver.recv().await {
+        //     debug!("apply command {:?}", command);
+        //     let db = unsafe {
+        //         &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
+        //     };
+        //     let frame = command.apply(db);
+        //     let _ = sender.send(frame);
+        // }
+        loop {
+            select! {
+                Some((sender, redis_cmd)) = self.receiver.recv() => {
+                    debug!("apply command {:?}", redis_cmd);
+                    let db = unsafe {
+                        &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
+                    };
+                    let frame = redis_cmd.apply(db);
+                    let _ = sender.send(frame);
+                }
+                Some(db_cmd) = self.db_rx.recv() => {
+                    match db_cmd {
+                        DbCommand::DbIter(sender) => {
+                            let iter = self.db_iter();
+                            let _ = sender.send(iter);
+                        }
+                    }
+                }
+                else => break,
+            }
         }
     }
 

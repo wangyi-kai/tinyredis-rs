@@ -102,15 +102,13 @@ pub struct Dict<V>
 impl<V> Dict<V>
 {
     pub fn create() -> Self {
-        unsafe {
-            Self {
-                ht_table: vec![vec![None; DICT_HT_INITIAL_SIZE], vec![]],
-                ht_used: vec![0; 2],
-                rehash_idx: -1,
-                pause_rehash: 0,
-                pause_auto_resize: 0,
-                ht_size_exp: vec![DICT_HT_INITIAL_EXP as i32; 2],
-            }
+        Self {
+            ht_table: vec![vec![None; DICT_HT_INITIAL_SIZE], vec![]],
+            ht_used: vec![0; 2],
+            rehash_idx: -1,
+            pause_rehash: 0,
+            pause_auto_resize: 0,
+            ht_size_exp: vec![DICT_HT_INITIAL_EXP as i32, -1],
         }
     }
 
