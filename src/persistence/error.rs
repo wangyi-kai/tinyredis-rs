@@ -8,7 +8,9 @@ pub enum PersistError {
     #[error("[RDB] {0}")]
     LoadErr(String),
     #[error("[RDB] {0}")]
-    EncodingErr(String),
+    EncodeErr(String),
+    #[error("[RDB] {0}")]
+    DecodeErr(String),
     #[error("[RDB] {0}")]
     TypeErr(String),
     #[error("I/O error: {0}")]

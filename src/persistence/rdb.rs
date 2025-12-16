@@ -1,14 +1,14 @@
 use std::{io::SeekFrom};
 use tokio::{fs::File};
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use std::sync::{Arc};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
-use crate::db::db::RedisDb;
 use crate::db::db_engine::DbCommand;
 use crate::persistence::error::PersistError;
 use crate::db::object::{*};
 use crate::persistence::{*};
+use crate::Result;
 
 #[derive(Clone)]
 pub struct Rdb<V> {
@@ -22,17 +22,17 @@ impl<V> Rdb<V> {
         Self { db_sender, buf }
     }
 
-    pub async fn save(&mut self, db_id: usize) -> Result<(), PersistError> {
+    pub async fn save(&mut self, db_id: u32) -> Result<()> {
         let tmp_path = "tmp.rdb".to_string();
         let mut tmp_file = File::create(&tmp_path).await?;
 
         tmp_file.seek(SeekFrom::Start(0)).await?;
         self.buf.extend_from_slice(b"RDB");
         self.buf.put_u8(RDB_OPCODE_SELECTDB);
-        self.buf.extend_from_slice(&db_id.to_le_bytes());
+        self.rdb_save_len(db_id as u64)?;
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
         let cmd = DbCommand::DbIter(tx);
-        let sender = self.db_sender[db_id].clone();
+        let sender = self.db_sender[db_id as usize].clone();
         let _ = sender.send(cmd).await;
         unsafe {
             match rx.recv().await {
@@ -57,7 +57,7 @@ impl<V> Rdb<V> {
     }
 
     #[inline(always)]
-    fn rdb_save_object_type(&mut self, object: &RedisObject<String>) -> Result<(), PersistError> {
+    fn rdb_save_object_type(&mut self, object: &RedisObject<String>) -> Result<()> {
         match object.encoding {
             OBJ_STRING => {
                 self.buf.put_u8(RDB_TYPE_STRING);
@@ -66,29 +66,29 @@ impl<V> Rdb<V> {
                 match object.encoding {
                     OBJ_ENCODING_INTSET => self.buf.put_u8(RDB_TYPE_SET_INTSET),
                     OBJ_ENCODING_HT => self.buf.put_u8(RDB_TYPE_SET),
-                    _ => return Err(PersistError::EncodingErr("Unknown set encoding".to_string()))
+                    _ => return Err(PersistError::EncodeErr("Unknown set encoding".to_string()).into())
                 }
             }
             OBJ_ZSET => {
                 match object.encoding {
                     OBJ_ENCODING_SKIPLIST => self.buf.put_u8(RDB_TYPE_ZSET_2),
-                    _ => return Err(PersistError::EncodingErr("Unknown sorted set encoding".to_string()))
+                    _ => return Err(PersistError::EncodeErr("Unknown sorted set encoding".to_string()).into())
                 }
             }
             OBJ_HASH => {
                 match object.encoding {
                     OBJ_ENCODING_HT => self.buf.put_u8(RDB_TYPE_HASH),
-                    _ => return Err(PersistError::EncodingErr("Unknown hash encoding".to_string()))
+                    _ => return Err(PersistError::EncodeErr("Unknown hash encoding".to_string()).into())
                 }
             }
             _ => {
-                return Err(PersistError::EncodingErr("Unknown object type".to_string()))
+                return Err(PersistError::EncodeErr("Unknown object type".to_string()).into())
             }
         }
         Ok(())
     }
 
-    fn rdb_save_string(&mut self, s: &str) -> Result<usize, PersistError> {
+    fn rdb_save_string(&mut self, s: &str) -> Result<usize> {
         let s_vec = s.as_bytes();
         let len = s_vec.len();
         self.rdb_save_len(len as u64)?;
@@ -98,48 +98,42 @@ impl<V> Rdb<V> {
 
 
     #[inline(always)]
-    fn rdb_save_len(&mut self, len: u64) -> Result<usize, PersistError> {
-        let mut buf = [0u8; 2];
+    fn rdb_save_len(&mut self, len: u64) -> Result<usize> {
         let mut nwritten = 0;
         if len < 1 << 6 {
-            buf[0] = (len as u8) | (RDB_6BITLEN << 6);
-            self.buf.extend_from_slice(&buf);
+            self.buf.put_u8(len as u8);
             nwritten = 1;
         } else if len < 1 << 14 {
-            buf[0] = ((len >> 8) as u8) | (RDB_14BITLEN << 6);
-            buf[1] = (len & 0xFF) as u8;
+            self.buf.put_u8(((len >> 8) as u8) | (RDB_14BITLEN << 6));
+            self.buf.put_u8(len as u8);
             nwritten = 2;
         } else if len <= u32::MAX as u64 {
-            buf[0] = RDB_32BITLEN;
-            self.buf.extend_from_slice(&buf);
-            let len32 = (len as u32).to_be_bytes();
-            self.buf.extend_from_slice(&len32);
+            self.buf.put_u8(RDB_32BITLEN);
+            self.buf.put_u32(len as u32);
             nwritten = 1 + 4;
         } else {
-            buf[0] = RDB_6BITLEN;
-            self.buf.extend_from_slice(&buf);
-            let len64 = len.to_be_bytes();
-            self.buf.extend_from_slice(&len64);
+            self.buf.put_u8(RDB_6BITLEN);
+            self.buf.put_u64(len);
             nwritten = 1 + 8;
         }
         Ok(nwritten)
     }
 
-    fn rdb_save_double_value(&mut self, val: f64) -> Result<usize, PersistError> {
+    fn rdb_save_double_value(&mut self, val: f64) -> Result<usize> {
         let f = val.to_ne_bytes();
         let len = f.len();
         self.buf.put_slice(&f);
         Ok(len)
     }
 
-    fn rdb_save_key_value_pair(&mut self, key: &str, value: &RedisObject<String>) -> Result<(), PersistError> {
+    fn rdb_save_key_value_pair(&mut self, key: &str, value: &RedisObject<String>) -> Result<()> {
         self.rdb_save_object_type(value)?;
         self.rdb_save_string(key)?;
         self.rdb_save_object(value)?;
         Ok(())
     }
 
-    fn rdb_save_object(&mut self, object: &RedisObject<String>) -> Result<(), PersistError> {
+    fn rdb_save_object(&mut self, object: &RedisObject<String>) -> Result<()> {
         let mut nwritten = 0;
         match object.object_type {
             OBJ_STRING => {
@@ -149,7 +143,7 @@ impl<V> Rdb<V> {
                         nwritten += n;
                     }
                     _ => {
-                        return Err(PersistError::TypeErr("err object type, expect string".to_string()))
+                        return Err(PersistError::TypeErr("err object type, expect string".to_string()).into())
                     }
                 }
             }
@@ -187,7 +181,7 @@ impl<V> Rdb<V> {
                         }
                     }
                     _ => {
-                        return Err(PersistError::TypeErr("err object type, expect zset".to_string()))
+                        return Err(PersistError::TypeErr("err object type, expect zset".to_string()).into())
                     }
                 }
             }
@@ -199,7 +193,7 @@ impl<V> Rdb<V> {
     }
 
     #[inline(always)]
-    fn rdb_load_len(&mut self, buf: &mut BytesMut) -> Result<u64, PersistError> {
+    fn rdb_load_len(&mut self, buf: &mut BytesMut) -> Result<u64> {
         let len_type = (buf[0] & 0xC0) >> 6;
         let len = match len_type {
             RDB_ENCVAL => {
@@ -212,21 +206,28 @@ impl<V> Rdb<V> {
                 ((buf[0] as u64 & 0x3F) << 8) | buf[1] as u64
             }
             RDB_32BITLEN => {
-                let mut b = [0u8; 4];
-                b.copy_from_slice(buf.get(0..4).unwrap());
-                u32::from_be_bytes(b) as u64
+                buf.get_u32() as u64
             }
             RDB_64BITLEN => {
-                let mut b = [0u8; 8];
-                b.copy_from_slice(buf.get(0..8).unwrap());
-                u64::from_be_bytes(b)
+                buf.get_u64()
             }
             _ => {
-                return Err(PersistError::LoadErr(format!("Unknown length encoding {} in rdb_load_len", len_type)));
+                return Err(PersistError::LoadErr(format!("Unknown length encoding {} in rdb_load_len", len_type)).into());
             }
         };
 
         Ok(len)
+    }
+
+    fn load_string(&mut self, buf: &mut BytesMut) -> Result<()> {
+        let rdb_flag = String::from_utf8(buf[0..3].to_vec())?;
+        if rdb_flag.ne("RDB") {
+            return Err(PersistError::DecodeErr("flag is not RDB".to_string()).into());
+        }
+        buf.advance(3);
+        let select_code = buf.get_u8();
+
+        Ok(())
     }
 }
 
