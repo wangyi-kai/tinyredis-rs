@@ -4,18 +4,18 @@ use crate::db::data_structure::dict::dict::{Dict, DictEntry};
 use crate::db::data_structure::dict::iter::DictIter;
 use crate::db::data_structure::dict::lib::dict_size;
 
-pub struct DictIterMut<V> {
-    dict: *mut Dict<V>,
+pub struct DictIterMut {
+    dict: *mut Dict,
     table: usize,
     bucket: u64,
     safe: bool,
-    current_entry: Option<NonNull<DictEntry<V>>>,
+    current_entry: Option<NonNull<DictEntry>>,
     remaining: usize,
     //_marker: PhantomData<&'a mut DictEntry<V>>,
 }
 
-impl <V> DictIterMut<V> {
-    pub fn new(dict: &mut Dict<V>) -> Self {
+impl DictIterMut {
+    pub fn new(dict: &mut Dict) -> Self {
         let remaining = dict.dict_size() as usize;
         let mut iter = DictIterMut {
             dict,
@@ -32,7 +32,7 @@ impl <V> DictIterMut<V> {
         iter
     }
 
-    pub fn new_safe(dict: &mut Dict<V>) -> Self {
+    pub fn new_safe(dict: &mut Dict) -> Self {
          let remaining = dict.dict_size() as usize;
         let mut iter = DictIterMut {
             dict,
@@ -97,8 +97,8 @@ impl <V> DictIterMut<V> {
 
 }
 
-impl <V> Iterator for DictIterMut<V> {
-    type Item = *mut DictEntry<V>;
+impl Iterator for DictIterMut {
+    type Item = *mut DictEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {

@@ -51,22 +51,22 @@ const OBJ_STATIC_REFCOUNT: i32 = i32::MAX - 1;
 const OBJ_FIRST_SPECIAL_REFCOUNT: i32 = OBJ_STATIC_REFCOUNT;
 
 #[derive(Clone)]
-pub enum RedisValue<T> {
-    String(T),
-    List(ListObject<T>),
-    Hash(Dict<T>),
-    SortSet(ZSet<f64>),
+pub enum RedisValue {
+    String(String),
+    List(ListObject),
+    Hash(Dict),
+    SortSet(ZSet),
     Set(IntSet),
 }
 
 #[derive(Clone)]
-pub enum ListObject<T> {
-    LinkList(LinkList<T>),
+pub enum ListObject {
+    LinkList(LinkList<String>),
     ZipList(ZipList),
 }
 
 #[derive(Clone)]
-pub struct RedisObject<T> {
+pub struct RedisObject {
     /// object type
     pub object_type: u32,
     /// object encoding
@@ -76,15 +76,15 @@ pub struct RedisObject<T> {
     /// object reference count
     ref_count: i32,
     /// actual object
-    pub ptr: RedisValue<T>,
+    pub ptr: RedisValue,
 }
 
-unsafe impl<T> Send for RedisObject<T> {}
-unsafe impl<T> Sync for RedisObject<T> {}
+unsafe impl Send for RedisObject {}
+unsafe impl Sync for RedisObject {}
 
 #[allow(dead_code)]
-impl<T> RedisObject<T> {
-    fn create(object_type: u32, ptr: RedisValue<T>) -> Self {
+impl RedisObject {
+    fn create(object_type: u32, ptr: RedisValue) -> Self {
         Self {
             object_type,
             encoding: OBJ_ENCODING_RAW,
@@ -94,13 +94,13 @@ impl<T> RedisObject<T> {
         }
     }
 
-    fn create_raw_string_object(s: String) -> RedisObject<String> {
+    fn create_raw_string_object(s: String) -> RedisObject {
         let s_object = RedisValue::String(s);
         RedisObject::create(OBJ_STRING, s_object)
     }
 
-    pub fn create_string_object(s: String) -> RedisObject<String> {
-        RedisObject::<T>::create_raw_string_object(s)
+    pub fn create_string_object(s: String) -> RedisObject {
+        RedisObject::create_raw_string_object(s)
     }
 
     // pub fn create_quicklist_object(fill: i32, compress: i32) -> Self {

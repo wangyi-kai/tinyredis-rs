@@ -1,29 +1,31 @@
 use std::{io::SeekFrom};
 use tokio::{fs::File};
 use bytes::{Buf, BufMut, BytesMut};
-use std::sync::{Arc};
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
+use crate::db::data_structure::dict::dict::Value;
 use crate::db::db_engine::DbCommand;
 use crate::persistence::error::PersistError;
 use crate::db::object::{*};
+use crate::parser::cmd::hash::HashCmd;
+use crate::parser::cmd::zset::SortedCmd;
 use crate::persistence::{*};
 use crate::Result;
 
 #[derive(Clone)]
-pub struct Rdb<V> {
-    db_sender: Vec<Sender<DbCommand<V>>>,
+pub struct Rdb {
+    db_sender: Vec<Sender<DbCommand>>,
     buf: BytesMut,
 }
 
-impl<V> Rdb<V> {
-    pub fn create(db_sender: Vec<Sender<DbCommand<V>>>) -> Self {
+impl Rdb {
+    pub fn create(db_sender: Vec<Sender<DbCommand>>) -> Self {
         let buf = BytesMut::with_capacity(1024 * 8);
         Self { db_sender, buf }
     }
 
     pub async fn save(&mut self, db_id: u32) -> Result<()> {
-        let tmp_path = "tmp.rdb".to_string();
+        let tmp_path = "./tmp.rdb".to_string();
         let mut tmp_file = File::create(&tmp_path).await?;
 
         tmp_file.seek(SeekFrom::Start(0)).await?;
@@ -40,9 +42,12 @@ impl<V> Rdb<V> {
                     for dict in iter {
                         let key = (*dict).get_key();
                         let value = (*dict).get_val();
-                        let v = &*(value as *mut V as *mut RedisObject<String>);
-                        self.rdb_save_key_value_pair(key, v)?;
+                        match value {
+                            Value::Val(robj) => self.rdb_save_key_value_pair(key, robj)?,
+                            _ => {}
+                        }
                     }
+                    self.buf.put_u8(RDB_OPCODE_EOF);
                 }
                 _ => {
 
@@ -50,15 +55,50 @@ impl<V> Rdb<V> {
             }
         }
         tmp_file.write_all(&self.buf).await?;
-        let rdb_path = "dump.rdb".to_string();
+        let rdb_path = "./dump.rdb".to_string();
         tokio::fs::rename(&tmp_path, &rdb_path).await?;
 
         Ok(())
     }
 
+    pub async fn load(&mut self) -> Result<()> {
+        let rdb_path = "./dump.rdb".to_string();
+        let mut rdb_file = File::open(&rdb_path).await?;
+        let mut buf = BytesMut::with_capacity(1024 * 8);
+        loop {
+            if rdb_file.read_buf(&mut buf).await? == 0 {
+                break;
+            }
+        }
+        let head = buf.split_to(3);
+        if head != b"RDB"[..] {
+            return Err(PersistError::DecodeErr("flag not rdb".to_string()).into());
+        }
+        let db_id_flag = buf.get_u8();
+        if db_id_flag != RDB_OPCODE_SELECTDB {
+            return Err(PersistError::DecodeErr("db_id_flag error".to_string()).into());
+        }
+        let db_id = self.rdb_load_len(&mut buf)?;
+        let sender = self.db_sender[db_id as usize].clone();
+        loop {
+            match buf.get_u8() {
+                RDB_OPCODE_EOF => break,
+                RDB_TYPE_STRING => {
+                    let s = self.load_string(&mut buf)?;
+                    let key = RedisObject::create_string_object(s);
+                    let value = self.rdb_load_object(RDB_TYPE_STRING, &mut buf)?;
+                    let cmd = DbCommand::RdbData {key, value};
+                    let _ = sender.send(cmd).await;
+                },
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     #[inline(always)]
-    fn rdb_save_object_type(&mut self, object: &RedisObject<String>) -> Result<()> {
-        match object.encoding {
+    fn rdb_save_object_type(&mut self, object: &RedisObject) -> Result<()> {
+        match object.object_type {
             OBJ_STRING => {
                 self.buf.put_u8(RDB_TYPE_STRING);
             }
@@ -119,21 +159,14 @@ impl<V> Rdb<V> {
         Ok(nwritten)
     }
 
-    fn rdb_save_double_value(&mut self, val: f64) -> Result<usize> {
-        let f = val.to_ne_bytes();
-        let len = f.len();
-        self.buf.put_slice(&f);
-        Ok(len)
-    }
-
-    fn rdb_save_key_value_pair(&mut self, key: &str, value: &RedisObject<String>) -> Result<()> {
+    fn rdb_save_key_value_pair(&mut self, key: &str, value: &RedisObject) -> Result<()> {
         self.rdb_save_object_type(value)?;
         self.rdb_save_string(key)?;
         self.rdb_save_object(value)?;
         Ok(())
     }
 
-    fn rdb_save_object(&mut self, object: &RedisObject<String>) -> Result<()> {
+    fn rdb_save_object(&mut self, object: &RedisObject) -> Result<()> {
         let mut nwritten = 0;
         match object.object_type {
             OBJ_STRING => {
@@ -156,9 +189,12 @@ impl<V> Rdb<V> {
                         unsafe {
                             for entry in ht_iter {
                                 let field = (*entry).get_key();
-                                let value = (*entry).value();
                                 nwritten += self.rdb_save_string(field)?;
-                                nwritten += self.rdb_save_string(value)?;
+                                let value = (*entry).value();
+                                match value {
+                                    Value::Sds(s) => nwritten += self.rdb_save_string(s)?,
+                                    _ => {}
+                                }
                             }
                         }
                     }
@@ -175,7 +211,7 @@ impl<V> Rdb<V> {
                         unsafe {
                             while let Some(node) = zn {
                                 nwritten += self.rdb_save_string(&(*node.as_ptr()).get_elem())?;
-                                nwritten += self.rdb_save_double_value((*node.as_ptr()).get_score())?;
+                                self.buf.put_f64(node.as_ref().get_score());
                                 zn = (*node.as_ptr()).back_ward();
                             }
                         }
@@ -185,25 +221,58 @@ impl<V> Rdb<V> {
                     }
                 }
             }
-            _ => {
-
-            }
+            _ => { }
         }
         Ok(())
     }
 
+    fn rdb_load_object(&self, obj_type: u8, buf: &mut BytesMut) -> Result<RedisObject> {
+        match obj_type {
+            RDB_TYPE_STRING => {
+                let s = self.load_string(buf)?;
+                let object = RedisObject::create_string_object(s);
+                Ok(object)
+            }
+            RDB_TYPE_HASH => {
+                let hash_size = self.rdb_load_len(buf)?;
+                let mut object = RedisObject::create_hash_object();
+                for _ in 0..hash_size {
+                    let key = self.load_string(buf)?;
+                    let value = self.load_string(buf)?;
+                    HashCmd::hash_set(&mut object, key, value);
+                }
+                Ok(object)
+            }
+            RDB_TYPE_ZSET_2 => {
+                let mut object = RedisObject::create_zset_object();
+                let len = self.rdb_load_len(buf)?;
+                for _ in 0..len {
+                    let ele = self.load_string(buf)?;
+                    let score = buf.get_f64();
+                    SortedCmd::zadd(&mut object, None, score, ele);
+                }
+                Ok(object)
+            }
+            _ => {
+                Err(PersistError::TypeErr("obj_type".to_string()).into())
+            }
+        }
+    }
+
     #[inline(always)]
-    fn rdb_load_len(&mut self, buf: &mut BytesMut) -> Result<u64> {
-        let len_type = (buf[0] & 0xC0) >> 6;
+    fn rdb_load_len(&self, buf: &mut BytesMut) -> Result<u64> {
+        let len_type = buf.get_u8();
         let len = match len_type {
             RDB_ENCVAL => {
                 (buf[0] & 0x3F) as u64
             }
             RDB_6BITLEN => {
-                (buf[0] & 0x3F) as u64
+                buf.get_u8() as u64
             }
             RDB_14BITLEN => {
-                ((buf[0] as u64 & 0x3F) << 8) | buf[1] as u64
+                let mut res = ((len_type & 0x3F) as u64) << 8;
+                res |= buf.get_u8() as u64;
+                res
             }
             RDB_32BITLEN => {
                 buf.get_u32() as u64
@@ -219,15 +288,10 @@ impl<V> Rdb<V> {
         Ok(len)
     }
 
-    fn load_string(&mut self, buf: &mut BytesMut) -> Result<()> {
-        let rdb_flag = String::from_utf8(buf[0..3].to_vec())?;
-        if rdb_flag.ne("RDB") {
-            return Err(PersistError::DecodeErr("flag is not RDB".to_string()).into());
-        }
-        buf.advance(3);
-        let select_code = buf.get_u8();
-
-        Ok(())
+    fn load_string(&self, buf: &mut BytesMut) -> Result<String> {
+        let len = self.rdb_load_len(buf)?;
+        let s = String::from_utf8(buf.split_to(len as usize).to_vec()).map_err(|_| PersistError::DecodeErr("invalid utf-8".to_string()))?;
+        Ok(s)
     }
 }
 

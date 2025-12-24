@@ -4,20 +4,21 @@ use crate::db::data_structure::dict::iter_mut::DictIterMut;
 use crate::db::kvstore::kvstore::KvStore;
 
 use std::ptr::NonNull;
+use crate::db::object::RedisObject;
 
-pub struct KvStoreIterator<V> {
-    pub(crate) kvs: *mut KvStore<V>,
+pub struct KvStoreIterator {
+    pub(crate) kvs: *mut KvStore,
     pub(crate) didx: i32,
     pub(crate) next_didx: i32,
-    pub(crate) di: DictIterMut<V>,
+    pub(crate) di: DictIterMut,
 }
 
-unsafe impl<V> Send for KvStoreIterator<V> {}
+unsafe impl Send for KvStoreIterator {}
 
-unsafe impl<V> Sync for KvStoreIterator<V> {}
+unsafe impl Sync for KvStoreIterator {}
 
-impl<V> KvStoreIterator<V> {
-    pub fn next_dict(&mut self) -> Option<NonNull<Dict<V>>> {
+impl KvStoreIterator {
+    pub fn next_dict(&mut self) -> Option<NonNull<Dict>> {
         if self.next_didx == -1 {
             return None;
         }
@@ -47,8 +48,8 @@ impl<V> KvStoreIterator<V> {
     }
 }
 
-impl<V> Iterator for KvStoreIterator<V> {
-    type Item = *mut DictEntry<V>;
+impl Iterator for KvStoreIterator {
+    type Item = *mut DictEntry;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             if let Some(entry) = self.di.next() {
@@ -66,17 +67,17 @@ impl<V> Iterator for KvStoreIterator<V> {
     }
 }
 
-impl<V> Drop for KvStoreIterator<V> {
+impl Drop for KvStoreIterator {
     fn drop(&mut self) {}
 }
 
-pub struct KvStoreDictIterator<V> {
-    pub(crate) kvs: *mut KvStore<V>,
+pub struct KvStoreDictIterator {
+    pub(crate) kvs: *mut KvStore,
     pub(crate) didx: i32,
-    pub(crate) di: DictIterMut<V>,
+    pub(crate) di: DictIterMut,
 }
 
-impl<V> KvStoreDictIterator<V> {
+impl KvStoreDictIterator {
     pub fn _release_dict_iterator(&mut self) {
         unsafe {
             if (*self.kvs).get_dict(self.didx as usize).is_some() {
@@ -87,8 +88,8 @@ impl<V> KvStoreDictIterator<V> {
     }
 }
 
-impl<V> Iterator for KvStoreDictIterator<V> {
-    type Item = *mut DictEntry<V>;
+impl Iterator for KvStoreDictIterator {
+    type Item = *mut DictEntry;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let d = (*self.kvs).get_dict(self.didx as usize);
@@ -100,6 +101,6 @@ impl<V> Iterator for KvStoreDictIterator<V> {
     }
 }
 
-impl<V> Drop for KvStoreDictIterator<V> {
+impl Drop for KvStoreDictIterator {
     fn drop(&mut self) {}
 }

@@ -3,9 +3,9 @@ use super::SKIP_LIST_MAX_LEVEL;
 use std::ptr::NonNull;
 use crate::db::data_structure::dict::dict::Dict;
 
-#[derive(Clone)]
-pub struct ZSet<T> {
-    pub(crate) dict: Dict<T>,
+#[derive(Clone, Debug)]
+pub struct ZSet {
+    pub(crate) dict: Dict,
     pub(crate) zsl: SkipList,
 }
 

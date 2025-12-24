@@ -14,24 +14,22 @@ use std::ptr::NonNull;
 use std::time::Instant;
 use crate::db::object::RedisObject;
 
-pub enum Value<T> {
-    Val(RedisObject<T>),
+pub enum Value {
+    Val(RedisObject),
     Sds(String),
     U64(u64),
     S64(i64),
     F(f64),
 }
 
-#[derive(Debug)]
-pub struct DictEntry<V>
-{
+
+pub struct DictEntry {
     pub(crate) key: String,
-    pub(crate) val: Option<V>,
-    pub(crate) next: Option<NonNull<DictEntry<V>>>,
+    pub(crate) val: Option<Value>,
+    pub(crate) next: Option<NonNull<DictEntry>>,
 }
 
-impl<V> Default for DictEntry<V>
-{
+impl Default for DictEntry {
     fn default() -> Self {
         Self {
             key: "".to_string(),
@@ -52,40 +50,37 @@ impl<V> Default for DictEntry<V>
 //     }
 // }
 
-impl<V> PartialEq for DictEntry<V>
-{
+impl PartialEq for DictEntry {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key
     }
 }
 
-impl<V> DictEntry<V>
-{
+impl DictEntry {
     #[inline]
     pub fn get_key(&self) -> &str {
         &self.key
     }
 
     #[inline]
-    pub fn get_val(&mut self) -> &mut V {
+    pub fn get_val(&mut self) -> &mut Value {
         self.val.as_mut().unwrap()
     }
 
     #[inline]
-    pub fn value(&self) -> &V {
+    pub fn value(&self) -> &Value {
         self.val.as_ref().unwrap()
     }
 }
 
-unsafe impl<V: Send> Send for Dict<V> {}
-unsafe impl<V: Sync> Sync for Dict<V> {}
+unsafe impl Send for Dict {}
+unsafe impl Sync for Dict {}
 
 #[derive(Clone, Debug)]
-pub struct Dict<V>
-{
+pub struct Dict {
     //pub dict_type: Arc<DictType<K, V>>,
     /// dict table
-    pub ht_table: Vec<Vec<Option<NonNull<DictEntry<V>>>>>,
+    pub ht_table: Vec<Vec<Option<NonNull<DictEntry>>>>,
     /// dict table used
     pub ht_used: Vec<u32>,
     /// rehashing not in progress if rehash_idx == -1
@@ -99,8 +94,7 @@ pub struct Dict<V>
     //pub metadata: Vec<Box<dyn Any>>,
 }
 
-impl<V> Dict<V>
-{
+impl Dict {
     pub fn create() -> Self {
         Self {
             ht_table: vec![vec![None; DICT_HT_INITIAL_SIZE], vec![]],
@@ -112,7 +106,7 @@ impl<V> Dict<V>
         }
     }
 
-    pub fn scan(&mut self, mut v: u64, scan_fn: DictScanFunction<V>) -> u64 {
+    pub fn scan(&mut self, mut v: u64, scan_fn: DictScanFunction) -> u64 {
         let mut ht_idx0 = 0;
         let mut ht_idx1 = 0;
         let mut m0 = 0;
@@ -174,7 +168,7 @@ impl<V> Dict<V>
         v
     }
 
-    pub unsafe fn find_position_for_insert(&mut self, key: &String) -> Option<NonNull<DictEntry<V>>> {
+    pub unsafe fn find_position_for_insert(&mut self, key: &String) -> Option<NonNull<DictEntry>> {
         let hash = sys_hash(&key);
         let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
         //Rehash the dict table if needed
@@ -205,7 +199,7 @@ impl<V> Dict<V>
     }
 
     #[inline]
-    pub fn add_raw(&mut self, key: String, val: V) -> Result<NonNull<DictEntry<V>>, HashError> {
+    pub fn add_raw(&mut self, key: String, val: Value) -> Result<NonNull<DictEntry>, HashError> {
         unsafe {
             let hash = sys_hash(&key);
             let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
@@ -247,7 +241,7 @@ impl<V> Dict<V>
     }
 
     #[inline]
-    pub fn add_raw_without_value(&mut self, key: String) -> Result<NonNull<DictEntry<V>>, HashError> {
+    pub fn add_raw_without_value(&mut self, key: String) -> Result<NonNull<DictEntry>, HashError> {
         unsafe {
             let hash = sys_hash(&key);
             let mut idx = hash & dict_size_mask(self.ht_size_exp[0]);
@@ -309,7 +303,7 @@ impl<V> Dict<V>
         }
     }
 
-    pub fn find_by_hash(&mut self, key: &str, hash: u64) -> Option<NonNull<DictEntry<V>>> {
+    pub fn find_by_hash(&mut self, key: &str, hash: u64) -> Option<NonNull<DictEntry>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -328,7 +322,7 @@ impl<V> Dict<V>
                     if he_key == key {
                         return he;
                     }
-                    he = (*entry.as_ptr()).next;
+                    he = entry.as_ref().next;
                 }
                 if !self.dict_is_rehashing() {
                     break;
@@ -338,7 +332,7 @@ impl<V> Dict<V>
         None
     }
 
-    pub fn find(&mut self, key: &str) -> Option<NonNull<DictEntry<V>>> {
+    pub fn find(&mut self, key: &str) -> Option<NonNull<DictEntry>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -347,17 +341,17 @@ impl<V> Dict<V>
         self.find_by_hash(key, hash)
     }
 
-    pub fn fetch_value(&mut self, key: &String) -> Option<&V> {
+    pub fn fetch_value(&mut self, key: &String) -> Option<&Value> {
         let he = self.find(key);
         unsafe {
             if let Some(entry) = he {
-                return Some((*entry.as_ptr()).get_val());
+                return Some(entry.as_ref().value());
             }
             None
         }
     }
 
-    pub fn generic_delete(&mut self, key: &str) -> Result<Option<NonNull<DictEntry<V>>>, HashError> {
+    pub fn generic_delete(&mut self, key: &str) -> Result<Option<NonNull<DictEntry>>, HashError> {
         unsafe {
             if self.dict_size() == 0 {
                 return Ok(None);
@@ -373,7 +367,7 @@ impl<V> Dict<V>
                 }
                 idx = h & dict_size_mask(self.ht_size_exp[table]);
                 let mut he = self.ht_table[table][idx as usize];
-                let mut prev_he: Option<NonNull<DictEntry<V>>> = None;
+                let mut prev_he: Option<NonNull<DictEntry>> = None;
                 while let Some(entry) = he {
                     let next_de = (*entry.as_ptr()).next;
                     let he_key = (*entry.as_ptr()).get_key();
@@ -689,7 +683,7 @@ impl<V> Dict<V>
         self._clear(1, None);
     }
 
-    fn _clear(&mut self, ht_idx: usize, call_back: Option<fn(&mut Dict<V>)>) {
+    fn _clear(&mut self, ht_idx: usize, call_back: Option<fn(&mut Dict)>) {
         unsafe {
             for i in 0..dict_size(self.ht_size_exp[ht_idx]) {
                 if self.ht_used[ht_idx] <= 0 {
@@ -713,7 +707,7 @@ impl<V> Dict<V>
         }
     }
 
-    pub fn empty(&mut self, call_back: Option<fn(&mut Dict<V>)>) {
+    pub fn empty(&mut self, call_back: Option<fn(&mut Dict)>) {
         self._clear(0, call_back);
         self._clear(1, call_back);
 
@@ -722,7 +716,7 @@ impl<V> Dict<V>
         self.pause_auto_resize = 0;
     }
 
-    pub fn get_random_key(&mut self) -> Option<NonNull<DictEntry<V>>> {
+    pub fn get_random_key(&mut self) -> Option<NonNull<DictEntry>> {
         unsafe {
             let mut he;
             if self.dict_size() == 0 {
@@ -774,7 +768,7 @@ impl<V> Dict<V>
         }
     }
 
-    pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry<V>>> {
+    pub fn get_fair_random_key(&mut self) -> Option<NonNull<DictEntry>> {
         let mut entries = Vec::with_capacity(GETFAIR_NUM_ENTRIES);
         let count = GETFAIR_NUM_ENTRIES;
         let cnt = self.get_some_keys(&mut entries, count as u64);
@@ -788,7 +782,7 @@ impl<V> Dict<V>
 
     fn get_some_keys(
         &mut self,
-        des: &mut Vec<Option<NonNull<DictEntry<V>>>>,
+        des: &mut Vec<Option<NonNull<DictEntry>>>,
         mut count: u64,
     ) -> u64 {
         let mut stored = 0;
@@ -859,7 +853,7 @@ impl<V> Dict<V>
         return if stored > count { stored } else { count };
     }
 
-    pub fn find_by_hash_and_ptr(&self, key: String, hash: u64) -> Option<NonNull<DictEntry<V>>> {
+    pub fn find_by_hash_and_ptr(&self, key: String, hash: u64) -> Option<NonNull<DictEntry>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -894,7 +888,7 @@ impl<V> Dict<V>
         &mut self,
         key: &String,
         table_index: &mut i32,
-    ) -> Option<NonNull<DictEntry<V>>> {
+    ) -> Option<NonNull<DictEntry>> {
         if self.dict_size() == 0 {
             return None;
         }
@@ -928,8 +922,8 @@ impl<V> Dict<V>
 
     pub fn dict_two_phase_unlink_free(
         &mut self,
-        he: Option<NonNull<DictEntry<V>>>,
-        mut plink: Option<NonNull<DictEntry<V>>>,
+        he: Option<NonNull<DictEntry>>,
+        mut plink: Option<NonNull<DictEntry>>,
         table_index: usize,
     ) {
         if he.is_none() {
@@ -945,7 +939,7 @@ impl<V> Dict<V>
     }
 }
 
-impl<V> Dict<V> {
+impl Dict {
     #[inline]
     pub fn reset(&mut self, table: usize) {
         self.ht_table[table] = vec![];

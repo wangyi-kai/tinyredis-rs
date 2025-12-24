@@ -1,4 +1,4 @@
-use crate::db::data_structure::dict::dict::{Dict, DictEntry};
+use crate::db::data_structure::dict::dict::{Dict, DictEntry, Value};
 use crate::db::kvstore::kvstore::KvStore;
 use crate::db::object::{RedisObject, RedisValue};
 
@@ -23,20 +23,20 @@ pub fn get_key_slot(key: &str) -> usize {
     0
 }
 
-pub struct RedisDb<V> {
+pub struct RedisDb {
     /// The keyspace for this DB. As metadata, holds key sizes histogram
-    pub kvs: KvStore<V>,
+    pub kvs: KvStore,
     /// Timeout of keys with a timeout set
-    pub expires: KvStore<V>,
+    pub expires: KvStore,
     /// Keys with clients waiting for data (BLPOP)
-    blocking_keys: Dict<V>,
+    blocking_keys: Dict,
     /// Keys with clients waiting for data,
     /// and should be unblocked if key is deleted (XREADEDGROUP)
-    blocking_keys_unblock_on_nokey: Dict<V>,
+    blocking_keys_unblock_on_nokey: Dict,
     /// Blocked keys that received a PUSH
-    read_keys: Dict<V>,
+    read_keys: Dict,
     /// WATCHED keys for MULTI/EXEC CAS
-    watched_keys: Dict<V>,
+    watched_keys: Dict,
     /// Database ID
     id: i32,
     /// Average TTL, just for stats
@@ -45,12 +45,11 @@ pub struct RedisDb<V> {
     expires_cursor: u64,
     pub(crate) sender: crate::MpscSender,
     receiver: crate::MpscReceiver,
-    _maker: PhantomData<V>,
-    db_rx: Receiver<DbCommand<V>>,
-    pub db_tx: Sender<DbCommand<V>>,
+    db_rx: Receiver<DbCommand>,
+    pub db_tx: Sender<DbCommand>,
 }
 
-impl<V> RedisDb<V> {
+impl RedisDb {
     pub fn create(slot_count_bits: u64, flag: i32, id: i32) -> Self {
         let (sender, receiver) = mpsc::channel(1024);
         let (tx, rx) = mpsc::channel(10);
@@ -66,29 +65,20 @@ impl<V> RedisDb<V> {
             expires_cursor: 0,
             sender,
             receiver,
-            _maker: PhantomData,
             db_rx: rx,
             db_tx: tx,
         }
     }
 
     pub async fn run(&mut self) {
-        // while let Some((sender, command)) = self.receiver.recv().await {
-        //     debug!("apply command {:?}", command);
-        //     let db = unsafe {
-        //         &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
-        //     };
-        //     let frame = command.apply(db);
-        //     let _ = sender.send(frame);
-        // }
         loop {
             select! {
                 Some((sender, redis_cmd)) = self.receiver.recv() => {
                     debug!("apply command {:?}", redis_cmd);
-                    let db = unsafe {
-                        &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
-                    };
-                    let frame = redis_cmd.apply(db);
+                    // let db = unsafe {
+                    //     &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
+                    // };
+                    let frame = redis_cmd.apply(self);
                     let _ = sender.send(frame);
                 }
                 Some(db_cmd) = self.db_rx.recv() => {
@@ -97,6 +87,9 @@ impl<V> RedisDb<V> {
                             let iter = self.db_iter();
                             let _ = sender.send(iter);
                         }
+                        DbCommand::RdbData { key, value } => {
+                            self.add(key, value);
+                        }
                     }
                 }
                 else => break,
@@ -104,28 +97,26 @@ impl<V> RedisDb<V> {
         }
     }
 
-    pub fn find(&self, key: &RedisObject<String>) -> Option<&mut V> {
+    pub fn find(&self, key: &RedisObject) -> Option<&mut RedisObject> {
         let k = match &key.ptr {
             RedisValue::String(s) => s,
             _ => return None,
         };
         let de = self.kvs.dict_find(0, k);
-
-        if let Some(de) = de {
+        if let Some(mut de) = de {
             unsafe {
-                let val = (*de.as_ptr()).get_val();
-                Some(val)
+                let val = de.as_mut().get_val();
+                match val {
+                    Value::Val(obj) => Some(obj),
+                    _ => None,
+                }
             }
         } else {
             None
         }
     }
 
-    pub fn add(&mut self, key: RedisObject<String>, val: V) -> Option<NonNull<DictEntry<V>>> {
-        self.add_internal(key, val)
-    }
-
-    fn add_internal(&mut self, key: RedisObject<String>, val: V) -> Option<NonNull<DictEntry<V>>> {
+    pub fn add(&mut self, key: RedisObject, val: RedisObject) -> Option<NonNull<DictEntry>> {
         let key = match key.ptr {
             RedisValue::String(s) => s,
             _ => { "".to_string() }
@@ -135,11 +126,7 @@ impl<V> RedisDb<V> {
         de
     }
 
-    pub fn delete(&mut self, key: &RedisObject<String>) {
-        self.generic_delete(key)
-    }
-
-    fn generic_delete(&mut self, key: &RedisObject<String>) {
+    pub fn delete(&mut self, key: &RedisObject) {
         let key = match &key.ptr {
             RedisValue::String(s) => s,
             _ => { "" }
@@ -151,7 +138,7 @@ impl<V> RedisDb<V> {
         }
     }
 
-    pub fn set_val(&mut self, key: &RedisObject<String>, val: V) {
+    pub fn set_val(&mut self, key: &RedisObject, val: RedisObject) {
         let old = self.find(key);
         if let Some(old) = old {
             *old = val;
@@ -164,7 +151,7 @@ impl<V> RedisDb<V> {
         self.kvs.kvstore_size()
     }
 
-    pub fn db_iter(&mut self) -> KvStoreIterator<V> {
+    pub fn db_iter(&mut self) -> KvStoreIterator {
         self.kvs.iter()
     }
 }

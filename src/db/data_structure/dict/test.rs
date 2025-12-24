@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod dict_test {
-    use crate::db::data_structure::dict::dict::Dict;
+    use crate::db::data_structure::dict::dict::{Dict, Value};
     use crate::db::data_structure::dict::error::HashError;
     use crate::db::data_structure::dict::hash::sys_hash;
     use crate::db::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
@@ -60,7 +60,7 @@ mod dict_test {
         {
             for j in 0..16 {
                 unsafe {
-                    d.add_raw(string_from_long_long(j), j)?;
+                    d.add_raw(string_from_long_long(j), Value::S64(j))?;
                 }
             }
             while d.dict_is_rehashing() {
@@ -76,7 +76,7 @@ mod dict_test {
             dict_set_resize_enabled(DictResizeAvoid);
             for j in 16..DICT_FORCE_RESIZE_RATIO as i64 * 16 {
                 unsafe {
-                    let res = d.add_raw(string_from_long_long(j), j)?;
+                    let res = d.add_raw(string_from_long_long(j), Value::S64(j))?;
                     //assert_eq!(res, true);
                 }
             }
@@ -90,7 +90,7 @@ mod dict_test {
         unsafe {
             let res = d.add_raw(
                 string_from_long_long(current_dict_used as i64),
-                current_dict_used as i64,
+                Value::S64(current_dict_used as i64),
             )?;
             //assert_eq!(res, true);
             current_dict_used += 1;
@@ -151,7 +151,7 @@ mod dict_test {
         {
             d.empty(None);
             for j in 0..128 {
-                d.add_raw(string_from_long_long(j), j)?;
+                d.add_raw(string_from_long_long(j), Value::S64(j))?;
             }
             while d.dict_is_rehashing() {
                 d.rehash_microseconds(1000)?;
@@ -216,7 +216,7 @@ mod dict_test {
         let count = 5000;
         for j in 0..count {
             let key = string_from_substring();
-            d.add_raw(key, 0)?;
+            d.add_raw(key, Value::S64(0))?;
         }
         let end = start.elapsed();
         println!(
@@ -229,7 +229,7 @@ mod dict_test {
         let start = Instant::now();
         for j in 0..count {
             let key = string_from_long_long(j as i64);
-            d.add_raw(key, j)?;
+            d.add_raw(key, Value::U64(j as u64))?;
         }
         let end = start.elapsed();
         println!("Inserting via dictAdd() non existing: {:?}", end);
@@ -261,7 +261,7 @@ mod dict_test {
                 let entry = d.find(&key);
                 assert!(entry.is_none());
 
-                let res = d.add_raw(key, 0)?;
+                let res = d.add_raw(key, Value::U64(0))?;
                 //assert_eq!(res, true);
             }
         }
@@ -330,7 +330,7 @@ mod dict_test {
             d.generic_delete(&key)?;
             let c = key.chars().nth(0).unwrap() as u8;
             key.replace_range(0..1, &(c + 17).to_string());
-            d.add_raw(key, j)?;
+            d.add_raw(key, Value::U64(j as u64))?;
         }
         let end = start.elapsed();
         println!("Removing and adding: {:?}", end);
@@ -341,12 +341,6 @@ mod dict_test {
     #[test]
     fn dict_insert_and_find() -> Result<(), HashError> {
         unsafe {
-            // let benchmark_dict_type = Arc::new(DictType {
-            //     hash_function: None,
-            //     rehashing_started: None,
-            //     rehashing_completed: None,
-            //     dict_meta_data_bytes: None,
-            // });
             let mut dict = Dict::create();
             let num = 10;
             let start = Instant::now();
@@ -354,7 +348,7 @@ mod dict_test {
             for i in 1..num + 1 {
                 let key = format!("{}", i.to_string());
                 let value = format!("val_{}", i.to_string());
-                let _ = dict.add_raw(key, value);
+                let _ = dict.add_raw(key, Value::Sds(value))?;
             }
             let end = start.elapsed();
             println!("dict插入时间: {:?}", end);
@@ -375,9 +369,14 @@ mod dict_test {
                 let entry = dict.find(&key);
                 match entry {
                     Some(entry) => {
-                        let val = (*entry.as_ptr()).get_val();
-                        assert_eq!(format!("val_{}", i.to_string()), *val);
-                        println!("找到要查找key: {}, val: {:?}", key, val);
+                        let value = (*entry.as_ptr()).get_val();
+                        match value {
+                            Value::Sds(val) => {
+                                assert_eq!(format!("val_{}", i.to_string()), *val.to_string());
+                                println!("找到要查找key: {}, val: {:?}", key, val);
+                            }
+                            _ => { assert!(false); }
+                        }
                     }
                     None => {
                         println!("没有找到key: {}", key);
@@ -400,7 +399,7 @@ mod dict_test {
             for i in 1..num + 1 {
                 let key = format!("key_{}", i.to_string());
                 let value = format!("val_{}", i.to_string());
-                let _ = dict.add_raw(key, value);
+                let _ = dict.add_raw(key, Value::Sds(value));
             }
             let end = start.elapsed();
 
@@ -420,19 +419,13 @@ mod dict_test {
     #[test]
     fn dict_delete() -> Result<(), HashError> {
         unsafe {
-            // let benchmark_dict_type = Arc::new(DictType {
-            //     hash_function: None,
-            //     rehashing_started: None,
-            //     rehashing_completed: None,
-            //     dict_meta_data_bytes: None,
-            // });
             let mut dict = Dict::create();
             let num = 10;
 
             for i in 1..num + 1 {
                 let key = format!("key_{}", i.to_string());
                 let value = format!("val_{}", i.to_string());
-                let _ = dict.add_raw(key, value);
+                let _ = dict.add_raw(key, Value::Sds(value))?;
             }
 
             for i in 1..num + 1 {
@@ -446,7 +439,12 @@ mod dict_test {
                 match entry {
                     Some(entry) => {
                         let val = (*entry.as_ptr()).get_val();
-                        assert_eq!(format!("val_{}", i.to_string()), *val);
+                        match val {
+                            Value::Sds(value) => {
+                                assert_eq!(format!("val_{}", i.to_string()), *value);
+                            }
+                            _ => {}
+                        }
                         //println!("找到要查找key: {}, entry: {:?}", key, val);
                     }
                     None => {

@@ -4,18 +4,18 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use crate::db::data_structure::dict::iter_mut::DictIterMut;
 
-pub struct DictIter<V> {
-    pub dict: *const Dict<V>,
+pub struct DictIter {
+    pub dict: *const Dict,
     table: usize,
     index: u64,
     safe: bool,
     remaining: usize,
-    entry: Option<NonNull<DictEntry<V>>>,
+    entry: Option<NonNull<DictEntry>>,
     //_marker: PhantomData<&'a DictEntry<V>>,
 }
 
-impl <V> DictIter<V> {
-    pub fn new(dict: &Dict<V>) -> Self {
+impl DictIter {
+    pub fn new(dict: &Dict) -> Self {
         let mut iter = DictIter {
             dict,
             table: 0,
@@ -31,7 +31,7 @@ impl <V> DictIter<V> {
         iter
     }
 
-    pub fn new_safe(dict: &Dict<V>) -> Self {
+    pub fn new_safe(dict: &Dict) -> Self {
         let mut iter = DictIter {
             dict,
             table: 0,
@@ -82,8 +82,8 @@ impl <V> DictIter<V> {
     }
 }
 
-impl <V> Iterator for DictIter<V> {
-    type Item = *const DictEntry<V>;
+impl Iterator for DictIter {
+    type Item = *const DictEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -106,20 +106,20 @@ impl <V> Iterator for DictIter<V> {
 }
 
 
-impl<'a, V> Dict<V> {
-    pub fn iter(&self) -> DictIter<V> {
+impl Dict {
+    pub fn iter(&self) -> DictIter {
         DictIter::new(self)
     }
 
-    pub fn safe_iter(&self) -> DictIter<V> {
+    pub fn safe_iter(&self) -> DictIter {
         DictIter::new_safe(self)
     }
 
-    pub fn iter_mut(&mut self) -> DictIterMut<V> {
+    pub fn iter_mut(&mut self) -> DictIterMut {
         DictIterMut::new(self)
     }
 
-    pub fn safe_iter_mut(&mut self) -> DictIterMut<V> {
+    pub fn safe_iter_mut(&mut self) -> DictIterMut {
         DictIterMut::new_safe(self)
     }
 }

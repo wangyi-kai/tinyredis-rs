@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use crate::db::data_structure::dict::dict::Value;
 use crate::db::db::RedisDb;
 use crate::db::object::{RedisObject, RedisValue};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
@@ -123,13 +124,13 @@ impl CommandStrategy for StringCmd {
         }
     }
 
-    fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
+    fn apply(self, db: &mut RedisDb) -> crate::Result<Frame> {
         match self {
             StringCmd::Append { key, field } => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let mut o = db.find(&key);
                 if let Some(o) = o {
-                    return match &mut o.ptr {
+                    match &mut o.ptr {
                         RedisValue::String(s) => {
                             s.push_str(&field);
                             Ok(Frame::Simple("OK".to_string()))
@@ -139,27 +140,27 @@ impl CommandStrategy for StringCmd {
                         }
                     }
                 } else {
-                    let value = RedisObject::<String>::create_string_object(field);
+                    let value = RedisObject::create_string_object(field);
                     db.add(key, value);
                     Ok(Frame::Simple("OK".to_string()))
                 }
             },
             StringCmd::Get {key} => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let o = db.find(&key);
                 if let Some(o) = o {
                     match &o.ptr {
                         RedisValue::String(s) => {
                             Ok(Frame::Bulk(Bytes::from(s.clone().into_bytes())))
                         }
-                        _ => return Err(ObjectTypeError(-3).into())
+                        _ => Err(ObjectTypeError(-3).into())
                     }
                 } else {
                     Ok(Frame::Null)
                 }
             }
             StringCmd::Set { key, value} => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let o = db.find(&key);
                 if let Some(o) = o {
                     match &mut o.ptr {
@@ -167,30 +168,30 @@ impl CommandStrategy for StringCmd {
                             *s = value;
                             Ok(Frame::Simple("OK".to_string()))
                         }
-                        _ => return Err(ObjectTypeError(-4).into())
+                        _ => Err(ObjectTypeError(-4).into())
                     }
                 } else {
-                    let v = RedisObject::<String>::create_string_object(value);
+                    let v = RedisObject::create_string_object(value);
                     db.add(key, v);
                     Ok(Frame::Simple("OK".to_string()))
                 }
             }
             StringCmd::SetNX {key, value} => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let o = db.find(&key);
                 if let Some(_o) = o {
                     Ok(Frame::Simple("key exists".to_string()))
                 } else {
-                    let value = RedisObject::<String>::create_string_object(value);
+                    let value = RedisObject::create_string_object(value);
                     db.add(key, value);
                     Ok(Frame::Simple("OK".to_string()))
                 }
             }
             StringCmd::SetXX {key, value} => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let o = db.find(&key);
                 if let Some(_o) = o {
-                    let value = RedisObject::<String>::create_string_object(value);
+                    let value = RedisObject::create_string_object(value);
                     db.set_val(&key, value);
                     Ok(Frame::Simple("OK".to_string()))
                 } else {

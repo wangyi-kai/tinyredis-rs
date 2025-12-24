@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use tracing::info;
-use crate::db::data_structure::dict::dict::Dict;
+use crate::db::data_structure::dict::dict::{Dict, Value};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::parser::cmd::error::CommandError;
 
@@ -71,13 +71,13 @@ impl CommandStrategy for HashCmd {
         }
     }
 
-    fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
+    fn apply(self, db: &mut RedisDb) -> crate::Result<Frame> {
         match self {
             HashCmd::HGet { key, field } => {
-                let key = RedisObject::<String>::create_string_object(key);
-                let o = db.find(&key);
-                if let Some(o) = o {
-                    let val = Self::hash_get(o, &field);
+                let key = RedisObject::create_string_object(key);
+                let value = db.find(&key);
+                if let Some(val) = value {
+                    let val = Self::hash_get(val, &field);
                     if let Some(val) = val {
                         Ok(Frame::Bulk(val.into()))
                     } else {
@@ -88,20 +88,22 @@ impl CommandStrategy for HashCmd {
                 }
             }
             HashCmd::HDel { key, field } => {
-                let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.find(&key);
-                if let Some(o) = o {
-                    Self::hash_delete(o, &field);
+                let key = RedisObject::create_string_object(key);
+                let mut value = db.find(&key);
+                if let Some(val) = value {
+                    Self::hash_delete(val, &field);
+                    Ok(Frame::Simple("ok".to_string()))
+                } else {
+                    Ok(Frame::Null)
                 }
-                Ok(Frame::Simple("ok".to_string()))
             }
             HashCmd::HSet { key, field, value } => {
-                let key = RedisObject::<String>::create_string_object(key);
-                let mut o = db.find(&key);
-                if let Some(o) = o {
-                    Self::hash_set(o, field, value);
+                let key = RedisObject::create_string_object(key);
+                let val = db.find(&key);
+                if let Some(v) = val {
+                    Self::hash_set(v, field, value);
                 } else {
-                    let mut ht = RedisObject::<String>::create_hash_object();
+                    let mut ht = RedisObject::create_hash_object();
                     Self::hash_set(&mut ht, field, value);
                     db.add(key, ht);
                 }
@@ -113,7 +115,7 @@ impl CommandStrategy for HashCmd {
 }
 
 impl HashCmd {
-    fn hash_set(o: &mut RedisObject<String>, field: String, value: String) {
+    pub fn hash_set(o: &mut RedisObject, field: String, value: String) {
         hash_type_try_conversion(o, &field, &value);
         if o.encoding == OBJ_ENCODING_HT {
             let ht = match &mut o.ptr {
@@ -122,10 +124,10 @@ impl HashCmd {
             };
             let entry = ht.find(&field);
             unsafe {
-                if let Some(entry) = entry {
-                    (*entry.as_ptr()).val = Some(value)
+                if let Some(mut entry) = entry {
+                    entry.as_mut().val = Some(Value::Sds(value))
                 } else {
-                    ht.add_raw(field, value).ok();
+                    ht.add_raw(field, Value::Sds(value)).ok();
                 }
             }
         } else if o.encoding == OBJ_ENCODING_ZIPLIST {
@@ -147,15 +149,13 @@ impl HashCmd {
                 let _ = zp.push(&value, false);
             }
             let len = zp.entry_num() as usize;
-            unsafe {
-                if len > REDIS_CONFIG.get().unwrap().hash_max_ziplist_entries {
-                    hash_type_convert(o);
-                }
+            if len > REDIS_CONFIG.get().unwrap().hash_max_ziplist_entries {
+                hash_type_convert(o);
             }
         }
     }
 
-    fn hash_get(o: &mut RedisObject<String>, field: &String) -> Option<String> {
+    fn hash_get(o: &mut RedisObject, field: &String) -> Option<String> {
         if o.encoding == OBJ_ENCODING_HT {
             let de = match &mut o.ptr {
                 RedisValue::Hash(ht) => ht.find(field),
@@ -163,8 +163,11 @@ impl HashCmd {
             };
             if let Some(de) = de {
                 unsafe {
-                    let value = (*de.as_ptr()).value();
-                    Some(value.clone())
+                    let value = de.as_ref().value();
+                    match value {
+                        Value::Sds(s) => Some(s.to_string()),
+                        _ => None
+                    }
                 }
             } else {
                 None
@@ -197,7 +200,7 @@ impl HashCmd {
         }
     }
 
-    fn hash_delete(o: &mut RedisObject<String>, field: &str) -> bool {
+    fn hash_delete(o: &mut RedisObject, field: &str) -> bool {
         let mut deleted = false;
         if o.encoding == OBJ_ENCODING_HT {
             match &mut o.ptr {
@@ -213,7 +216,7 @@ impl HashCmd {
     }
 }
 
-fn hash_type_try_conversion(o: &mut RedisObject<String>, field: &String, value: &String) {
+fn hash_type_try_conversion(o: &mut RedisObject, field: &String, value: &String) {
     if o.encoding == OBJ_ENCODING_ZIPLIST {
         unsafe {
             if field.len() > REDIS_CONFIG.get().unwrap().hash_max_ziplist_value || value.len() > REDIS_CONFIG.get().unwrap().hash_max_ziplist_value {
@@ -223,7 +226,7 @@ fn hash_type_try_conversion(o: &mut RedisObject<String>, field: &String, value: 
     }
 }
 
-fn hash_type_convert(o: &mut RedisObject<String>) {
+fn hash_type_convert(o: &mut RedisObject) {
     if o.encoding != OBJ_ENCODING_ZIPLIST {
         return;
     }
@@ -242,7 +245,7 @@ fn hash_type_convert(o: &mut RedisObject<String>) {
                             Content::Char(s) => s,
                             Content::Integer(v) => v.to_string(),
                         };
-                        if let Err(e) = dict.add_raw(field, value) {
+                        if let Err(e) = dict.add_raw(field, Value::Sds(value)) {
                             println!("Err: {e}");
                         }
                     }

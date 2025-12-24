@@ -80,9 +80,7 @@ pub fn dict_get_stats_msg(
     buf.len()
 }
 
-impl<V> Dict<V>
-where V: Default + PartialEq + Clone,
-{
+impl Dict {
     pub fn get_stats_ht(&self, ht_idx: usize, full: bool) -> DictStats {
         let cl_vector = Vec::with_capacity(DICT_STATS_VECTLEN);
         let mut stats = DictStats {

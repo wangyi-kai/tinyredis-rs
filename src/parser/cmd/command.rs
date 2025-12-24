@@ -12,7 +12,7 @@ use crate::parser::cmd::zset::SortedCmd;
 pub trait CommandStrategy {
     fn into_frame(self) -> Frame;
     fn from_frame(name: &str, frame: Frame) -> crate::Result<RedisCommand>;
-    fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame>;
+    fn apply(self, db: &mut RedisDb) -> crate::Result<Frame>;
 }
 
 #[allow(dead_code)]
@@ -52,7 +52,7 @@ impl CommandStrategy for RedisCommand {
         Ok(command)
     }
 
-    fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
+    fn apply(self, db: &mut RedisDb) -> crate::Result<Frame> {
         match self {
             RedisCommand::Hash(cmd) => cmd.apply(db),
             RedisCommand::String(cmd) => cmd.apply(db),

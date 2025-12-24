@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use crate::db::data_structure::dict::dict::Value;
 use crate::db::db::RedisDb;
 use crate::db::object::{OBJ_ENCODING_SKIPLIST, RedisObject, RedisValue};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
@@ -87,10 +88,10 @@ impl CommandStrategy for SortedCmd {
         }
     }
 
-    fn apply(self, db: &mut RedisDb<RedisObject<String>>) -> crate::Result<Frame> {
+    fn apply(self, db: &mut RedisDb) -> crate::Result<Frame> {
         match self {
             SortedCmd::ZAdd { key, arg, values} => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let o = db.find(&key);
                 let len = values.len();
                 if let Some(o) = o {
@@ -100,7 +101,7 @@ impl CommandStrategy for SortedCmd {
                         Self::zadd(o, arg.clone(), score, ele);
                     }
                 } else {
-                    let mut z_obj = RedisObject::<String>::create_zset_object();
+                    let mut z_obj = RedisObject::create_zset_object();
                     for i in (0..len - 1).step_by(2) {
                         let score: f64 = values[i].clone().parse()?;
                         let ele = values[i + 1].clone();
@@ -114,7 +115,7 @@ impl CommandStrategy for SortedCmd {
                 Ok(Frame::Simple((len >> 1).to_string()))
             }
             SortedCmd::ZCard {key} => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let o = db.find(&key);
                 if let Some(o) = o {
                     if o.encoding == OBJ_ENCODING_SKIPLIST {
@@ -130,7 +131,7 @@ impl CommandStrategy for SortedCmd {
                 }
             }
             SortedCmd::ZScore {key, member} => {
-                let key = RedisObject::<String>::create_string_object(key);
+                let key = RedisObject::create_string_object(key);
                 let o = db.find(&key);
                 if let Some(o) = o {
                     match &mut o.ptr {
@@ -138,8 +139,11 @@ impl CommandStrategy for SortedCmd {
                             let de = zset.dict.find(&member);
                             if let Some(de) = de {
                                 unsafe {
-                                    let score = *(*de.as_ptr()).value();
-                                    Ok(Frame::Simple(score.to_string()))
+                                    let score = de.as_ref().value();
+                                    match score {
+                                        Value::F(score) => Ok(Frame::Simple(score.to_string())),
+                                        _ => Ok(Frame::Error("type mismatch".to_string())),
+                                    }
                                 }
                             } else {
                                 Err(CommandError::NotExist(format!("{} not exist", member)).into())
@@ -157,7 +161,7 @@ impl CommandStrategy for SortedCmd {
 }
 
 impl SortedCmd {
-    pub fn zadd(o: &mut RedisObject<String>, arg: Option<String>, mut score: f64, ele: String) {
+    pub fn zadd(o: &mut RedisObject, arg: Option<String>, mut score: f64, ele: String) {
         if o.encoding == OBJ_ENCODING_SKIPLIST {
             let zs = match &mut o.ptr {
                 RedisValue::SortSet(zset) => zset,
@@ -169,28 +173,31 @@ impl SortedCmd {
             } else {
                 "".to_string()
             };
-            if let Some(de) = de {
+            if let Some(mut de) = de {
                 unsafe {
-                    let cur_score = (*de.as_ptr()).value();
+                    let cur_score = match (*de.as_ptr()).value() {
+                        Value::F(val) => val.clone(),
+                        _ => 0f64,
+                    };
                     if arg.eq("nx") {
                         return;
                     }
                     if arg.eq("incr") {
                         score += cur_score;
                     }
-                    if (arg.eq("lt") && score >= *cur_score) || (arg.eq("gt") && score <= *cur_score) {
+                    if (arg.eq("lt") && score >= cur_score) || (arg.eq("gt") && score <= cur_score) {
                         return;
                     }
-                    if score != *cur_score {
-                        let node = zs.zsl.update_score(*cur_score, &ele, score);
-                        (*de.as_ptr()).val = Some((*node.as_ptr()).get_score());
+                    if score != cur_score {
+                        let node = zs.zsl.update_score(cur_score, &ele, score);
+                        de.as_mut().val = Some(Value::F(node.as_ref().get_score()));
                     }
                 }
             } else {
                 unsafe {
                     let node = zs.zsl.insert(score, ele.clone());
                     let score = (*node.as_ptr()).get_score();
-                    if let Err(e) = zs.dict.add_raw(ele, score) {
+                    if let Err(e) = zs.dict.add_raw(ele, Value::F(score)) {
                         println!("zadd err: {e}");
                         return;
                     }

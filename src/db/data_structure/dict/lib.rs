@@ -2,6 +2,7 @@ use std::mem::size_of;
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
 use crate::db::data_structure::dict::lib::DictResizeFlag::DictResizeEnable;
 use rand::Rng;
+use crate::db::object::RedisObject;
 
 pub(crate) const DICT_HT_INITIAL_EXP: usize = 2;
 pub(crate) const DICT_HT_INITIAL_SIZE: usize = 1 << DICT_HT_INITIAL_EXP;
@@ -19,13 +20,13 @@ pub enum DictResizeFlag {
     DictResizeForbid,
 }
 
-pub type DictScanFunction<V> = fn(de: &mut DictEntry<V>);
+pub type DictScanFunction = fn(de: &mut DictEntry);
 
-pub struct DictType<V> {
+pub struct DictType {
     pub hash_function: Option<Box<dyn Fn(&String) -> u64>>,
-    pub rehashing_started: Option<Box<dyn Fn(&Dict<V>)>>,
-    pub rehashing_completed: Option<Box<dyn Fn(&Dict<V>)>>,
-    pub dict_meta_data_bytes: Option<Box<dyn Fn(&Dict<V>) -> usize>>,
+    pub rehashing_started: Option<Box<dyn Fn(&Dict)>>,
+    pub rehashing_completed: Option<Box<dyn Fn(&Dict)>>,
+    pub dict_meta_data_bytes: Option<Box<dyn Fn(&Dict) -> usize>>,
     //pub user_data: Option<KvStore<K, V>>,
 }
 
@@ -39,8 +40,8 @@ pub fn dict_size_mask(exp: i32) -> u64 {
     return if exp == -1 { 0 } else { dict_size(exp) - 1 };
 }
 
-pub fn entry_mem_usage<V>() -> usize {
-    size_of::<DictEntry<V>>()
+pub fn entry_mem_usage() -> usize {
+    size_of::<DictEntry>()
 }
 
 pub fn next_exp(size: usize) -> i32 {
