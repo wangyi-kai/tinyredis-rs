@@ -167,7 +167,7 @@ impl KvStore {
             } else {
                 let d = self.dicts[0];
                 if d.is_some() {
-                    (*d.unwrap().as_ptr()).dict_size() as u64
+                    d.unwrap().as_ref().dict_size() as u64
                 } else {
                     0
                 }
@@ -308,14 +308,14 @@ impl KvStore {
         true
     }
 
-    pub fn get_fair_random_dict_index(&self) -> usize {
-        let target = if self.kvstore_size() > 0 {
-            rand::rng().random::<u64>() % self.kvstore_size() + 1
-        } else {
-            0
-        };
-        self.find_dict_index_by_key_index(target)
-    }
+    // pub fn get_fair_random_dict_index(&self) -> usize {
+    //     let target = if self.kvstore_size() > 0 {
+    //         rand::rng().random::<u64>() % self.kvstore_size() + 1
+    //     } else {
+    //         0
+    //     };
+    //     self.find_dict_index_by_key_index(target)
+    // }
 
     pub fn get_next_non_empty_dict_index(&self, didx: usize) -> i32 {
         if self.num_dicts == 1 {
@@ -383,7 +383,7 @@ impl KvStore {
         if self.num_dicts == 1 || self.kvstore_size() == 0 {
             return 0;
         }
-        assert!(target < self.kvstore_size());
+        assert!(target <= self.kvstore_size());
 
         let mut result = 0;
         let bit_mask = 1 << self.num_dicts_bits;

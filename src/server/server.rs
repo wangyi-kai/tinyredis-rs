@@ -1,20 +1,19 @@
 use std::future::Future;
 use std::sync::{Arc};
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, Semaphore, broadcast, oneshot, Mutex, RwLock};
+use tokio::sync::{mpsc, Semaphore, broadcast, oneshot, Mutex};
 use tokio::time;
 use tracing::{error, info};
+
 use crate::config::ServerConfig;
-use crate::parser::cmd::command::{CommandStrategy, RedisCommand, parse_frame};
+use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::parser::cmd::conn::{*};
 use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
 use crate::persistence::rdb::Rdb;
-use crate::persistence::rdb_config::SaveParam;
-use crate::server::{REDIS_CONFIG, REDIS_SERVER};
+use crate::server::{REDIS_CONFIG};
 use crate::server::shutdown::Shutdown;
 
 const MAX_CONNECTIONS: usize = 250;
@@ -37,13 +36,21 @@ impl RedisServer {
         let db_sender = db_handler.db_sender.clone();
 
         let rdb = Arc::new(Mutex::new(Rdb::create(db_sender)));
+        let rdb_clone = rdb.clone();
+        tokio::spawn(async move { 
+            let mut rdb_guard = rdb_clone.lock().await;
+            let _ = rdb_guard.load().await;
+        });
+
         for save_params in REDIS_CONFIG.get().unwrap().get_param() {
             let interval = Duration::from_secs(save_params.seconds);
             let rdb = rdb.clone();
             tokio::spawn(async move {
-                let mut rdb_guard = rdb.lock().await;
-                tokio::time::sleep(interval).await;
-                let _ = rdb_guard.save(0).await;
+                loop {
+                    let mut rdb_guard = rdb.lock().await;
+                    tokio::time::sleep(interval).await;
+                    let _ = rdb_guard.save(0).await;
+                }
             });
         }
 

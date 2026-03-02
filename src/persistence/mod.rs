@@ -24,7 +24,7 @@ const RDB_TYPE_SET_LISTPACK: u8 = 20;
 const RDB_TYPE_STREAM_LISTPACKS_3: u8 = 21;
 
 /// DB number of the following keys.
-const RDB_OPCODE_SELECTDB: u8 = 253;
+const RDB_OPCODE_SELECTDB: u8 = 0;
 /// End of the RDB file.
 const RDB_OPCODE_EOF: u8 = 254;
 const RDB_6BITLEN: u8 = 0;

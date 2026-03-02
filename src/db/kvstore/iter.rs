@@ -1,10 +1,8 @@
 use crate::db::data_structure::dict::dict::{Dict, DictEntry};
-use crate::db::data_structure::dict::iter::{DictIter};
 use crate::db::data_structure::dict::iter_mut::DictIterMut;
 use crate::db::kvstore::kvstore::KvStore;
 
 use std::ptr::NonNull;
-use crate::db::object::RedisObject;
 
 pub struct KvStoreIterator {
     pub(crate) kvs: *mut KvStore,
@@ -53,14 +51,14 @@ impl Iterator for KvStoreIterator {
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             if let Some(entry) = self.di.next() {
-                return Some(entry)
+                Some(entry)
             } else {
                 if let Some(d) = self.next_dict() {
                     let iter = DictIterMut::new(&mut *d.as_ptr());
                     self.di = iter;
-                    return self.di.next()
+                    self.di.next()
                 } else {
-                    return None;
+                    None
                 }
             }
         }

@@ -75,9 +75,6 @@ impl RedisDb {
             select! {
                 Some((sender, redis_cmd)) = self.receiver.recv() => {
                     debug!("apply command {:?}", redis_cmd);
-                    // let db = unsafe {
-                    //     &mut *(self as *mut RedisDb<V> as *mut RedisDb<RedisObject<String>>)
-                    // };
                     let frame = redis_cmd.apply(self);
                     let _ = sender.send(frame);
                 }
@@ -85,7 +82,7 @@ impl RedisDb {
                     match db_cmd {
                         DbCommand::DbIter(sender) => {
                             let iter = self.db_iter();
-                            let _ = sender.send(iter);
+                            let _ = sender.send(iter).await;
                         }
                         DbCommand::RdbData { key, value } => {
                             self.add(key, value);

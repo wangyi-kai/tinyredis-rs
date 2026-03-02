@@ -49,11 +49,10 @@ impl Rdb {
                     }
                     self.buf.put_u8(RDB_OPCODE_EOF);
                 }
-                _ => {
-
-                }
+                _ => { }
             }
         }
+
         tmp_file.write_all(&self.buf).await?;
         let rdb_path = "./dump.rdb".to_string();
         tokio::fs::rename(&tmp_path, &rdb_path).await?;
@@ -90,7 +89,23 @@ impl Rdb {
                     let cmd = DbCommand::RdbData {key, value};
                     let _ = sender.send(cmd).await;
                 },
-                _ => {}
+                RDB_TYPE_HASH => {
+                    let s = self.load_string(&mut buf)?;
+                    let key = RedisObject::create_string_object(s);
+                    let value = self.rdb_load_object(RDB_TYPE_HASH, &mut buf)?;
+                    let cmd = DbCommand::RdbData {key, value};
+                    let _ = sender.send(cmd).await;
+                }
+                RDB_TYPE_ZSET_2 => {
+                    let s = self.load_string(&mut buf)?;
+                    let key = RedisObject::create_string_object(s);
+                    let value = self.rdb_load_object(RDB_TYPE_ZSET_2, &mut buf)?;
+                    let cmd = DbCommand::RdbData {key, value};
+                    let _ = sender.send(cmd).await;
+                }
+                _ => {
+                    return Err(PersistError::DecodeErr("invalid rdb load byte".to_string()).into());
+                }
             }
         }
         Ok(())
@@ -162,6 +177,7 @@ impl Rdb {
     fn rdb_save_key_value_pair(&mut self, key: &str, value: &RedisObject) -> Result<()> {
         self.rdb_save_object_type(value)?;
         self.rdb_save_string(key)?;
+        println!("save key: {}", key);
         self.rdb_save_object(value)?;
         Ok(())
     }
@@ -189,10 +205,14 @@ impl Rdb {
                         unsafe {
                             for entry in ht_iter {
                                 let field = (*entry).get_key();
+                                println!("save field: {}", field);
                                 nwritten += self.rdb_save_string(field)?;
                                 let value = (*entry).value();
                                 match value {
-                                    Value::Sds(s) => nwritten += self.rdb_save_string(s)?,
+                                    Value::Sds(s) => {
+                                        println!("save value: {}", s);
+                                        nwritten += self.rdb_save_string(s)?
+                                    },
                                     _ => {}
                                 }
                             }
@@ -210,9 +230,9 @@ impl Rdb {
                         let mut zn = zsl.tail;
                         unsafe {
                             while let Some(node) = zn {
-                                nwritten += self.rdb_save_string(&(*node.as_ptr()).get_elem())?;
+                                nwritten += self.rdb_save_string(&node.as_ref().get_elem())?;
                                 self.buf.put_f64(node.as_ref().get_score());
-                                zn = (*node.as_ptr()).back_ward();
+                                zn = node.as_ref().back_ward();
                             }
                         }
                     }

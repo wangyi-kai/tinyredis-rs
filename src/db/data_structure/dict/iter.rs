@@ -51,7 +51,7 @@ impl DictIter {
         loop {
             if let Some(entry) = self.entry {
                 unsafe {
-                    if let Some(next_entry) = (*entry.as_ptr()).next {
+                    if let Some(next_entry) = entry.as_ref().next {
                         self.entry = Some(next_entry);
                         return
                     }
@@ -91,14 +91,14 @@ impl Iterator for DictIter {
         }
         if let Some(entry) = self.entry {
             unsafe {
-                if let Some(next_entry) = (*entry.as_ptr()).next {
+                if let Some(next_entry) = entry.as_ref().next {
                     self.entry = Some(next_entry);
                 } else {
                     self.entry = None;
                     self.advance_next_entry();
                 }
                 self.remaining -= 1;
-                return Some(&*entry.as_ptr())
+                return Some(entry.as_ref())
             }
         }
         None
