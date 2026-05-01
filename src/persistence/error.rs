@@ -15,4 +15,6 @@ pub enum PersistError {
     TypeErr(String),
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
+    #[error("[RDB] {0}")]
+    RdbErr(String),
 }

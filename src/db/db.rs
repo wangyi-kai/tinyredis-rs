@@ -2,15 +2,13 @@ use crate::db::data_structure::dict::dict::{Dict, DictEntry, Value};
 use crate::db::kvstore::kvstore::KvStore;
 use crate::db::object::{RedisObject, RedisValue};
 
-use std::marker::PhantomData;
 use std::ptr::NonNull;
 use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::mpsc;
-use tracing::{debug, info};
-use crate::db::db_engine::DbCommand;
+use tracing::{debug};
+use crate::db::db_engine::{RDbCommand};
 use crate::db::kvstore::iter::KvStoreIterator;
-use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
+use crate::parser::cmd::command::{CommandStrategy};
 
 pub enum KeyStatus {
     KeyValid = 0,
@@ -29,30 +27,30 @@ pub struct RedisDb {
     /// Timeout of keys with a timeout set
     pub expires: KvStore,
     /// Keys with clients waiting for data (BLPOP)
-    blocking_keys: Dict,
+    pub blocking_keys: Dict,
     /// Keys with clients waiting for data,
     /// and should be unblocked if key is deleted (XREADEDGROUP)
-    blocking_keys_unblock_on_nokey: Dict,
+    pub blocking_keys_unblock_on_nokey: Dict,
     /// Blocked keys that received a PUSH
-    read_keys: Dict,
+    pub read_keys: Dict,
     /// WATCHED keys for MULTI/EXEC CAS
-    watched_keys: Dict,
+    pub watched_keys: Dict,
     /// Database ID
-    id: i32,
+    pub id: i32,
     /// Average TTL, just for stats
-    avg_ttl: i64,
+    pub avg_ttl: i64,
     /// Cursor of the active expire cycle
-    expires_cursor: u64,
-    pub(crate) sender: crate::MpscSender,
-    receiver: crate::MpscReceiver,
-    db_rx: Receiver<DbCommand>,
-    pub db_tx: Sender<DbCommand>,
+    pub expires_cursor: u64,
+    pub sender: crate::MpscSender,
+    pub receiver: crate::MpscReceiver,
+    pub db_rx: Receiver<RDbCommand>,
+    pub db_tx: Sender<RDbCommand>,
 }
 
 impl RedisDb {
     pub fn create(slot_count_bits: u64, flag: i32, id: i32) -> Self {
-        let (sender, receiver) = mpsc::channel(1024);
-        let (tx, rx) = mpsc::channel(10);
+        let (sender, receiver) = tokio::sync::mpsc::channel(1024);
+        let (tx, rx) = tokio::sync::mpsc::channel(10);
         Self {
             kvs: KvStore::create(slot_count_bits, flag),
             expires: KvStore::create(slot_count_bits, flag),
@@ -80,12 +78,12 @@ impl RedisDb {
                 }
                 Some(db_cmd) = self.db_rx.recv() => {
                     match db_cmd {
-                        DbCommand::DbIter(sender) => {
+                        RDbCommand::DbIter(sender) => {
                             let iter = self.db_iter();
-                            let _ = sender.send(iter).await;
+                            let _ = sender.send(iter);
                         }
-                        DbCommand::RdbData { key, value } => {
-                            self.add(key, value);
+                        RDbCommand::RdbData { key, value } => {
+                             let _ = self.add(key, value);
                         }
                     }
                 }

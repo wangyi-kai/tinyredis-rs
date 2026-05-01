@@ -1,25 +1,20 @@
-use std::sync::{Arc};
-use std::time::Duration;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::Mutex;
-use crate::db::data_structure::dict::dict::Value;
+
 use crate::db::db::RedisDb;
 use crate::db::kvstore::iter::KvStoreIterator;
 use crate::db::kvstore::KVSTORE_ALLOCATE_DICTS_ON_DEMAND;
 use crate::db::object::RedisObject;
 use crate::MpscSender;
-use crate::persistence::rdb::Rdb;
-use crate::server::REDIS_CONFIG;
 
-pub enum DbCommand {
-    DbIter(Sender<KvStoreIterator>),
+pub enum RDbCommand {
+    DbIter(std::sync::mpsc::Sender<KvStoreIterator>),
     RdbData { key: RedisObject, value: RedisObject },
 }
 
 #[derive(Debug)]
 pub struct DbHandler {
     sender: Vec<MpscSender>,
-    pub db_sender: Vec<Sender<DbCommand>>,
+    pub db_sender: Vec<Sender<RDbCommand>>,
 }
 
 impl DbHandler {

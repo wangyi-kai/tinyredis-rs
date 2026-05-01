@@ -1,5 +1,5 @@
 pub mod rdb;
-mod error;
+pub mod error;
 pub mod rdb_config;
 
 const RDB_TYPE_STRING: u8 = 0;
