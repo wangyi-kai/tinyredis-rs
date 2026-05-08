@@ -5,6 +5,7 @@ use crate::db::object::{OBJ_ENCODING_SKIPLIST, RedisObject, RedisValue};
 use crate::parser::cmd::command::{CommandStrategy, RedisCommand};
 use crate::parser::cmd::error::CommandError;
 use crate::parser::frame::Frame;
+use crate::server::REDIS_SERVER;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -204,5 +205,6 @@ impl SortedCmd {
                 }
             }
         }
+        unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty();}
     }
 }

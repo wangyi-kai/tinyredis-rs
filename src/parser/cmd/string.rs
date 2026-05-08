@@ -7,6 +7,7 @@ use crate::parser::cmd::error::CommandError;
 use crate::parser::cmd::error::CommandError::ObjectTypeError;
 use crate::parser::cmd::string::StringCmd::Strlen;
 use crate::parser::frame::Frame;
+use crate::server::REDIS_SERVER;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -128,11 +129,12 @@ impl CommandStrategy for StringCmd {
         match self {
             StringCmd::Append { key, field } => {
                 let key = RedisObject::create_string_object(key);
-                let mut o = db.find(&key);
+                let o = db.find(&key);
                 if let Some(o) = o {
                     match &mut o.ptr {
                         RedisValue::String(s) => {
                             s.push_str(&field);
+                            unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty();}
                             Ok(Frame::Simple("OK".to_string()))
                         }
                         _ => {
@@ -142,6 +144,7 @@ impl CommandStrategy for StringCmd {
                 } else {
                     let value = RedisObject::create_string_object(field);
                     db.add(key, value);
+                    unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty();}
                     Ok(Frame::Simple("OK".to_string()))
                 }
             },
@@ -166,6 +169,7 @@ impl CommandStrategy for StringCmd {
                     match &mut o.ptr {
                         RedisValue::String(s) => {
                             *s = value;
+                            unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty();}
                             Ok(Frame::Simple("OK".to_string()))
                         }
                         _ => Err(ObjectTypeError(-4).into())
@@ -173,6 +177,7 @@ impl CommandStrategy for StringCmd {
                 } else {
                     let v = RedisObject::create_string_object(value);
                     db.add(key, v);
+                    unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty();}
                     Ok(Frame::Simple("OK".to_string()))
                 }
             }
@@ -184,6 +189,7 @@ impl CommandStrategy for StringCmd {
                 } else {
                     let value = RedisObject::create_string_object(value);
                     db.add(key, value);
+                    unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty();}
                     Ok(Frame::Simple("OK".to_string()))
                 }
             }
@@ -193,6 +199,7 @@ impl CommandStrategy for StringCmd {
                 if let Some(_o) = o {
                     let value = RedisObject::create_string_object(value);
                     db.set_val(&key, value);
+                    unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty();}
                     Ok(Frame::Simple("OK".to_string()))
                 } else {
                     Ok(Frame::Simple("key not exists".to_string()))

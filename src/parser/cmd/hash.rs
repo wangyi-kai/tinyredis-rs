@@ -153,6 +153,7 @@ impl HashCmd {
                 hash_type_convert(o);
             }
         }
+        unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty(); }
     }
 
     fn hash_get(o: &mut RedisObject, field: &String) -> Option<String> {
@@ -201,11 +202,12 @@ impl HashCmd {
     }
 
     fn hash_delete(o: &mut RedisObject, field: &str) -> bool {
-        let mut deleted = false;
+        let deleted = false;
         if o.encoding == OBJ_ENCODING_HT {
             match &mut o.ptr {
                 RedisValue::Hash(ht) => {
                     ht.generic_delete(field).ok();
+                    unsafe { REDIS_SERVER.get_mut().unwrap().incr_dirty(); }
                     true
                 }
                 _ => deleted,

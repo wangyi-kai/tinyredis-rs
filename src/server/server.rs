@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::sync::{Arc};
+use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Semaphore, broadcast, oneshot};
@@ -13,7 +14,7 @@ use crate::server::connection::Connection;
 use crate::db::db_engine::DbHandler;
 use crate::parser::frame::Frame;
 use crate::persistence::rdb::RdbHandler;
-use crate::server::{REDIS_CONFIG};
+use crate::server::{REDIS_CONFIG, REDIS_SERVER};
 use crate::server::shutdown::Shutdown;
 
 const MAX_CONNECTIONS: usize = 250;
@@ -26,6 +27,7 @@ pub struct RedisServer {
     db_handler: Arc<DbHandler>,
     shutdown_complete_tx: mpsc::Sender<()>,
     shutdown_complete_rx: mpsc::Receiver<()>,
+    pub(crate) dirty: AtomicU64,
 }
 
 impl RedisServer {
@@ -39,6 +41,15 @@ impl RedisServer {
             Ok(_) => info!("load rdb file success"),
             Err(err) => error!(cause = %err, "load rdb file failed")
         }
+        let save_params = REDIS_CONFIG.get().unwrap().get_param();
+        if !save_params.is_empty()  {
+            for param in save_params {
+                let handler = rdb_handler.clone();
+                tokio::spawn(async move {
+                    Self::run_rdb_check(handler, param.seconds, param.changes as u64).await;
+                });
+            }
+        }
 
         Self {
             listener,
@@ -47,6 +58,7 @@ impl RedisServer {
             db_handler,
             shutdown_complete_tx,
             shutdown_complete_rx,
+            dirty: AtomicU64::new(0),
         }
     }
 
@@ -85,6 +97,29 @@ impl RedisServer {
             }
             time::sleep(Duration::from_secs(backoff)).await;
             backoff *= 2;
+        }
+    }
+
+    pub fn incr_dirty(&mut self) {
+        self.dirty.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    async fn run_rdb_check(rdb_handler: RdbHandler, seconds: u64, change: u64) {
+        let mut interval = time::interval(Duration::from_secs(seconds));
+        unsafe {
+            loop {
+                interval.tick().await;
+                let current_dirty = REDIS_SERVER.get().unwrap().dirty.load(std::sync::atomic::Ordering::Relaxed);
+                if current_dirty >= change {
+                    let db_num = REDIS_CONFIG.get().unwrap().db_num;
+                    for db_id in 0..db_num {
+                        if let Err(e) = rdb_handler.save(db_id) {
+                            error!("Failed to save RDB for database {}: {}", db_id, e);
+                        }
+                    }
+                    REDIS_SERVER.get().unwrap().dirty.store(0, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
         }
     }
 }
@@ -154,10 +189,11 @@ impl Drop for Handler {
 pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
     let mut server_config = ServerConfig::default();
     server_config.set_rdb_save_param(1, 10);
-    REDIS_CONFIG.set(server_config).unwrap();
-    let mut server = RedisServer::new(listener);
+    REDIS_CONFIG.set(server_config).expect("set redis config failed");
+    let server = RedisServer::new(listener);
+    REDIS_SERVER.set(server).expect("set redis server failed");
     tokio::select! {
-        res = server.run() => {
+        res = REDIS_SERVER.get_mut().unwrap().run() => {
             if let Err(err) = res {
                  error!(cause = %err, "failed to accept");
             }
@@ -166,14 +202,17 @@ pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_
              info!("server shutting down");
        }
     }
-    let RedisServer {
-        mut shutdown_complete_rx,
-        shutdown_complete_tx,
-        notify_shutdown,
-        ..
-    } = server;
-    drop(notify_shutdown);
-    drop(shutdown_complete_tx);
-    let _ = shutdown_complete_rx.recv().await;
+
+    if let Some(server) = REDIS_SERVER.take() {
+        let RedisServer {
+            mut shutdown_complete_rx,
+            shutdown_complete_tx,
+            notify_shutdown,
+            ..
+        } = server;
+        drop(notify_shutdown);
+        drop(shutdown_complete_tx);
+        let _ = shutdown_complete_rx.recv().await;
+    }
 }
 
