@@ -136,6 +136,7 @@ impl Rdb {
             return Err(PersistError::DecodeErr("db_id_flag error".to_string()).into());
         }
         let db_id = Self::rdb_load_len(&mut buf)?;
+        println!("db_id: {}", db_id);
         let sender = self.db_sender[db_id as usize].clone();
         
         // 解析数据并在当前异步上下文中发送命令
@@ -212,6 +213,7 @@ impl Rdb {
             OBJ_HASH => {
                 match object.encoding {
                     OBJ_ENCODING_HT => buf.put_u8(RDB_TYPE_HASH),
+                    OBJ_ENCODING_ZIPLIST => buf.put_u8(RDB_TYPE_HASH_ZIPLIST),
                     _ => return Err(PersistError::EncodeErr("Unknown hash encoding".to_string()).into())
                 }
             }
@@ -234,18 +236,18 @@ impl Rdb {
     fn rdb_save_len(buf: &mut BytesMut, len: u64) -> Result<usize> {
         let mut nwritten = 0;
         if len < 1 << 6 {
-            buf.put_u8(len as u8);
+            buf.put_u8(len as u8 | RDB_6BITLEN << 6);
             nwritten = 1;
         } else if len < 1 << 14 {
-            buf.put_u8(((len >> 8) as u8) | (RDB_14BITLEN << 6));
-            buf.put_u8(len as u8);
+            buf.put_u8(((len >> 8) as u8) & 0xFF | (RDB_14BITLEN << 6));
+            buf.put_u8((len & 0xFF) as u8);
             nwritten = 2;
         } else if len <= u32::MAX as u64 {
             buf.put_u8(RDB_32BITLEN);
             buf.put_u32(len as u32);
             nwritten = 1 + 4;
         } else {
-            buf.put_u8(RDB_6BITLEN);
+            buf.put_u8(RDB_64BITLEN);
             buf.put_u64(len);
             nwritten = 1 + 8;
         }
@@ -253,9 +255,9 @@ impl Rdb {
     }
 
     fn rdb_save_key_value_pair(buf: &mut BytesMut, key: &str, value: &RedisObject) -> Result<()> {
+        println!("key: {}, encoding: {}", key, value.encoding);
         Self::rdb_save_object_type(buf, value)?;
         Self::rdb_save_string(buf, key)?;
-        println!("save key: {}", key);
         Self::rdb_save_object(buf, value)?;
         Ok(())
     }
@@ -360,12 +362,9 @@ impl Rdb {
     #[inline(always)]
     fn rdb_load_len(buf: &mut BytesMut) -> Result<u64> {
         let len_type = buf.get_u8();
-        let len = match len_type {
-            RDB_ENCVAL => {
-                (buf[0] & 0x3F) as u64
-            }
-            RDB_6BITLEN => {
-                buf.get_u8() as u64
+        let len = match (len_type & 0xC0) >> 6 {
+            RDB_ENCVAL | RDB_6BITLEN => {
+                (len_type & 0x3F) as u64
             }
             RDB_14BITLEN => {
                 let mut res = ((len_type & 0x3F) as u64) << 8;

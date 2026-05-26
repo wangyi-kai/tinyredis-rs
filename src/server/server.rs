@@ -188,7 +188,7 @@ impl Drop for Handler {
 
 pub async unsafe fn run_server(listener: TcpListener, shutdown: impl Future, db_num: u32) {
     let mut server_config = ServerConfig::default();
-    server_config.set_rdb_save_param(1, 10);
+    server_config.set_rdb_save_param(1, 1);
     REDIS_CONFIG.set(server_config).expect("set redis config failed");
     let server = RedisServer::new(listener);
     REDIS_SERVER.set(server).expect("set redis server failed");
